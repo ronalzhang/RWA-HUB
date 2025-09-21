@@ -1,820 +1,364 @@
 """
-自动佣金服务
-实现固定比例佣金分配算法和平台可持续性监控
+自动化佣金处理服务
+包含佣金自动计算、取现自动处理等功能
+实现完全无人参与的分销系统
 """
 
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional, Tuple
-from sqlalchemy import func, and_, or_
-from sqlalchemy.exc import IntegrityError
-
+from flask import current_app
 from app.extensions import db
-from app.models.referral import UserReferral, CommissionRecord
+from app.models.commission_withdrawal import CommissionWithdrawal
 from app.models.commission_config import UserCommissionBalance, CommissionConfig
+from app.models.user import User
 from app.models.trade import Trade
-from app.models.asset import Asset
-from app.services.unlimited_referral_system import UnlimitedReferralSystem
+from app.blockchain.asset_service import AssetService
 
 logger = logging.getLogger(__name__)
 
 
 class AutoCommissionService:
-    """自动佣金服务"""
+    """自动化佣金处理服务"""
     
-    def __init__(self):
-        self.referral_system = UnlimitedReferralSystem()
-        # 不在构造函数中缓存配置值，而是每次实时获取
-        self.platform_sustainability_threshold = Decimal('0.15')  # 平台可持续性阈值15%
-        
-    def process_batch_commission_records(self, trade_ids: List[int]) -> Dict:
+    @staticmethod
+    def process_pending_withdrawals():
         """
-        批量处理佣金记录创建
-        
-        Args:
-            trade_ids: 交易ID列表
-            
-        Returns:
-            Dict: 批量处理结果
+        自动处理到期的取现申请
+        返回处理结果统计
         """
-        results = {
-            'success_count': 0,
-            'failed_count': 0,
-            'total_commission_amount': Decimal('0'),
-            'platform_earnings': Decimal('0'),
-            'failed_trades': [],
-            'commission_records': []
-        }
-        
         try:
-            for trade_id in trade_ids:
+            # 获取所有可处理的取现申请
+            ready_withdrawals = CommissionWithdrawal.get_ready_to_process()
+            
+            processed_count = 0
+            failed_count = 0
+            total_amount = 0.0
+            results = []
+            
+            for withdrawal in ready_withdrawals:
                 try:
-                    result = self._process_single_trade_commission(trade_id)
-                    if result['success']:
-                        results['success_count'] += 1
-                        results['total_commission_amount'] += result['total_commission']
-                        results['platform_earnings'] += result['platform_fee']
-                        results['commission_records'].extend(result['commission_records'])
+                    # 验证用户余额是否足够
+                    user_balance = UserCommissionBalance.query.filter_by(
+                        user_address=withdrawal.user_address
+                    ).first()
+                    
+                    if not user_balance or user_balance.available_balance < withdrawal.amount:
+                        withdrawal.mark_failed("余额不足")
+                        failed_count += 1
+                        continue
+                    
+                    # 处理提现
+                    success = AutoCommissionService._process_single_withdrawal(withdrawal)
+                    
+                    if success:
+                        processed_count += 1
+                        total_amount += float(withdrawal.amount)
+                        results.append({
+                            'withdrawal_id': withdrawal.id,
+                            'user_address': withdrawal.user_address,
+                            'amount': float(withdrawal.amount),
+                            'status': 'success'
+                        })
                     else:
-                        results['failed_count'] += 1
-                        results['failed_trades'].append({
-                            'trade_id': trade_id,
-                            'error': result['error']
+                        failed_count += 1
+                        results.append({
+                            'withdrawal_id': withdrawal.id,
+                            'user_address': withdrawal.user_address,
+                            'amount': float(withdrawal.amount),
+                            'status': 'failed'
                         })
                         
                 except Exception as e:
-                    results['failed_count'] += 1
-                    results['failed_trades'].append({
-                        'trade_id': trade_id,
-                        'error': str(e)
-                    })
-                    logger.error(f"处理交易 {trade_id} 佣金失败: {e}")
+                    logger.error(f"处理取现 {withdrawal.id} 失败: {str(e)}")
+                    withdrawal.mark_failed(f"处理异常: {str(e)}")
+                    failed_count += 1
             
-            # 批量提交数据库更改
-            db.session.commit()
-            
-            logger.info(f"批量佣金处理完成: 成功 {results['success_count']}, 失败 {results['failed_count']}")
-            return results
-            
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"批量佣金处理失败: {e}")
-            raise
-    
-    def _process_single_trade_commission(self, trade_id: int) -> Dict:
-        """
-        处理单个交易的佣金分配
-        
-        Args:
-            trade_id: 交易ID
-            
-        Returns:
-            Dict: 处理结果
-        """
-        try:
-            # 1. 获取交易信息
-            trade = Trade.query.get(trade_id)
-            if not trade:
-                return {'success': False, 'error': f'交易 {trade_id} 不存在'}
-            
-            # 2. 检查是否已处理过佣金
-            existing_commission = CommissionRecord.query.filter_by(transaction_id=trade_id).first()
-            if existing_commission:
-                return {'success': False, 'error': f'交易 {trade_id} 已处理过佣金'}
-            
-            # 3. 计算佣金分配
-            distribution = self.referral_system.calculate_commission_distribution(
-                Decimal(str(trade.total)),
-                trade.trader_address
-            )
-            
-            # 4. 创建佣金记录
-            commission_records = []
-            
-            # 创建推荐佣金记录
-            for referral_info in distribution['referral_commissions']:
-                commission = CommissionRecord(
-                    transaction_id=trade_id,
-                    asset_id=trade.asset_id,
-                    recipient_address=referral_info['referrer_address'],
-                    amount=float(referral_info['commission_amount']),
-                    currency='USDC',
-                    commission_type=f'referral_level_{referral_info["level"]}',
-                    status='pending',
-                    created_at=datetime.utcnow()
-                )
-                commission_records.append(commission)
-            
-            # 创建平台佣金记录
-            if distribution['platform_fee'] > 0:
-                platform_commission = CommissionRecord(
-                    transaction_id=trade_id,
-                    asset_id=trade.asset_id,
-                    recipient_address='platform',  # 平台地址标识
-                    amount=float(distribution['platform_fee']),
-                    currency='USDC',
-                    commission_type='platform_fee',
-                    status='pending',
-                    created_at=datetime.utcnow()
-                )
-                commission_records.append(platform_commission)
-            
-            # 5. 批量保存佣金记录
-            if commission_records:
-                db.session.bulk_save_objects(commission_records)
-            
-            # 6. 更新用户佣金余额
-            for referral_info in distribution['referral_commissions']:
-                self._update_user_commission_balance_optimized(
-                    referral_info['referrer_address'],
-                    referral_info['commission_amount']
-                )
+            logger.info(f"取现自动处理完成: 成功 {processed_count} 笔，失败 {failed_count} 笔，总金额 {total_amount}")
             
             return {
-                'success': True,
-                'total_commission': distribution['total_referral_amount'],
-                'platform_fee': distribution['platform_fee'],
-                'commission_records': [c.to_dict() if hasattr(c, 'to_dict') else str(c) for c in commission_records],
-                'referral_levels': len(distribution['referral_commissions'])
+                'processed_count': processed_count,
+                'failed_count': failed_count,
+                'total_amount': total_amount,
+                'results': results
             }
             
         except Exception as e:
-            logger.error(f"处理交易 {trade_id} 佣金失败: {e}")
-            return {'success': False, 'error': str(e)}
+            logger.error(f"自动处理取现失败: {str(e)}", exc_info=True)
+            return {
+                'processed_count': 0,
+                'failed_count': 0,
+                'total_amount': 0.0,
+                'error': str(e)
+            }
     
-    def _update_user_commission_balance_optimized(self, user_address: str, amount: Decimal):
-        """
-        优化的用户佣金余额更新
-        
-        Args:
-            user_address: 用户地址
-            amount: 佣金金额
-        """
-        # 使用 ON CONFLICT 或 INSERT ... ON DUPLICATE KEY UPDATE 的思路
-        # 先尝试更新，如果不存在则创建
-        balance = UserCommissionBalance.query.filter_by(user_address=user_address).first()
-        
-        if balance:
-            # 更新现有记录
-            balance.total_earned += amount
-            balance.available_balance += amount
-            balance.last_updated = datetime.utcnow()
-        else:
-            # 创建新记录
-            balance = UserCommissionBalance(
-                user_address=user_address,
-                total_earned=amount,
-                available_balance=amount,
-                withdrawn_amount=Decimal('0'),
-                frozen_amount=Decimal('0'),
-                currency='USDC',
-                last_updated=datetime.utcnow(),
-                created_at=datetime.utcnow()
-            )
-            db.session.add(balance)
-
     @staticmethod
-    def run_automation_cycle() -> Dict:
+    def _process_single_withdrawal(withdrawal):
         """
-        运行完整的自动化周期：处理佣金计算和提现申请
-
-        Returns:
-            Dict: 自动化处理结果
+        处理单个取现申请
+        包含区块链转账逻辑（当前为模拟实现）
         """
         try:
-            results = {
-                'success': True,
-                'commission_update': {'updated_count': 0},
-                'withdrawal_process': {'processed_count': 0, 'total_amount': 0.0}
-            }
-
-            # 1. 处理待处理的提现申请
-            from app.models.commission_withdrawal import CommissionWithdrawal
-            ready_withdrawals = CommissionWithdrawal.get_ready_to_process()
-
-            processed_count = 0
-            total_amount = Decimal('0')
-
-            for withdrawal in ready_withdrawals:
-                success = AutoCommissionService._process_single_withdrawal(withdrawal)
-                if success:
-                    processed_count += 1
-                    total_amount += withdrawal.amount
-
-            results['withdrawal_process'] = {
-                'processed_count': processed_count,
-                'total_amount': float(total_amount)
-            }
-
-            logger.info(f"自动化周期完成: 处理提现 {processed_count} 笔，总金额 {total_amount}")
-            return results
-
-        except Exception as e:
-            logger.error(f"自动化周期执行失败: {e}")
-            return {'success': False, 'error': str(e)}
-
-    @staticmethod
-    def _process_single_withdrawal(withdrawal) -> bool:
-        """
-        处理单个提现申请
-
-        Args:
-            withdrawal: CommissionWithdrawal对象
-
-        Returns:
-            bool: 是否处理成功
-        """
-        try:
-            from app.models.commission_config import UserCommissionBalance
-
-            # 检查是否到了处理时间
-            if not withdrawal.is_ready_to_process:
-                return False
-
             # 标记为处理中
             withdrawal.mark_processing()
-
-            # 执行区块链转账
-            success = AutoCommissionService._execute_blockchain_transfer(withdrawal)
-
-            if success:
-                withdrawal.mark_completed(
-                    success.get('tx_hash', 'auto_processed'),
-                    success.get('actual_amount', withdrawal.amount)
-                )
-                logger.info(f"提现处理成功: {withdrawal.id}, 金额: {withdrawal.amount}")
+            
+            # 冻结用户余额
+            user_balance = UserCommissionBalance.query.filter_by(
+                user_address=withdrawal.user_address
+            ).first()
+            
+            if user_balance:
+                # 从可用余额转移到冻结余额
+                user_balance.available_balance -= withdrawal.amount
+                user_balance.frozen_balance += withdrawal.amount
+                db.session.commit()
+            
+            # TODO: 实际的区块链转账逻辑
+            # 这里应该调用相应的区块链转账函数
+            # 例如：USDC转账到指定地址
+            
+            # 模拟转账处理
+            import uuid
+            import time
+            
+            # 模拟网络延迟
+            time.sleep(1)
+            
+            # 生成模拟交易哈希
+            tx_hash = f"0x{uuid.uuid4().hex}"
+            
+            # 计算手续费（模拟）
+            gas_fee = Decimal('0.01')  # 0.01 USDC手续费
+            actual_amount = withdrawal.amount - gas_fee
+            
+            # 模拟转账成功
+            success_rate = 0.95  # 95%成功率
+            import random
+            if random.random() < success_rate:
+                # 转账成功
+                withdrawal.mark_completed(tx_hash, actual_amount, gas_fee)
+                
+                # 更新用户余额：解冻金额并记录提现
+                if user_balance:
+                    user_balance.frozen_balance -= withdrawal.amount
+                    user_balance.withdrawn_amount += withdrawal.amount
+                    db.session.commit()
+                
+                logger.info(f"取现 {withdrawal.id} 处理成功: {tx_hash}")
                 return True
             else:
+                # 转账失败
                 withdrawal.mark_failed("区块链转账失败")
+                
+                # 退还用户余额
+                if user_balance:
+                    user_balance.available_balance += withdrawal.amount
+                    user_balance.frozen_balance -= withdrawal.amount
+                    db.session.commit()
+                
+                logger.warning(f"取现 {withdrawal.id} 转账失败")
                 return False
-
+                
         except Exception as e:
-            logger.error(f"处理提现 {withdrawal.id} 失败: {e}")
-            withdrawal.mark_failed(str(e))
+            logger.error(f"处理取现 {withdrawal.id} 异常: {str(e)}", exc_info=True)
+            
+            # 回滚操作，退还用户余额
+            try:
+                if user_balance:
+                    user_balance.available_balance += withdrawal.amount
+                    user_balance.frozen_balance -= withdrawal.amount
+                    db.session.commit()
+            except:
+                pass
+            
+            withdrawal.mark_failed(f"处理异常: {str(e)}")
             return False
-
+    
     @staticmethod
-    def _execute_blockchain_transfer(withdrawal) -> Optional[Dict]:
+    def auto_update_all_commission_balances():
         """
-        执行区块链转账（简化版本，暂时模拟成功）
-
-        Args:
-            withdrawal: CommissionWithdrawal对象
-
-        Returns:
-            Optional[Dict]: 转账结果
+        自动更新所有用户的佣金余额
+        适合定时任务执行
         """
         try:
-            # TODO: 实现真实的区块链转账逻辑
-            # 这里应该调用TradeServiceV3的转账功能
-            # 从平台钱包转账到用户指定地址
-
-            # 暂时模拟成功（实际实现时需要集成真实的USDC转账）
-            logger.info(f"模拟区块链转账: 从平台钱包转账 {withdrawal.amount} USDC 到 {withdrawal.to_address}")
-
+            # 获取所有有推荐关系的用户
+            users_with_referrals = User.query.filter(
+                User.referrer_address.isnot(None)
+            ).all()
+            
+            # 获取所有推荐过别人的用户
+            referrers = db.session.query(User.referrer_address).distinct().all()
+            referrer_addresses = {r[0] for r in referrers if r[0]}
+            
+            # 合并所有需要更新佣金的用户
+            all_addresses = set()
+            for user in users_with_referrals:
+                all_addresses.add(user.eth_address)
+            all_addresses.update(referrer_addresses)
+            
+            updated_count = 0
+            total_commission = 0.0
+            
+            for address in all_addresses:
+                if address:
+                    try:
+                        # 更新佣金余额
+                        balance = AssetService.update_commission_balance(address)
+                        if balance:
+                            updated_count += 1
+                            total_commission += float(balance.total_earned)
+                    except Exception as e:
+                        logger.error(f"更新用户 {address} 佣金失败: {str(e)}")
+            
+            logger.info(f"佣金自动更新完成: 更新 {updated_count} 个用户，总佣金 {total_commission}")
+            
             return {
-                'tx_hash': f'sim_{int(datetime.utcnow().timestamp())}_{withdrawal.id}',
-                'actual_amount': withdrawal.amount,
-                'gas_fee': Decimal('0.01')  # 模拟手续费
+                'updated_count': updated_count,
+                'total_commission': total_commission,
+                'addresses_processed': len(all_addresses)
             }
-
+            
         except Exception as e:
-            logger.error(f"区块链转账失败: {e}")
-            return None
-
+            logger.error(f"自动更新佣金余额失败: {str(e)}", exc_info=True)
+            return {
+                'updated_count': 0,
+                'total_commission': 0.0,
+                'error': str(e)
+            }
+    
     @staticmethod
-    def create_auto_withdrawal(user_address: str, to_address: str, amount: float, currency: str = 'USDC') -> Dict:
+    def create_auto_withdrawal(user_address, to_address, amount, currency='USDC'):
         """
-        创建自动提现申请
-
-        Args:
-            user_address: 用户地址
-            to_address: 提现到的地址
-            amount: 提现金额
-            currency: 币种
-
-        Returns:
-            Dict: 创建结果
+        创建自动取现申请
+        包含余额验证和延迟设置
         """
         try:
-            from app.models.commission_withdrawal import CommissionWithdrawal
-            from app.models.commission_config import UserCommissionBalance, CommissionConfig
-
-            # 检查用户余额
-            balance = UserCommissionBalance.get_balance(user_address)
-            amount_decimal = Decimal(str(amount))
-
-            if balance.available_balance < amount_decimal:
-                return {'success': False, 'error': '余额不足'}
-
-            # 检查最低提现金额
+            # 验证用户余额
+            user_balance = UserCommissionBalance.query.filter_by(
+                user_address=user_address
+            ).first()
+            
+            if not user_balance:
+                return {'success': False, 'error': '用户佣金余额不存在'}
+            
+            if user_balance.available_balance < amount:
+                return {
+                    'success': False, 
+                    'error': f'余额不足，可用余额: {user_balance.available_balance}'
+                }
+            
+            # 获取最低提现金额配置
             min_withdraw = CommissionConfig.get_config('min_withdraw_amount', 10.0)
             if amount < min_withdraw:
-                return {'success': False, 'error': f'最低提现金额为 {min_withdraw} {currency}'}
-
-            # 获取延迟设置
+                return {
+                    'success': False,
+                    'error': f'提现金额不能少于 {min_withdraw} {currency}'
+                }
+            
+            # 获取延迟时间配置（分钟）
             delay_minutes = CommissionConfig.get_config('withdrawal_delay_minutes', 1)
-
-            # 冻结余额
-            UserCommissionBalance.update_balance(user_address, amount, 'freeze')
-
-            # 创建提现记录
+            
+            # 创建提现申请
             withdrawal = CommissionWithdrawal(
                 user_address=user_address,
                 to_address=to_address,
-                amount=amount_decimal,
+                amount=Decimal(str(amount)),
                 currency=currency,
-                delay_minutes=delay_minutes
+                delay_minutes=delay_minutes,
+                note=f'自动取现申请 - 延迟 {delay_minutes} 分钟'
             )
+            
             db.session.add(withdrawal)
             db.session.commit()
-
+            
+            logger.info(f"创建自动取现申请: 用户 {user_address}, 金额 {amount} {currency}")
+            
             return {
                 'success': True,
-                'message': f'提现申请已创建，预计 {delay_minutes} 分钟后处理',
                 'withdrawal_id': withdrawal.id,
-                'amount': float(withdrawal.amount),
-                'delay_minutes': withdrawal.delay_minutes
+                'delay_minutes': delay_minutes,
+                'process_at': withdrawal.process_at.isoformat()
             }
-
+            
         except Exception as e:
             db.session.rollback()
-            logger.error(f"创建自动提现失败: {e}")
+            logger.error(f"创建自动取现申请失败: {str(e)}", exc_info=True)
             return {'success': False, 'error': str(e)}
     
-    def get_platform_sustainability_metrics(self) -> Dict:
+    @staticmethod
+    def get_commission_summary(user_address):
         """
-        获取平台可持续性指标监控
-        
-        Returns:
-            Dict: 平台可持续性指标
+        获取用户佣金详细信息
+        包含分层级的佣金明细
         """
         try:
-            # 1. 基础统计数据
-            total_transactions = Trade.query.count()
-            total_transaction_volume = db.session.query(func.sum(Trade.total)).scalar() or Decimal('0')
+            # 获取详细的佣金计算结果
+            commission_data = AssetService.calculate_unlimited_commission(user_address)
             
-            # 2. 佣金统计
-            total_referral_commission = db.session.query(func.sum(CommissionRecord.amount))\
-                .filter(CommissionRecord.commission_type.like('referral_%')).scalar() or Decimal('0')
+            # 获取余额信息
+            user_balance = UserCommissionBalance.query.filter_by(
+                user_address=user_address
+            ).first()
             
-            total_platform_fee = db.session.query(func.sum(CommissionRecord.amount))\
-                .filter_by(commission_type='platform_fee').scalar() or Decimal('0')
+            # 获取取现历史
+            withdrawals = CommissionWithdrawal.get_user_withdrawals(user_address, limit=10)
             
-            # 3. 计算关键指标
-            if total_transaction_volume > 0:
-                referral_cost_ratio = total_referral_commission / total_transaction_volume
-                platform_profit_ratio = total_platform_fee / total_transaction_volume
-                total_commission_ratio = (total_referral_commission + total_platform_fee) / total_transaction_volume
-            else:
-                referral_cost_ratio = Decimal('0')
-                platform_profit_ratio = Decimal('0')
-                total_commission_ratio = Decimal('0')
+            # 构建返回数据
+            summary = {
+                'user_address': user_address,
+                'commission_calculation': commission_data,
+                'balance': {
+                    'total_earned': float(user_balance.total_earned) if user_balance else 0.0,
+                    'available_balance': float(user_balance.available_balance) if user_balance else 0.0,
+                    'frozen_balance': float(user_balance.frozen_balance) if user_balance else 0.0,
+                    'withdrawn_amount': float(user_balance.withdrawn_amount) if user_balance else 0.0
+                },
+                'recent_withdrawals': [w.to_dict() for w in withdrawals],
+                'auto_process_enabled': True,
+                'min_withdraw_amount': CommissionConfig.get_config('min_withdraw_amount', 10.0),
+                'withdrawal_delay_minutes': CommissionConfig.get_config('withdrawal_delay_minutes', 1)
+            }
             
-            # 4. 活跃用户统计
-            active_referrers = db.session.query(func.count(func.distinct(CommissionRecord.recipient_address)))\
-                .filter(CommissionRecord.commission_type.like('referral_%')).scalar() or 0
+            return summary
             
-            total_users_with_referrals = UserReferral.query.filter_by(status='active').count()
-            
-            # 5. 时间段分析（最近30天）
-            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-            recent_transactions = Trade.query.filter(Trade.created_at >= thirty_days_ago).count()
-            recent_volume = db.session.query(func.sum(Trade.total))\
-                .filter(Trade.created_at >= thirty_days_ago).scalar() or Decimal('0')
-            
-            recent_referral_commission = db.session.query(func.sum(CommissionRecord.amount))\
-                .filter(
-                    and_(
-                        CommissionRecord.commission_type.like('referral_%'),
-                        CommissionRecord.created_at >= thirty_days_ago
-                    )
-                ).scalar() or Decimal('0')
-            
-            # 6. 可持续性评分计算
-            sustainability_score = self._calculate_sustainability_score(
-                referral_cost_ratio,
-                platform_profit_ratio,
-                active_referrers,
-                total_users_with_referrals
-            )
-            
-            # 7. 推荐层级分析
-            level_analysis = self._analyze_referral_levels()
-            
+        except Exception as e:
+            logger.error(f"获取佣金摘要失败: {str(e)}", exc_info=True)
             return {
-                'basic_metrics': {
-                    'total_transactions': total_transactions,
-                    'total_volume': float(total_transaction_volume),
-                    'total_referral_commission': float(total_referral_commission),
-                    'total_platform_fee': float(total_platform_fee)
-                },
-                'ratio_metrics': {
-                    'referral_cost_ratio': float(referral_cost_ratio),
-                    'platform_profit_ratio': float(platform_profit_ratio),
-                    'total_commission_ratio': float(total_commission_ratio)
-                },
-                'user_metrics': {
-                    'active_referrers': active_referrers,
-                    'total_users_with_referrals': total_users_with_referrals,
-                    'referrer_activation_rate': float(active_referrers / max(total_users_with_referrals, 1))
-                },
-                'recent_metrics': {
-                    'recent_transactions': recent_transactions,
-                    'recent_volume': float(recent_volume),
-                    'recent_referral_commission': float(recent_referral_commission),
-                    'recent_growth_rate': float(recent_volume / max(total_transaction_volume - recent_volume, 1))
-                },
-                'sustainability': {
-                    'score': sustainability_score,
-                    'status': self._get_sustainability_status(sustainability_score),
-                    'recommendations': self._get_sustainability_recommendations(sustainability_score)
-                },
-                'level_analysis': level_analysis,
-                'generated_at': datetime.utcnow().isoformat()
+                'user_address': user_address,
+                'error': str(e)
+            }
+    
+    @staticmethod
+    def run_automation_cycle():
+        """
+        运行一个完整的自动化周期
+        包含佣金更新和取现处理
+        """
+        try:
+            logger.info("开始运行自动化佣金处理周期")
+            
+            # 1. 更新所有用户佣金余额
+            update_result = AutoCommissionService.auto_update_all_commission_balances()
+            
+            # 2. 处理到期的取现申请
+            withdrawal_result = AutoCommissionService.process_pending_withdrawals()
+            
+            # 汇总结果
+            cycle_result = {
+                'cycle_time': datetime.utcnow().isoformat(),
+                'commission_update': update_result,
+                'withdrawal_process': withdrawal_result,
+                'success': True
             }
             
+            logger.info(f"自动化周期完成: 更新佣金 {update_result['updated_count']} 用户，处理取现 {withdrawal_result['processed_count']} 笔")
+            
+            return cycle_result
+            
         except Exception as e:
-            logger.error(f"获取平台可持续性指标失败: {e}")
-            raise
-    
-    def _calculate_sustainability_score(self, referral_cost_ratio: Decimal, 
-                                      platform_profit_ratio: Decimal,
-                                      active_referrers: int,
-                                      total_users: int) -> float:
-        """
-        计算可持续性评分 (0-100)
-        
-        Args:
-            referral_cost_ratio: 推荐成本比例
-            platform_profit_ratio: 平台利润比例
-            active_referrers: 活跃推荐人数
-            total_users: 总用户数
-            
-        Returns:
-            float: 可持续性评分
-        """
-        score = 100.0
-        
-        # 1. 成本控制评分 (40分)
-        if referral_cost_ratio > Decimal('0.30'):  # 超过30%成本
-            score -= 40
-        elif referral_cost_ratio > Decimal('0.20'):  # 超过20%成本
-            score -= 20
-        elif referral_cost_ratio > Decimal('0.15'):  # 超过15%成本
-            score -= 10
-        
-        # 2. 平台盈利评分 (30分)
-        if platform_profit_ratio < Decimal('0.05'):  # 低于5%利润
-            score -= 30
-        elif platform_profit_ratio < Decimal('0.10'):  # 低于10%利润
-            score -= 15
-        elif platform_profit_ratio < Decimal('0.15'):  # 低于15%利润
-            score -= 5
-        
-        # 3. 用户活跃度评分 (20分)
-        if total_users > 0:
-            activation_rate = active_referrers / total_users
-            if activation_rate < 0.1:  # 低于10%激活率
-                score -= 20
-            elif activation_rate < 0.2:  # 低于20%激活率
-                score -= 10
-            elif activation_rate < 0.3:  # 低于30%激活率
-                score -= 5
-        
-        # 4. 增长潜力评分 (10分)
-        if active_referrers < 10:  # 活跃推荐人太少
-            score -= 10
-        elif active_referrers < 50:
-            score -= 5
-        
-        return max(0.0, min(100.0, score))
-    
-    def _get_sustainability_status(self, score: float) -> str:
-        """获取可持续性状态"""
-        if score >= 80:
-            return 'excellent'
-        elif score >= 60:
-            return 'good'
-        elif score >= 40:
-            return 'warning'
-        else:
-            return 'critical'
-    
-    def _get_sustainability_recommendations(self, score: float) -> List[str]:
-        """获取可持续性建议"""
-        recommendations = []
-        
-        if score < 40:
-            recommendations.extend([
-                '立即调整佣金比例，降低推荐成本',
-                '增加平台基础费用以提高盈利能力',
-                '限制推荐层级深度以控制成本'
-            ])
-        elif score < 60:
-            recommendations.extend([
-                '监控佣金成本比例，确保不超过20%',
-                '优化用户激活策略，提高推荐人活跃度',
-                '考虑引入阶梯式佣金比例'
-            ])
-        elif score < 80:
-            recommendations.extend([
-                '保持当前佣金策略，继续监控指标',
-                '扩大用户基数以提高整体收益',
-                '优化推荐人培训和激励机制'
-            ])
-        else:
-            recommendations.extend([
-                '当前策略表现优秀，可考虑适度扩展',
-                '继续优化用户体验以维持增长',
-                '考虑引入更多激励机制'
-            ])
-        
-        return recommendations
-    
-    def _analyze_referral_levels(self) -> Dict:
-        """分析推荐层级分布"""
-        try:
-            # 统计各层级的佣金分布
-            level_stats = db.session.query(
-                CommissionRecord.commission_type,
-                func.count(CommissionRecord.id).label('count'),
-                func.sum(CommissionRecord.amount).label('total_amount'),
-                func.avg(CommissionRecord.amount).label('avg_amount')
-            ).filter(
-                CommissionRecord.commission_type.like('referral_level_%')
-            ).group_by(CommissionRecord.commission_type).all()
-            
-            level_analysis = {}
-            total_referral_records = 0
-            total_referral_amount = Decimal('0')
-            
-            for stat in level_stats:
-                level_num = stat.commission_type.replace('referral_level_', '')
-                level_analysis[f'level_{level_num}'] = {
-                    'count': stat.count,
-                    'total_amount': float(stat.total_amount or 0),
-                    'avg_amount': float(stat.avg_amount or 0),
-                    'percentage': 0  # 将在后面计算
-                }
-                total_referral_records += stat.count
-                total_referral_amount += Decimal(str(stat.total_amount or 0))
-            
-            # 计算百分比
-            for level_key in level_analysis:
-                if total_referral_amount > 0:
-                    level_analysis[level_key]['percentage'] = float(
-                        Decimal(str(level_analysis[level_key]['total_amount'])) / total_referral_amount * 100
-                    )
-            
-            # 计算平均推荐深度
-            max_level = 0
-            for level_key in level_analysis:
-                level_num = int(level_key.replace('level_', ''))
-                max_level = max(max_level, level_num)
-            
+            logger.error(f"自动化周期执行失败: {str(e)}", exc_info=True)
             return {
-                'level_distribution': level_analysis,
-                'max_level': max_level,
-                'total_referral_records': total_referral_records,
-                'total_referral_amount': float(total_referral_amount),
-                'avg_referral_depth': self._calculate_avg_referral_depth()
-            }
-            
-        except Exception as e:
-            logger.error(f"分析推荐层级失败: {e}")
-            return {}
-    
-    def _calculate_avg_referral_depth(self) -> float:
-        """计算平均推荐深度"""
-        try:
-            # 获取所有有推荐关系的用户
-            users_with_referrals = db.session.query(UserReferral.referrer_address)\
-                .filter_by(status='active')\
-                .distinct().all()
-            
-            total_depth = 0
-            user_count = 0
-            
-            for (user_address,) in users_with_referrals:
-                depth = self.referral_system._calculate_referral_chain_depth(user_address)
-                total_depth += depth
-                user_count += 1
-            
-            return total_depth / max(user_count, 1)
-            
-        except Exception as e:
-            logger.error(f"计算平均推荐深度失败: {e}")
-            return 0.0
-    
-    def optimize_commission_rates(self) -> Dict:
-        """
-        基于平台可持续性指标优化佣金比例
-        
-        Returns:
-            Dict: 优化建议
-        """
-        try:
-            metrics = self.get_platform_sustainability_metrics()
-            current_rate = float(self.fixed_referral_rate)
-            
-            recommendations = {
-                'current_rate': current_rate,
-                'recommended_rate': current_rate,
-                'reason': '',
-                'expected_impact': {},
-                'should_adjust': False
-            }
-            
-            sustainability_score = metrics['sustainability']['score']
-            referral_cost_ratio = metrics['ratio_metrics']['referral_cost_ratio']
-            platform_profit_ratio = metrics['ratio_metrics']['platform_profit_ratio']
-            
-            # 基于可持续性评分调整建议
-            if sustainability_score < 40:
-                # 严重情况：大幅降低佣金比例
-                recommended_rate = max(0.02, current_rate * 0.6)  # 降低40%，最低2%
-                recommendations.update({
-                    'recommended_rate': recommended_rate,
-                    'reason': '平台可持续性评分过低，需要大幅降低佣金比例以控制成本',
-                    'should_adjust': True
-                })
-            elif sustainability_score < 60:
-                # 警告情况：适度降低佣金比例
-                recommended_rate = max(0.03, current_rate * 0.8)  # 降低20%，最低3%
-                recommendations.update({
-                    'recommended_rate': recommended_rate,
-                    'reason': '平台可持续性需要改善，建议适度降低佣金比例',
-                    'should_adjust': True
-                })
-            elif sustainability_score > 80 and platform_profit_ratio > 0.20:
-                # 优秀情况：可以考虑适度提高佣金比例
-                recommended_rate = min(0.08, current_rate * 1.2)  # 提高20%，最高8%
-                recommendations.update({
-                    'recommended_rate': recommended_rate,
-                    'reason': '平台表现优秀且盈利充足，可以适度提高佣金比例以激励用户',
-                    'should_adjust': True
-                })
-            else:
-                recommendations['reason'] = '当前佣金比例合适，建议保持现状'
-            
-            # 计算预期影响
-            if recommendations['should_adjust']:
-                rate_change = recommended_rate - current_rate
-                expected_cost_change = rate_change * metrics['basic_metrics']['total_volume']
-                
-                recommendations['expected_impact'] = {
-                    'rate_change_percentage': (rate_change / current_rate) * 100,
-                    'expected_cost_change': float(expected_cost_change),
-                    'expected_sustainability_score_change': self._estimate_score_change(
-                        sustainability_score, rate_change
-                    )
-                }
-            
-            return recommendations
-            
-        except Exception as e:
-            logger.error(f"优化佣金比例失败: {e}")
-            raise
-    
-    def _estimate_score_change(self, current_score: float, rate_change: float) -> float:
-        """估算评分变化"""
-        # 简单的线性估算，实际可以更复杂
-        if rate_change < 0:  # 降低佣金比例
-            return min(20, abs(rate_change) * 400)  # 最多提高20分
-        else:  # 提高佣金比例
-            return max(-15, -rate_change * 300)  # 最多降低15分
-    
-    def generate_commission_report(self, start_date: datetime = None, end_date: datetime = None) -> Dict:
-        """
-        生成佣金报表
-        
-        Args:
-            start_date: 开始日期
-            end_date: 结束日期
-            
-        Returns:
-            Dict: 佣金报表
-        """
-        if not start_date:
-            start_date = datetime.utcnow() - timedelta(days=30)
-        if not end_date:
-            end_date = datetime.utcnow()
-        
-        try:
-            # 基础查询条件
-            base_query = CommissionRecord.query.filter(
-                and_(
-                    CommissionRecord.created_at >= start_date,
-                    CommissionRecord.created_at <= end_date
-                )
-            )
-            
-            # 1. 总体统计
-            total_records = base_query.count()
-            total_amount = base_query.with_entities(func.sum(CommissionRecord.amount)).scalar() or 0
-            
-            # 2. 按类型统计
-            type_stats = base_query.with_entities(
-                CommissionRecord.commission_type,
-                func.count(CommissionRecord.id).label('count'),
-                func.sum(CommissionRecord.amount).label('amount')
-            ).group_by(CommissionRecord.commission_type).all()
-            
-            # 3. 按状态统计
-            status_stats = base_query.with_entities(
-                CommissionRecord.status,
-                func.count(CommissionRecord.id).label('count'),
-                func.sum(CommissionRecord.amount).label('amount')
-            ).group_by(CommissionRecord.status).all()
-            
-            # 4. 按日期统计
-            daily_stats = base_query.with_entities(
-                func.date(CommissionRecord.created_at).label('date'),
-                func.count(CommissionRecord.id).label('count'),
-                func.sum(CommissionRecord.amount).label('amount')
-            ).group_by(func.date(CommissionRecord.created_at)).all()
-            
-            # 5. 顶级推荐人统计
-            top_referrers = base_query.filter(
-                CommissionRecord.commission_type.like('referral_%')
-            ).with_entities(
-                CommissionRecord.recipient_address,
-                func.count(CommissionRecord.id).label('count'),
-                func.sum(CommissionRecord.amount).label('amount')
-            ).group_by(CommissionRecord.recipient_address)\
-             .order_by(func.sum(CommissionRecord.amount).desc())\
-             .limit(10).all()
-            
-            return {
-                'period': {
-                    'start_date': start_date.isoformat(),
-                    'end_date': end_date.isoformat(),
-                    'days': (end_date - start_date).days
-                },
-                'summary': {
-                    'total_records': total_records,
-                    'total_amount': float(total_amount),
-                    'avg_amount_per_record': float(total_amount / max(total_records, 1))
-                },
-                'by_type': [
-                    {
-                        'type': stat.commission_type,
-                        'count': stat.count,
-                        'amount': float(stat.amount or 0),
-                        'percentage': float((stat.amount or 0) / max(total_amount, 1) * 100)
-                    }
-                    for stat in type_stats
-                ],
-                'by_status': [
-                    {
-                        'status': stat.status,
-                        'count': stat.count,
-                        'amount': float(stat.amount or 0),
-                        'percentage': float((stat.amount or 0) / max(total_amount, 1) * 100)
-                    }
-                    for stat in status_stats
-                ],
-                'daily_trend': [
-                    {
-                        'date': stat.date.isoformat(),
-                        'count': stat.count,
-                        'amount': float(stat.amount or 0)
-                    }
-                    for stat in daily_stats
-                ],
-                'top_referrers': [
-                    {
-                        'address': stat.recipient_address,
-                        'count': stat.count,
-                        'amount': float(stat.amount or 0)
-                    }
-                    for stat in top_referrers
-                ],
-                'generated_at': datetime.utcnow().isoformat()
-            }
-            
-        except Exception as e:
-            logger.error(f"生成佣金报表失败: {e}")
-            raise
+                'cycle_time': datetime.utcnow().isoformat(),
+                'success': False,
+                'error': str(e)
+            } 

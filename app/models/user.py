@@ -1,6 +1,3 @@
-import logging
-
-logger = logging.getLogger(__name__)
 import enum
 from datetime import datetime
 from app.extensions import db
@@ -8,7 +5,6 @@ from sqlalchemy.orm import validates
 import re
 import json
 from sqlalchemy import func, or_
-from app.utils.validation_utils import ValidationUtils, ValidationError
 
 class UserRole(enum.Enum):
     USER = 'user'          # 普通用户
@@ -60,9 +56,10 @@ class User(db.Model):
 
     @validates('eth_address')
     def validate_eth_address(self, key, value):
-        if value and not ValidationUtils.validate_ethereum_address(value):
-            raise ValidationError('无效的以太坊地址格式', field='eth_address')
-        return ValidationUtils.normalize_address(value) if value else value
+        if value:
+            if not re.match(r'^0x[a-fA-F0-9]{40}$', value):
+                raise ValueError('Invalid Ethereum address format')
+        return value
 
     @validates('role')
     def validate_role(self, key, value):
@@ -107,55 +104,23 @@ class User(db.Model):
         self.settings = json.dumps(current_settings)
 
     def to_dict(self):
-        """转换为字典格式 - 使用统一的数据转换器"""
-        from app.utils.data_converters import UserDataConverter
-        return UserDataConverter.to_api_format(self)
-
-    @classmethod
-    def find_by_address(cls, address, wallet_type='ethereum'):
-        """通过地址查找用户"""
-        if wallet_type.lower() == 'ethereum':
-            return cls.query.filter(or_(cls.eth_address == address, cls.eth_address == address.lower())).first()
-        else:
-            return cls.query.filter_by(solana_address=address).first()
-
-    @classmethod
-    def find_or_create_user(cls, address, wallet_type='ethereum'):
-        """查找或创建用户"""
-        from app.models.commission_config import UserCommissionBalance
-        from app.extensions import db
-
-        user = cls.find_by_address(address, wallet_type)
-        if user:
-            return user
-
-        try:
-            new_user = cls(
-                username=f'user_{address[:8]}',
-                email=f'{address[:8]}@wallet.generated',
-                role='user',
-                is_distributor=True,
-                created_at=datetime.utcnow()
-            )
-            if wallet_type.lower() == 'ethereum':
-                new_user.eth_address = address
-            else:
-                new_user.solana_address = address
-
-            db.session.add(new_user)
-            db.session.flush()
-
-            commission_balance = UserCommissionBalance(
-                user_address=address,
-                total_earned=0,
-                available_balance=0,
-                withdrawn_amount=0,
-                frozen_amount=0
-            )
-            db.session.add(commission_balance)
-            db.session.commit()
-            return new_user
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to create user {address}: {e}", exc_info=True)
-            return None
+        """转换为字典格式"""
+        return {
+            'id': self.id,
+            'username': self.username,
+            'email': self.email,
+            'eth_address': self.eth_address,
+            'solana_address': self.solana_address,
+            'wallet_type': self.wallet_type,
+            'role': self.role,
+            'status': self.status,
+            'settings': self.get_settings(),
+            'is_active': self.is_active,
+            'is_distributor': self.is_distributor,
+            'is_verified': self.is_verified,
+            'is_blocked': self.is_blocked,
+            'referrer_address': self.referrer_address,
+            'last_login_at': self.last_login_at.isoformat() if self.last_login_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }

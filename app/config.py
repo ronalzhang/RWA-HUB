@@ -2,15 +2,18 @@ import os
 from datetime import timedelta
 from dotenv import load_dotenv
 
-# 尝试加载.env文件 - 修正路径到项目根目录
-dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+# 尝试加载.env文件
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
+    print(f"已加载环境变量文件: {dotenv_path}")
+else:
+    print(f"未找到环境变量文件: {dotenv_path}")
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
     PURCHASE_CONTRACT_ADDRESS = os.environ.get('PURCHASE_CONTRACT_ADDRESS', 'rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql://rwa_hub_user:password@localhost/rwa_hub')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql://rwa_hub_user:password@localhost/rwa_hub?sslmode=require')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static/uploads')
 
@@ -18,11 +21,21 @@ class Config:
     BABEL_DEFAULT_LOCALE = 'en'
     BABEL_DEFAULT_TIMEZONE = 'UTC'
     LANGUAGES = ['en', 'zh_Hant']
-
-    # 管理员配置已移至数据库AdminUser模型，不再硬编码
-    # 如需添加管理员，请使用后台管理界面或数据库直接操作
-
-    # 权限等级说明（保留作为参考）
+    
+    # 管理员配置
+    ADMIN_CONFIG = {
+        'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4': {
+            'role': 'super_admin',
+            'name': 'SOL超级管理员',
+            'level': 1,
+            'permissions': ['审核', '编辑', '删除', '发布公告', '管理用户', '查看统计']
+        }
+    }
+    
+    # 写入ADMIN_ADDRESSES以向后兼容旧代码
+    ADMIN_ADDRESSES = list(ADMIN_CONFIG.keys())
+    
+    # 权限等级说明
     PERMISSION_LEVELS = {
         '审核': 2,    # 副管理员及以上可审核
         '编辑': 2,    # 副管理员及以上可编辑
@@ -38,18 +51,11 @@ class Config:
         VALUE_DECIMALS = 2  # 价值小数位数
 
     # 区块链网络配置
-    SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea')
-    SOLANA_NETWORK_URL = os.environ.get('SOLANA_NETWORK_URL', os.environ.get('SOLANA_RPC_URL', 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea'))
+    SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
     SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID', '2TsURTNQXyqHLB2bfbzFME7HkSMLWueYPjqXBBy2u1wP')
     SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')  # Mainnet USDC
-    
-    # Solana交易参数配置 - 从环境变量获取，不硬编码
-    PLATFORM_TREASURY_WALLET = os.environ.get('PLATFORM_TREASURY_WALLET')
-    PAYMENT_TOKEN_MINT_ADDRESS = os.environ.get('PAYMENT_TOKEN_MINT_ADDRESS', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')  # USDC mint address
-    PAYMENT_TOKEN_DECIMALS = int(os.environ.get('PAYMENT_TOKEN_DECIMALS', 6))  # USDC has 6 decimals
-
     # 平台费用地址现在通过ConfigManager动态获取，不再使用硬编码
-    PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS')
+    # PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4')
     PLATFORM_FEE_RATE = float(os.environ.get('PLATFORM_FEE_RATE', 0.035))  # 3.5%平台费率
     PLATFORM_FEE_BASIS_POINTS = int(os.environ.get('PLATFORM_FEE_BASIS_POINTS', 350))  # 3.5%平台费率，以基点表示
     
@@ -60,104 +66,10 @@ class Config:
     ETH_RPC_URL = os.environ.get('ETH_RPC_URL', 'https://rpc.ankr.com/eth')
     ETH_USDC_CONTRACT = os.environ.get('ETH_USDC_CONTRACT', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
-    # SPL Token配置
-    PLATFORM_SPL_KEYPAIR = os.environ.get('PLATFORM_SPL_KEYPAIR')  # 加密的SPL Token平台私钥
-    CRYPTO_PASSWORD = os.environ.get('CRYPTO_PASSWORD')  # 加密密码
-    CRYPTO_SALT = os.environ.get('CRYPTO_SALT')  # 加密盐值
-    
-    # Redis缓存配置
-    REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-    CACHE_TYPE = 'redis'
-    CACHE_DEFAULT_TIMEOUT = 300  # 5分钟默认缓存时间
-    
-    # 性能优化配置
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 20,
-        'max_overflow': 30,
-        'pool_timeout': 30,
-        'pool_recycle': 3600,
-        'pool_pre_ping': True,
-    }
-
-    @staticmethod
-    def validate_solana_configuration(app):
-        """验证所有必需的Solana配置参数 - 使用SolanaConfigValidator"""
-        # Import here to avoid circular imports
-        from app.services.solana_config_validator import SolanaConfigValidator
-        
-        result = SolanaConfigValidator.validate_configuration(app)
-        
-        if not result['valid']:
-            error_parts = []
-            if result['missing_params']:
-                error_parts.append(f"缺失参数: {', '.join(result['missing_params'])}")
-            if result['invalid_params']:
-                error_parts.append(f"无效参数: {', '.join(result['invalid_params'])}")
-            raise ValueError(f"Solana配置验证失败: {'; '.join(error_parts)}")
-        
-        return True
-    
-    @staticmethod
-    def get_solana_config_status():
-        """获取Solana配置状态，用于调试和监控 - 使用SolanaConfigValidator"""
-        try:
-            from app.services.solana_config_validator import SolanaConfigValidator
-            from flask import current_app
-            
-            # Try to use the validator if in app context
-            return SolanaConfigValidator.get_configuration_status()
-        except (RuntimeError, ImportError):
-            # Fallback to basic status check
-            try:
-                Config.validate_solana_configuration()
-                return {
-                    'status': 'valid',
-                    'message': '所有Solana配置参数已正确设置',
-                    'config': {
-                        'SOLANA_RPC_URL': os.environ.get('SOLANA_RPC_URL', 'NOT_SET'),
-                        'PLATFORM_TREASURY_WALLET': os.environ.get('PLATFORM_TREASURY_WALLET', 'NOT_SET'),
-                        'PAYMENT_TOKEN_MINT_ADDRESS': os.environ.get('PAYMENT_TOKEN_MINT_ADDRESS', 'NOT_SET'),
-                        'PAYMENT_TOKEN_DECIMALS': os.environ.get('PAYMENT_TOKEN_DECIMALS', 'NOT_SET'),
-                        'SOLANA_PROGRAM_ID': os.environ.get('SOLANA_PROGRAM_ID', 'NOT_SET')
-                    }
-                }
-            except ValueError as e:
-                return {
-                    'status': 'invalid',
-                    'message': str(e),
-                    'config': {
-                        'SOLANA_RPC_URL': os.environ.get('SOLANA_RPC_URL', 'NOT_SET'),
-                        'PLATFORM_TREASURY_WALLET': os.environ.get('PLATFORM_TREASURY_WALLET', 'NOT_SET'),
-                        'PAYMENT_TOKEN_MINT_ADDRESS': os.environ.get('PAYMENT_TOKEN_MINT_ADDRESS', 'NOT_SET'),
-                        'PAYMENT_TOKEN_DECIMALS': os.environ.get('PAYMENT_TOKEN_DECIMALS', 'NOT_SET'),
-                        'SOLANA_PROGRAM_ID': os.environ.get('SOLANA_PROGRAM_ID', 'NOT_SET')
-                    }
-                }
-
     @staticmethod
     def init_app(app):
         # 基础配置初始化
-        from app.services.database_optimizer import get_database_optimizer
-        from app.services.cache_service import get_cache_manager
-        
-        # 验证Solana配置
-        try:
-            Config.validate_solana_configuration(app)
-        except ValueError as e:
-            # 允许应用在开发或测试环境中继续，但在日志中记录严重警告
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.critical(f"Solana配置验证失败，这在生产环境中是致命错误: {e}")
-            logger.critical("请立即检查您的环境变量或配置文件！")
-        
-        # 初始化数据库优化
-        db_optimizer = get_database_optimizer()
-        db_optimizer.optimize_connection_pool(app)
-        
-        # 初始化缓存
-        cache_manager = get_cache_manager()
-        
-        # 在应用启动后创建索引（延迟执行）
+        pass
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -171,16 +83,14 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     
-    # 生产环境数据库配置 - 本地开发环境不需要SSL
-    SQLALCHEMY_DATABASE_URI = 'postgresql://rwa_hub_user:password@localhost/rwa_hub'
-    
-    # 明确从环境变量获取SOLANA_RPC_URL
-    SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea')
+    # !! 关键改动：直接指定生产环境使用本地数据库 (SSL enabled) !!
+    SQLALCHEMY_DATABASE_URI = 'postgresql://rwa_hub_user:password@localhost/rwa_hub?sslmode=require'
+    print(f"生产环境强制使用本地数据库 (SSL enabled): {SQLALCHEMY_DATABASE_URI}")
     
     @staticmethod
     def init_app(app):
         Config.init_app(app)
-        # 生产环境特定的配置
+        # 生产环境特定的配置 (数据库URI已在类级别硬编码为本地)
         pass
 
 config = {

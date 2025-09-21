@@ -1,26 +1,15 @@
 from flask import g, current_app
 import os
 from werkzeug.utils import secure_filename
-from .decorators import (
-    handle_api_errors, 
-    require_wallet_address, 
-    require_admin_wallet, 
-    api_endpoint
-)
+from .decorators import token_required, eth_address_required, admin_required, permission_required
 from .admin import is_admin, get_admin_permissions, has_permission
 from .storage import storage, init_storage, get_storage
 
-# For backward compatibility, create aliases
-admin_required = require_admin_wallet
-eth_address_required = require_wallet_address
-
 __all__ = [
-    'handle_api_errors',
-    'require_wallet_address',
-    'require_admin_wallet',
-    'api_endpoint',
-    'admin_required',
+    'token_required',
     'eth_address_required',
+    'admin_required',
+    'permission_required',
     'is_admin',
     'get_admin_permissions',
     'has_permission'

@@ -14,19 +14,17 @@ admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
 
 # 导入所有子模块，确保路由被注册
 from . import auth
-from . import assets
+from . import assets  
 from . import users
 from . import dashboard
 from . import commission
 from . import trades
 from . import utils
-from . import monitoring
-from . import news_hotspot
-from . import ip_security  # 新增IP安全管理模块
 
 # 导出常用函数，保持向后兼容
 from .auth import admin_required, api_admin_required, admin_page_required, permission_required
 from .utils import has_permission, get_admin_role, get_admin_info, is_valid_solana_address
+from app.utils.decorators import is_admin
 
 # 添加V2版本的页面路由（这些路由在各个专门模块中没有定义）
 @admin_bp.route('/v2')
@@ -71,11 +69,11 @@ def share_messages_v2():
     """V2版本分享消息管理页面"""
     return render_template('admin_v2/share_messages.html')
 
-@admin_bp.route('/v2/news-hotspots')
+@admin_bp.route('/share-messages')
 @admin_page_required
-def news_hotspots_v2():
-    """V2版本热点新闻管理页面"""
-    return render_template('admin_v2/news_hotspots.html')
+def share_messages():
+    """分享消息管理页面"""
+    return render_template('admin_v2/share_messages.html')
 
 @admin_bp.route('/v2/settings')
 @admin_page_required
@@ -83,8 +81,18 @@ def settings_v2():
     """V2版本系统设置页面"""
     from app.models.admin import SystemConfig
     
-    # 系统设置页面现在只保留私钥管理，支付配置已迁移到支付管理页面
+    # 获取所有配置
     configs = {}
+    config_keys = [
+        'PLATFORM_FEE_BASIS_POINTS',
+        'PLATFORM_FEE_ADDRESS', 
+        'PURCHASE_CONTRACT_ADDRESS',
+        'ASSET_CREATION_FEE_AMOUNT',
+        'ASSET_CREATION_FEE_ADDRESS'
+    ]
+    
+    for key in config_keys:
+        configs[key] = SystemConfig.get_value(key, '')
     
     return render_template('admin_v2/settings.html', configs=configs)
 
@@ -96,13 +104,27 @@ def update_settings_v2():
     from flask import request, flash, redirect, url_for, g
     
     try:
-        # 系统设置页面现在只保留私钥管理功能
-        # 支付相关配置已迁移到支付管理页面
-        flash('系统设置页面现在只保留私钥管理功能，支付配置请前往支付管理页面', 'info')
+        # 获取管理员地址
+        admin_address = getattr(g, 'eth_address', None) or session.get('admin_wallet_address')
+        
+        # 更新配置
+        config_updates = {
+            'PLATFORM_FEE_BASIS_POINTS': request.form.get('platform_fee_basis_points'),
+            'PLATFORM_FEE_ADDRESS': request.form.get('platform_fee_address'),
+            'PURCHASE_CONTRACT_ADDRESS': request.form.get('purchase_contract_address'),
+            'ASSET_CREATION_FEE_AMOUNT': request.form.get('asset_creation_fee_amount'),
+            'ASSET_CREATION_FEE_ADDRESS': request.form.get('asset_creation_fee_address')
+        }
+        
+        for key, value in config_updates.items():
+            if value is not None:
+                SystemConfig.set_value(key, value, f'Updated by admin {admin_address}')
+        
+        flash('系统设置已成功更新', 'success')
         
     except Exception as e:
-        flash(f'操作失败: {str(e)}', 'error')
-        current_app.logger.error(f"系统设置操作失败: {str(e)}")
+        flash(f'更新设置失败: {str(e)}', 'error')
+        current_app.logger.error(f"更新系统设置失败: {str(e)}")
     
     return redirect(url_for('admin.settings_v2'))
 
@@ -117,7 +139,6 @@ def encrypt_private_key():
         data = request.get_json()
         private_key = data.get('private_key')
         crypto_password = data.get('crypto_password')
-        crypto_salt = data.get('crypto_salt')
         
         if not private_key:
             return jsonify({'success': False, 'error': '私钥不能为空'}), 400
@@ -125,20 +146,16 @@ def encrypt_private_key():
         if not crypto_password:
             return jsonify({'success': False, 'error': '加密密码不能为空'}), 400
         
-        # 临时设置加密密码和盐值
+        # 临时设置加密密码
         import os
         original_password = os.environ.get('CRYPTO_PASSWORD')
-        original_salt = os.environ.get('CRYPTO_SALT')
-        
         os.environ['CRYPTO_PASSWORD'] = crypto_password
-        if crypto_salt:
-            os.environ['CRYPTO_SALT'] = crypto_salt
         
         try:
             # 直接验证私钥格式，不依赖环境变量
             import base58
             import base64
-            from solders.keypair import Keypair # <-- FIXED
+            from app.utils.solana_compat.keypair import Keypair
             
             # 检测私钥格式并转换
             try:
@@ -170,7 +187,7 @@ def encrypt_private_key():
                 
                 # 创建密钥对验证
                 keypair = Keypair.from_seed(seed)
-                wallet_address = str(keypair.pubkey()) # <-- FIXED
+                wallet_address = str(keypair.public_key)
                 
             except Exception as e:
                 return jsonify({'success': False, 'error': f'私钥格式错误: {str(e)}'}), 400
@@ -184,23 +201,15 @@ def encrypt_private_key():
             
             # 保存加密密码到系统配置（注意：这里需要进一步加密）
             # 为了安全，我们使用一个固定的系统密钥来加密用户的加密密码
-            from app.utils.crypto_manager import get_system_master_key
             system_crypto = get_crypto_manager()
             # 临时设置系统密钥
-            system_key = get_system_master_key()
-            os.environ['CRYPTO_PASSWORD'] = system_key
+            os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
             encrypted_password = system_crypto.encrypt_private_key(crypto_password)
             SystemConfig.set_value('CRYPTO_PASSWORD_ENCRYPTED', encrypted_password, '系统加密的用户密码')
-            
-            # 保存盐值到系统配置
-            if crypto_salt:
-                SystemConfig.set_value('CRYPTO_SALT', crypto_salt, '用户设置的加密盐值')
             
             # 设置环境变量以便立即生效
             os.environ['SOLANA_PRIVATE_KEY_ENCRYPTED'] = encrypted_key
             os.environ['CRYPTO_PASSWORD'] = crypto_password
-            if crypto_salt:
-                os.environ['CRYPTO_SALT'] = crypto_salt
             
             current_app.logger.info(f"私钥已加密并保存，钱包地址: {wallet_address}")
             
@@ -212,147 +221,15 @@ def encrypt_private_key():
             })
             
         finally:
-            # 恢复原始配置
+            # 恢复原始密码
             if original_password:
                 os.environ['CRYPTO_PASSWORD'] = original_password
-            if original_salt:
-                os.environ['CRYPTO_SALT'] = original_salt
+            elif 'CRYPTO_PASSWORD' in os.environ and crypto_password != os.environ.get('CRYPTO_PASSWORD'):
+                # 如果不是刚设置的密码，则删除
+                pass
         
     except Exception as e:
         current_app.logger.error(f"加密私钥失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@admin_bp.route('/v2/api/crypto/security-status', methods=['GET'])
-@api_admin_required
-def get_security_status():
-    """获取安全配置状态"""
-    try:
-        import os
-        from app.models.admin import SystemConfig
-        from app.utils.crypto_manager import get_crypto_manager
-        
-        # 检查环境变量
-        crypto_password = os.environ.get('CRYPTO_PASSWORD', '')
-        crypto_salt = os.environ.get('CRYPTO_SALT', '')
-        
-        # 检查数据库配置
-        encrypted_key = SystemConfig.get_value('SOLANA_PRIVATE_KEY_ENCRYPTED')
-        
-        # 密码强度评估
-        password_score = 0
-        password_strength = '极弱'
-        
-        if crypto_password:
-            # 长度评分 - 更注重长密码
-            if len(crypto_password) >= 64:
-                password_score += 35  # 64位+密码给更高分
-            elif len(crypto_password) >= 32:
-                password_score += 25
-            elif len(crypto_password) >= 16:
-                password_score += 15
-            
-            # 复杂度评分
-            if any(c.isupper() for c in crypto_password):
-                password_score += 10  # 大写字母
-            if any(c.islower() for c in crypto_password):
-                password_score += 10  # 小写字母  
-            if any(c.isdigit() for c in crypto_password):
-                password_score += 10  # 数字
-            if any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?-_' for c in crypto_password):
-                password_score += 10  # 特殊字符
-            
-            # 随机性和复杂性评分
-            if len(crypto_password) > 0:
-                unique_chars = len(set(crypto_password))
-                diversity_ratio = unique_chars / len(crypto_password)
-                if diversity_ratio > 0.8:
-                    password_score += 20  # 高随机性
-                elif diversity_ratio > 0.6:
-                    password_score += 15  # 中等随机性
-                elif diversity_ratio > 0.4:
-                    password_score += 10  # 低随机性
-            
-            # 检查弱密码模式
-            weak_patterns = ['123456', '654321', 'abcdef', 'qwerty', 'password', '000000', '111111', 'admin', 'root', '123abc']
-            has_weak_pattern = False
-            for pattern in weak_patterns:
-                if pattern.lower() in crypto_password.lower():
-                    password_score = max(0, password_score - 30)  # 减分而不是清零
-                    has_weak_pattern = True
-                    break
-            
-            # 额外加分：如果密码很长且很随机
-            if len(crypto_password) >= 32 and diversity_ratio > 0.7 and not has_weak_pattern:
-                password_score += 5  # 额外奖励分
-            
-            # 确保最大值不超过100
-            password_score = min(password_score, 100)
-            
-            # 强度等级判定
-            if password_score >= 85:
-                password_strength = '极强'
-            elif password_score >= 70:
-                password_strength = '强'
-            elif password_score >= 55:
-                password_strength = '中等'
-            elif password_score >= 30:
-                password_strength = '弱'
-            else:
-                password_strength = '极弱'
-        
-        # 盐值检查
-        has_custom_salt = bool(crypto_salt and crypto_salt != 'rwa_hub_salt_2025'.encode().hex())
-        
-        # 私钥状态检查
-        key_status = '未配置'
-        if encrypted_key:
-            try:
-                crypto_manager = get_crypto_manager()
-                crypto_manager.decrypt_private_key(encrypted_key)
-                key_status = '正常'
-            except:
-                key_status = '解密失败'
-        
-        # 总体安全评分
-        security_score = 0
-        
-        # 密码评分 (最高70分)
-        security_score += min(password_score, 70)
-        
-        # 盐值评分 (20分)
-        if has_custom_salt:
-            security_score += 20
-        
-        # 私钥状态评分 (10分)
-        if key_status == '正常':
-            security_score += 10
-        
-        security_score = min(security_score, 100)
-        
-        if security_score >= 80:
-            security_level = '高'
-        elif security_score >= 60:
-            security_level = '中'
-        elif security_score >= 40:
-            security_level = '低'
-        else:
-            security_level = '极低'
-        
-        return jsonify({
-            'success': True,
-            'status': {
-                'password_strength': password_strength,
-                'has_custom_salt': has_custom_salt,
-                'key_status': key_status,
-                'security_level': security_level,
-                'security_score': security_score,
-                'password_length': len(crypto_password),
-                'salt_configured': bool(crypto_salt)
-            }
-        })
-        
-    except Exception as e:
-        current_app.logger.error(f"获取安全状态失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/crypto/load-encrypted-key', methods=['POST'])
@@ -362,78 +239,68 @@ def load_encrypted_key():
     try:
         from app.models.admin import SystemConfig
         from app.utils.crypto_manager import get_crypto_manager
-        from solders.keypair import Keypair # <-- FIXED
+        from app.utils.solana_compat.keypair import Keypair
         import base58
         import base64
-        import os
         
-        # 获取加密的私钥
+        # 获取加密的私钥和密码
         encrypted_key = SystemConfig.get_value('SOLANA_PRIVATE_KEY_ENCRYPTED')
+        encrypted_password = SystemConfig.get_value('CRYPTO_PASSWORD_ENCRYPTED')
         
-        if not encrypted_key:
+        if not encrypted_key or not encrypted_password:
             return jsonify({
                 'success': False,
                 'error': '未找到加密的私钥配置，请先设置并加密私钥'
             })
         
-        # 直接使用当前环境变量解密
-        crypto_manager = get_crypto_manager()
-        private_key = crypto_manager.decrypt_private_key(encrypted_key)
+        # 解密用户密码
+        import os
+        original_password = os.environ.get('CRYPTO_PASSWORD')
+        os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
         
-        # 获取保存的加密配置
-        crypto_password = ''
-        crypto_salt = ''
-        
-        # 1. 尝试从数据库获取加密的密码
-        encrypted_password = SystemConfig.get_value('CRYPTO_PASSWORD_ENCRYPTED')
-        if encrypted_password:
-            try:
-                # 临时设置系统密钥来解密用户密码
-                from app.utils.crypto_manager import get_system_master_key
-                original_password = os.environ.get('CRYPTO_PASSWORD')
-                system_key = get_system_master_key()
-                os.environ['CRYPTO_PASSWORD'] = system_key
-                crypto_password = crypto_manager.decrypt_private_key(encrypted_password)
-                if original_password:
-                    os.environ['CRYPTO_PASSWORD'] = original_password
-            except Exception as e:
-                current_app.logger.warning(f"无法解密保存的密码: {e}")
-        
-        # 2. 从数据库获取盐值
-        crypto_salt = SystemConfig.get_value('CRYPTO_SALT') or ''
-        
-        # 3. 如果数据库没有，回退到环境变量（兼容性）
-        if not crypto_password:
-            crypto_password = os.environ.get('CRYPTO_PASSWORD', '123abc74531')
-        if not crypto_salt:
-            crypto_salt = os.environ.get('CRYPTO_SALT', '')
-
-            
-        # 解析私钥并生成地址
         try:
-            private_key_bytes = base58.b58decode(private_key)
-        except:
-            # 如果base58失败，尝试其他格式
-            if len(private_key) == 128:  # 十六进制格式
-                private_key_bytes = bytes.fromhex(private_key)
-            elif len(private_key) == 88:  # Base64格式
-                private_key_bytes = base64.b64decode(private_key)
+            system_crypto = get_crypto_manager()
+            crypto_password = system_crypto.decrypt_private_key(encrypted_password)
+            
+            # 设置解密密码
+            os.environ['CRYPTO_PASSWORD'] = crypto_password
+            
+            # 验证私钥
+            user_crypto = get_crypto_manager()
+            private_key = user_crypto.decrypt_private_key(encrypted_key)
+            
+            # 解析私钥并生成地址
+            # 优先尝试base58解码（Solana最常用格式）
+            try:
+                private_key_bytes = base58.b58decode(private_key)
+            except:
+                # 如果base58失败，尝试其他格式
+                if len(private_key) == 128:  # 十六进制格式
+                    private_key_bytes = bytes.fromhex(private_key)
+                elif len(private_key) == 88:  # Base64格式
+                    private_key_bytes = base64.b64decode(private_key)
+                else:
+                    raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
+            
+            # 处理不同长度的私钥
+            if len(private_key_bytes) == 64:
+                # 标准64字节格式，前32字节是私钥
+                seed = private_key_bytes[:32]
+            elif len(private_key_bytes) == 32:
+                # 仅私钥
+                seed = private_key_bytes
+            elif len(private_key_bytes) == 66:
+                # 可能包含校验和，取前32字节作为私钥
+                seed = private_key_bytes[:32]
             else:
-                raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
-        
-        # 处理不同长度的私钥
-        if len(private_key_bytes) == 64:
-            seed = private_key_bytes[:32]
-        elif len(private_key_bytes) == 32:
-            seed = private_key_bytes
-        elif len(private_key_bytes) == 66:
-            seed = private_key_bytes[:32]
-        else:
-            raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
-        
-        # 创建密钥对验证
-        keypair = Keypair.from_seed(seed)
-        wallet_address = str(keypair.pubkey()) # <-- FIXED
+                raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
+            
+            # 创建密钥对验证
+            keypair = Keypair.from_seed(seed)
+            wallet_address = str(keypair.public_key)
+            
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'私钥格式错误: {str(e)}'}), 400
         
         current_app.logger.info(f"成功加载加密私钥，钱包地址: {wallet_address}")
         
@@ -441,54 +308,12 @@ def load_encrypted_key():
             'success': True,
             'wallet_address': wallet_address,
             'private_key': private_key,  # 返回解密后的私钥供前端填充表单
-            'crypto_password': crypto_password,  # 返回当前的加密密码
-            'crypto_salt': crypto_salt,  # 返回当前的盐值
+            'crypto_password': crypto_password,  # 返回解密后的密码供前端填充表单
             'message': '加密私钥已成功加载'
         })
         
     except Exception as e:
         current_app.logger.error(f"加载加密私钥失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@admin_bp.route('/v2/api/crypto/get-config', methods=['GET'])
-@api_admin_required
-def get_crypto_config():
-    """获取已保存的加密配置"""
-    try:
-        from app.models.admin import SystemConfig
-        from app.utils.crypto_manager import get_crypto_manager
-        import os
-        
-        crypto_password = ''
-        crypto_salt = ''
-        
-        # 1. 尝试从数据库获取加密的密码
-        encrypted_password = SystemConfig.get_value('CRYPTO_PASSWORD_ENCRYPTED')
-        if encrypted_password:
-            try:
-                # 临时设置系统密钥来解密用户密码
-                from app.utils.crypto_manager import get_system_master_key
-                crypto_manager = get_crypto_manager()
-                original_password = os.environ.get('CRYPTO_PASSWORD')
-                system_key = get_system_master_key()
-                os.environ['CRYPTO_PASSWORD'] = system_key
-                crypto_password = crypto_manager.decrypt_private_key(encrypted_password)
-                if original_password:
-                    os.environ['CRYPTO_PASSWORD'] = original_password
-            except Exception as e:
-                current_app.logger.warning(f"无法解密保存的密码: {e}")
-        
-        # 2. 从数据库获取盐值
-        crypto_salt = SystemConfig.get_value('CRYPTO_SALT') or ''
-        
-        return jsonify({
-            'success': True,
-            'crypto_password': crypto_password,
-            'crypto_salt': crypto_salt
-        })
-        
-    except Exception as e:
-        current_app.logger.error(f"获取加密配置失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/crypto/test-key', methods=['POST'])
@@ -727,223 +552,14 @@ def export_onchain_history():
 
 
 
+
+
+
+
+
+
 # 注意：dashboard、assets、users、trades等路由已在各自模块中定义
-# 避免重复定义导致路由冲突 
-
-# 系统密钥管理API
-@admin_bp.route('/v2/api/system-key/status', methods=['GET'])
-@api_admin_required
-def get_system_key_status():
-    """获取系统密钥配置状态"""
-    try:
-        from app.models.admin import SystemConfig
-        
-        # 检查是否有系统密钥配置
-        system_key_configured = SystemConfig.get_value('SYSTEM_MASTER_KEY_CONFIGURED')
-        
-        if system_key_configured == 'true':
-            # 获取创建时间
-            config_record = SystemConfig.query.filter_by(config_key='SYSTEM_MASTER_KEY_CONFIGURED').first()
-            created_at = config_record.created_at.strftime('%Y-%m-%d %H:%M:%S') if config_record and config_record.created_at else None
-            
-            return jsonify({
-                'success': True,
-                'configured': True,
-                'created_at': created_at
-            })
-        else:
-            return jsonify({
-                'success': True,
-                'configured': False,
-                'created_at': None
-            })
-            
-    except Exception as e:
-        current_app.logger.error(f"获取系统密钥状态失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': '获取系统密钥状态失败'
-        }), 500
-
-@admin_bp.route('/v2/api/system-key/save', methods=['POST'])
-@api_admin_required
-def save_system_key():
-    """保存系统主密钥"""
-    try:
-        from app.models.admin import SystemConfig
-        
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': '请求数据不能为空'
-            }), 400
-        
-        system_key = data.get('system_key', '').strip()
-        if not system_key:
-            return jsonify({
-                'success': False,
-                'error': '系统主密钥不能为空'
-            }), 400
-        
-        if len(system_key) < 32:
-            return jsonify({
-                'success': False,
-                'error': '系统主密钥长度至少需要32字符'
-            }), 400
-        
-        is_update = data.get('is_update', False)
-        
-        # 检查是否已存在系统密钥
-        existing_key = SystemConfig.get_value('SYSTEM_MASTER_KEY_CONFIGURED')
-        
-        if existing_key == 'true' and not is_update:
-            return jsonify({
-                'success': False,
-                'error': '系统主密钥已存在，如需更新请使用更新功能'
-            }), 400
-        
-        if existing_key != 'true' and is_update:
-            return jsonify({
-                'success': False,
-                'error': '系统密钥未配置，无法执行更新操作'
-            }), 400
-        
-        # 保存系统主密钥到数据库，使用加密存储
-        from app.utils.crypto_manager import get_crypto_manager
-        from datetime import datetime
-        import os
-        
-        # 临时使用一个固定密码来加密系统密钥存储
-        original_password = os.environ.get('CRYPTO_PASSWORD')
-        os.environ['CRYPTO_PASSWORD'] = 'SYSTEM_KEY_ENCRYPTION_PASSWORD_2024'
-        
-        try:
-            crypto_manager = get_crypto_manager()
-            encrypted_system_key = crypto_manager.encrypt_private_key(system_key)
-            
-            # 如果是更新操作，需要重新加密所有用户密码
-            if is_update:
-                current_app.logger.info("开始执行系统密钥更新，重新加密所有用户密码")
-                
-                # 获取当前系统密钥
-                from app.utils.crypto_manager import get_system_master_key
-                old_system_key = get_system_master_key()
-                
-                # 获取所有需要重新加密的用户密码配置
-                all_encrypted_passwords = SystemConfig.query.filter_by(config_key='CRYPTO_PASSWORD_ENCRYPTED').all()
-                
-                # 使用旧密钥解密，新密钥加密
-                for password_config in all_encrypted_passwords:
-                    try:
-                        # 使用旧系统密钥解密用户密码
-                        os.environ['CRYPTO_PASSWORD'] = old_system_key
-                        old_crypto_manager = get_crypto_manager()
-                        user_password = old_crypto_manager.decrypt_private_key(password_config.config_value)
-                        
-                        # 使用新系统密钥加密用户密码
-                        os.environ['CRYPTO_PASSWORD'] = system_key
-                        new_crypto_manager = get_crypto_manager()
-                        new_encrypted_password = new_crypto_manager.encrypt_private_key(user_password)
-                        
-                        # 更新配置
-                        password_config.config_value = new_encrypted_password
-                        password_config.description = f'系统密钥更新时重新加密 - {datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")}'
-                        
-                    except Exception as e:
-                        current_app.logger.error(f"重新加密用户密码失败: {e}")
-                        # 继续处理其他密码，不中断整个过程
-                        continue
-                
-                current_app.logger.info("所有用户密码重新加密完成")
-            
-            # 保存或更新加密后的系统密钥
-            SystemConfig.set_value(
-                'SYSTEM_MASTER_KEY_ENCRYPTED', 
-                encrypted_system_key, 
-                f'系统主密钥（{"更新" if is_update else "创建"}于{datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")}）'
-            )
-            
-            # 设置或更新配置状态标记
-            SystemConfig.set_value(
-                'SYSTEM_MASTER_KEY_CONFIGURED',
-                'true',
-                f'系统主密钥配置状态标记（{"更新" if is_update else "创建"}于{datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")}）'
-            )
-            
-            current_app.logger.info(f"系统主密钥已安全{'更新' if is_update else '保存'}到数据库")
-            
-            return jsonify({
-                'success': True,
-                'message': f'系统主密钥{"更新" if is_update else "保存"}成功',
-                'is_update': is_update
-            })
-            
-        finally:
-            # 恢复原始密码
-            if original_password:
-                os.environ['CRYPTO_PASSWORD'] = original_password
-            else:
-                os.environ.pop('CRYPTO_PASSWORD', None)
-        
-    except Exception as e:
-        current_app.logger.error(f"保存系统密钥失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': f'保存系统密钥失败: {str(e)}'
-        }), 500
-
-@admin_bp.route('/v2/api/system-key/get', methods=['GET'])
-@api_admin_required  
-def get_system_key():
-    """获取系统主密钥（内部使用）"""
-    try:
-        from app.models.admin import SystemConfig
-        from app.utils.crypto_manager import get_crypto_manager
-        import os
-        
-        # 检查系统密钥是否已配置
-        configured = SystemConfig.get_value('SYSTEM_MASTER_KEY_CONFIGURED')
-        if configured != 'true':
-            return jsonify({
-                'success': False,
-                'error': '系统密钥未配置'
-            }), 400
-        
-        # 获取加密的系统密钥
-        encrypted_key = SystemConfig.get_value('SYSTEM_MASTER_KEY_ENCRYPTED')
-        if not encrypted_key:
-            return jsonify({
-                'success': False,
-                'error': '系统密钥数据不存在'
-            }), 400
-        
-        # 解密系统密钥
-        original_password = os.environ.get('CRYPTO_PASSWORD')
-        os.environ['CRYPTO_PASSWORD'] = 'SYSTEM_KEY_ENCRYPTION_PASSWORD_2024'
-        
-        try:
-            crypto_manager = get_crypto_manager()
-            system_key = crypto_manager.decrypt_private_key(encrypted_key)
-            
-            return jsonify({
-                'success': True,
-                'system_key': system_key
-            })
-            
-        finally:
-            # 恢复原始密码
-            if original_password:
-                os.environ['CRYPTO_PASSWORD'] = original_password
-            else:
-                os.environ.pop('CRYPTO_PASSWORD', None)
-                
-    except Exception as e:
-        current_app.logger.error(f"获取系统密钥失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': f'获取系统密钥失败: {str(e)}'
-        }), 500
+# 避免重复定义导致路由冲突
 
 # 添加钱包相关API
 @admin_bp.route('/api/wallet-info', methods=['GET'])
@@ -953,7 +569,7 @@ def get_wallet_info():
     try:
         from app.models.admin import SystemConfig
         from app.utils.crypto_manager import get_crypto_manager
-        from solders.keypair import Keypair # <-- FIXED
+        from app.utils.solana_compat.keypair import Keypair
         import base58
         import base64
         
@@ -964,180 +580,15 @@ def get_wallet_info():
         if not encrypted_key or not encrypted_password:
             return jsonify({
                 'address': None,
-                'sol_balance': '0.0',
-                'usdc_balance': '0.0',
+                'balance': 0,
                 'status': 'not_configured'
             })
         
         try:
-            # 解密私钥 - 使用临时环境变量避免竞态条件
-            import os
-            
-            # 首先解密用户密码
-            system_crypto = get_crypto_manager()
-            
-            # 临时设置系统密钥来解密用户密码 
-            from app.utils.crypto_manager import get_system_master_key
-            original_password = os.environ.get('CRYPTO_PASSWORD')
-            try:
-                system_key = get_system_master_key()
-                os.environ['CRYPTO_PASSWORD'] = system_key
-                crypto_password = system_crypto.decrypt_private_key(encrypted_password)
-            finally:
-                # 恢复原始密码
-                if original_password:
-                    os.environ['CRYPTO_PASSWORD'] = original_password
-                else:
-                    os.environ.pop('CRYPTO_PASSWORD', None)
-            
-            # 使用解密的用户密码来解密私钥
-            try:
-                os.environ['CRYPTO_PASSWORD'] = crypto_password
-                user_crypto = get_crypto_manager()
-                private_key = user_crypto.decrypt_private_key(encrypted_key)
-            finally:
-                # 恢复原始密码
-                if original_password:
-                    os.environ['CRYPTO_PASSWORD'] = original_password
-                else:
-                    os.environ.pop('CRYPTO_PASSWORD', None)
-            
-            # 解析私钥并生成地址
-            # 优先尝试base58解码（Solana最常用格式）
-            try:
-                private_key_bytes = base58.b58decode(private_key)
-            except:
-                # 如果base58失败，尝试其他格式
-                if len(private_key) == 128:  # 十六进制格式
-                    private_key_bytes = bytes.fromhex(private_key)
-                elif len(private_key) == 88:  # Base64格式
-                    private_key_bytes = base64.b64decode(private_key)
-                else:
-                    raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
-            
-            # 处理不同长度的私钥
-            if len(private_key_bytes) == 64:
-                seed = private_key_bytes[:32]
-            elif len(private_key_bytes) == 32:
-                seed = private_key_bytes
-            elif len(private_key_bytes) == 66:
-                seed = private_key_bytes[:32]
-            else:
-                raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
-            
-            keypair = Keypair.from_seed(seed)
-            wallet_address = str(keypair.pubkey()) # <-- FIXED
-            
-            # 查询SOL和USDC余额
-            try:
-                from app.blockchain.solana_service import get_solana_client # <-- FIXED
-                from solders.pubkey import Pubkey # <-- FIXED
-                from spl.token.instructions import get_associated_token_address
-                
-                # 使用主网RPC端点，设置较短的超时时间
-                client = get_solana_client() # <-- FIXED
-                public_key = Pubkey.from_string(wallet_address) # <-- FIXED
-                
-                # 获取SOL余额（以lamports为单位）
-                balance_response = client.get_balance(public_key)
-                if balance_response.value is not None:
-                    # 转换为SOL（1 SOL = 1,000,000,000 lamports）
-                    balance_sol = balance_response.value / 1_000_000_000
-                    sol_balance_str = f"{balance_sol:.9f}"
-                else:
-                    sol_balance_str = "查询失败"
-                
-                # 查询USDC余额
-                try:
-                    # USDC代币地址 (mainnet)
-                    USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
-                    usdc_mint = Pubkey.from_string(USDC_MINT)
-                    
-                    # 获取关联代币账户地址
-                    usdc_ata = get_associated_token_address(public_key, usdc_mint)
-                    
-                    # 获取USDC账户信息
-                    usdc_account_info = client.get_account_info(usdc_ata)
-                    
-                    if usdc_account_info.value:
-                        # 解析代币账户数据
-                        data = usdc_account_info.value.data
-                        if len(data) >= 72:
-                            # amount字段在偏移量64处，为8字节的little-endian数字
-                            view = data[64:72]
-                            raw_amount = int.from_bytes(view, byteorder='little')
-                            usdc_balance = raw_amount / 1_000_000  # USDC有6位小数
-                            usdc_balance_str = f"{usdc_balance:.6f}"
-                        else:
-                            usdc_balance_str = "0.0"
-                    else:
-                        usdc_balance_str = "0.0"
-                        
-                except Exception as usdc_error:
-                    current_app.logger.warning(f"查询USDC余额失败: {usdc_error}")
-                    usdc_balance_str = "0.0"
-                    
-            except Exception as balance_error:
-                current_app.logger.warning(f"查询余额失败: {balance_error}")
-                # 简化错误处理，直接返回0.0
-                sol_balance_str = "0.0"
-                usdc_balance_str = "0.0"
-            
-            return jsonify({
-                'address': wallet_address,
-                'sol_balance': sol_balance_str,
-                'usdc_balance': usdc_balance_str,
-                'status': 'configured'
-            })
-            
-        except Exception as decrypt_error:
-            current_app.logger.error(f"解密私钥失败: {decrypt_error}")
-            return jsonify({
-                'address': None,
-                'sol_balance': '0.0',
-                'usdc_balance': '0.0',
-                'status': 'error',
-                'error': f'解密失败: {str(decrypt_error)}'
-            })
-        
-    except Exception as e:
-        current_app.logger.error(f"获取钱包信息失败: {str(e)}")
-        return jsonify({
-            'address': None,
-            'sol_balance': '0.0',
-            'usdc_balance': '0.0',
-            'status': 'error',
-            'error': str(e)
-        })
-
-@admin_bp.route('/api/test-wallet', methods=['POST'])
-@api_admin_required  
-def test_wallet_connection():
-    """测试钱包连接API"""
-    try:
-        from app.models.admin import SystemConfig
-        from app.utils.crypto_manager import get_crypto_manager
-        from solders.keypair import Keypair # <-- FIXED
-        import base58
-        import base64
-        
-        # 尝试从数据库获取加密的私钥
-        encrypted_key = SystemConfig.get_value('SOLANA_PRIVATE_KEY_ENCRYPTED')
-        encrypted_password = SystemConfig.get_value('CRYPTO_PASSWORD_ENCRYPTED')
-        
-        if not encrypted_key or not encrypted_password:
-            return jsonify({
-                'success': False,
-                'error': '未配置钱包或私钥无效'
-            })
-        
-        try:
             # 解密私钥
-            from app.utils.crypto_manager import get_system_master_key
             import os
             original_password = os.environ.get('CRYPTO_PASSWORD')
-            system_key = get_system_master_key()
-            os.environ['CRYPTO_PASSWORD'] = system_key
+            os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
             
             system_crypto = get_crypto_manager()
             crypto_password = system_crypto.decrypt_private_key(encrypted_password)
@@ -1170,7 +621,119 @@ def test_wallet_connection():
                 raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
             
             keypair = Keypair.from_seed(seed)
-            wallet_address = str(keypair.pubkey()) # <-- FIXED
+            wallet_address = str(keypair.public_key)
+            
+            # 查询SOL余额
+            try:
+                import requests
+                from solana.rpc.api import Client
+                from solana.publickey import PublicKey
+                
+                # 使用主网RPC端点，设置较短的超时时间
+                client = Client("https://api.mainnet-beta.solana.com", timeout=5)
+                public_key = PublicKey(wallet_address)
+                
+                # 获取余额（以lamports为单位）
+                balance_response = client.get_balance(public_key)
+                if balance_response.value is not None:
+                    # 转换为SOL（1 SOL = 1,000,000,000 lamports）
+                    balance_sol = balance_response.value / 1_000_000_000
+                    balance_str = f"{balance_sol:.9f}"
+                else:
+                    balance_str = "查询失败"
+                    
+            except Exception as balance_error:
+                current_app.logger.warning(f"查询SOL余额失败: {balance_error}")
+                # 简化错误处理，直接返回0.0
+                balance_str = "0.0"
+            
+            # 恢复原始密码
+            if original_password:
+                os.environ['CRYPTO_PASSWORD'] = original_password
+            
+            return jsonify({
+                'address': wallet_address,
+                'balance': balance_str,
+                'status': 'configured'
+            })
+            
+        except Exception as decrypt_error:
+            current_app.logger.error(f"解密私钥失败: {decrypt_error}")
+            return jsonify({
+                'address': None,
+                'balance': 0,
+                'status': 'error',
+                'error': f'解密失败: {str(decrypt_error)}'
+            })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取钱包信息失败: {str(e)}")
+        return jsonify({
+            'address': None,
+            'balance': 0,
+            'status': 'error',
+            'error': str(e)
+        })
+
+@admin_bp.route('/api/test-wallet', methods=['POST'])
+@api_admin_required  
+def test_wallet_connection():
+    """测试钱包连接API"""
+    try:
+        from app.models.admin import SystemConfig
+        from app.utils.crypto_manager import get_crypto_manager
+        from app.utils.solana_compat.keypair import Keypair
+        import base58
+        import base64
+        
+        # 尝试从数据库获取加密的私钥
+        encrypted_key = SystemConfig.get_value('SOLANA_PRIVATE_KEY_ENCRYPTED')
+        encrypted_password = SystemConfig.get_value('CRYPTO_PASSWORD_ENCRYPTED')
+        
+        if not encrypted_key or not encrypted_password:
+            return jsonify({
+                'success': False,
+                'error': '未配置钱包或私钥无效'
+            })
+        
+        try:
+            # 解密私钥
+            import os
+            original_password = os.environ.get('CRYPTO_PASSWORD')
+            os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+            
+            system_crypto = get_crypto_manager()
+            crypto_password = system_crypto.decrypt_private_key(encrypted_password)
+            
+            os.environ['CRYPTO_PASSWORD'] = crypto_password
+            user_crypto = get_crypto_manager()
+            private_key = user_crypto.decrypt_private_key(encrypted_key)
+            
+            # 解析私钥并生成地址
+            # 优先尝试base58解码（Solana最常用格式）
+            try:
+                private_key_bytes = base58.b58decode(private_key)
+            except:
+                # 如果base58失败，尝试其他格式
+                if len(private_key) == 128:  # 十六进制格式
+                    private_key_bytes = bytes.fromhex(private_key)
+                elif len(private_key) == 88:  # Base64格式
+                    private_key_bytes = base64.b64decode(private_key)
+                else:
+                    raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
+            
+            # 处理不同长度的私钥
+            if len(private_key_bytes) == 64:
+                seed = private_key_bytes[:32]
+            elif len(private_key_bytes) == 32:
+                seed = private_key_bytes
+            elif len(private_key_bytes) == 66:
+                seed = private_key_bytes[:32]
+            else:
+                raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
+            
+            keypair = Keypair.from_seed(seed)
+            wallet_address = str(keypair.public_key)
             
             # 恢复原始密码
             if original_password:
@@ -1373,6 +936,8 @@ def delete_admin_user(wallet_address):
         db.session.delete(admin)
         db.session.commit()
         
+        current_app.logger.info(f"删除管理员: {wallet_address}")
+        
         return jsonify({
             'success': True,
             'message': '管理员删除成功'
@@ -1381,179 +946,4 @@ def delete_admin_user(wallet_address):
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"删除管理员失败: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-# ================== 分享消息管理API ==================
-
-@admin_api_bp.route('/v2/share-messages', methods=['GET'])
-@api_admin_required
-def get_share_messages_v2():
-    """获取分享消息列表"""
-    try:
-        from app.models.share_message import ShareMessage
-        
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
-        
-        # 分页查询
-        pagination = ShareMessage.query.order_by(ShareMessage.created_at.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
-        
-        messages = []
-        for msg in pagination.items:
-            messages.append({
-                'id': msg.id,
-                'content': msg.content,
-                'message_type': msg.message_type,
-                'is_active': msg.is_active,
-                'weight': msg.weight,
-                'created_at': msg.created_at.isoformat() if msg.created_at else None,
-                'updated_at': msg.updated_at.isoformat() if msg.updated_at else None
-            })
-        
-        # 计算统计信息
-        total_messages = ShareMessage.query.count()
-        active_messages = ShareMessage.query.filter_by(is_active=True).count()
-        share_content_count = ShareMessage.query.filter_by(message_type='share_content').count()
-        reward_plan_count = ShareMessage.query.filter_by(message_type='reward_plan').count()
-        
-        return jsonify({
-            'success': True,
-            'data': {
-                'messages': messages,
-                'pagination': {
-                    'page': pagination.page,
-                    'pages': pagination.pages,
-                    'per_page': pagination.per_page,
-                    'total': pagination.total,
-                    'has_prev': pagination.has_prev,
-                    'has_next': pagination.has_next
-                },
-                'stats': {
-                    'total': total_messages,
-                    'active': active_messages,
-                    'share_content': share_content_count,
-                    'reward_plan': reward_plan_count
-                }
-            }
-        })
-        
-    except Exception as e:
-        current_app.logger.error(f"获取分享消息失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@admin_api_bp.route('/v2/share-messages', methods=['POST'])
-@api_admin_required
-def create_share_message_v2():
-    """创建分享消息"""
-    try:
-        from app.models.share_message import ShareMessage
-        from app.extensions import db
-        
-        data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'error': '请求数据为空'}), 400
-        
-        content = data.get('content', '').strip()
-        if not content:
-            return jsonify({'success': False, 'error': '消息内容不能为空'}), 400
-        
-        weight = data.get('weight', 1)
-        is_active = data.get('is_active', True)
-        message_type = data.get('message_type', 'share_content')
-        
-        # 创建新消息
-        message = ShareMessage(
-            content=content,
-            message_type=message_type,
-            weight=weight,
-            is_active=is_active
-        )
-        
-        db.session.add(message)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': '分享消息创建成功',
-            'data': {
-                'id': message.id,
-                'content': message.content,
-                'message_type': message.message_type,
-                'weight': message.weight,
-                'is_active': message.is_active
-            }
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"创建分享消息失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@admin_api_bp.route('/v2/share-messages/<int:message_id>', methods=['PUT'])
-@api_admin_required
-def update_share_message_v2(message_id):
-    """更新分享消息"""
-    try:
-        from app.models.share_message import ShareMessage
-        from app.extensions import db
-        
-        message = ShareMessage.query.get_or_404(message_id)
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({'success': False, 'error': '请求数据为空'}), 400
-        
-        content = data.get('content', '').strip()
-        if not content:
-            return jsonify({'success': False, 'error': '消息内容不能为空'}), 400
-        
-        # 更新消息
-        message.content = content
-        message.message_type = data.get('message_type', message.message_type)
-        message.weight = data.get('weight', message.weight)
-        message.is_active = data.get('is_active', message.is_active)
-        message.updated_at = datetime.utcnow()
-        
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': '分享消息更新成功',
-            'data': {
-                'id': message.id,
-                'content': message.content,
-                'message_type': message.message_type,
-                'weight': message.weight,
-                'is_active': message.is_active
-            }
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"更新分享消息失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@admin_api_bp.route('/v2/share-messages/<int:message_id>', methods=['DELETE'])
-@api_admin_required
-def delete_share_message_v2(message_id):
-    """删除分享消息"""
-    try:
-        from app.models.share_message import ShareMessage
-        from app.extensions import db
-        
-        message = ShareMessage.query.get_or_404(message_id)
-        
-        db.session.delete(message)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': '分享消息删除成功'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"删除分享消息失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'error': str(e)}), 500 

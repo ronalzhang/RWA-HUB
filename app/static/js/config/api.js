@@ -24,8 +24,8 @@ const CONTRACT_CONFIG = {
     
     // 网络配置
     NETWORK: {
-        SOLANA_ENDPOINT: '/api/solana/relay', // 使用后端代理
-        SOLANA_CLUSTER: 'mainnet-beta'
+        SOLANA_ENDPOINT: 'https://api.devnet.solana.com',
+        SOLANA_CLUSTER: 'devnet'
     },
     
     // 费用配置 - 将从API动态获取

@@ -28,15 +28,14 @@
     }
   }
   
-  // Use the unified getWalletAddress function from wallet-unified-manager.js
+  // 获取钱包地址
   function getWalletAddress() {
-    if (window.getWalletAddress) {
-      return window.getWalletAddress();
-    }
-    // Fallback if unified manager not available
+    // 优先使用 walletState
     if (window.walletState && window.walletState.address) {
       return window.walletState.address;
     }
+    
+    // 备用方案，从localStorage获取
     return localStorage.getItem('walletAddress');
   }
   
@@ -58,10 +57,10 @@
   function showMessage(message, type = 'info', title = null) {
     if (typeof Swal !== 'undefined') {
       const swalConfig = {
-        title: title || (type === 'error' ? 'Error' : (type === 'success' ? 'Success' : 'Notice')),
+        title: title || (type === 'error' ? '错误' : (type === 'success' ? '成功' : '提示')),
         text: message,
         icon: type,
-        confirmButtonText: 'OK',
+        confirmButtonText: '确定',
         confirmButtonColor: '#007bff',
         customClass: {
           popup: 'swal2-popup-custom',

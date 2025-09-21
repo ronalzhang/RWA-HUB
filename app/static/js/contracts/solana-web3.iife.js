@@ -21,16 +21,11 @@ originalScript.onload = function() {
     console.log('原始Solana库已加载，开始修改Connection对象');
     
     // 确保全局变量正确设置
-    // 检查各种可能的全局变量名
-    if (typeof solanaWeb3 !== 'undefined') {
-        window.solanaWeb3 = solanaWeb3;
-    } else if (window.solanaWeb3js) {
+    if (window.solanaWeb3js) {
         window.solanaWeb3 = window.solanaWeb3js;
     } else if (window.solana && window.solana.web3) {
         window.solanaWeb3 = window.solana.web3;
     }
-    
-    console.log('检查solanaWeb3对象:', window.solanaWeb3);
     
     if (!window.solanaWeb3 || !window.solanaWeb3.Connection) {
         console.error('无法找到solanaWeb3.Connection对象');

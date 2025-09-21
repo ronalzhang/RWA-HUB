@@ -4,7 +4,6 @@ from flask_login import LoginManager
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_babel import Babel
-from flask_caching import Cache
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -12,9 +11,6 @@ import logging
 
 # 初始化数据库
 db = SQLAlchemy()
-
-# 初始化缓存
-cache = Cache()
 
 # 初始化数据库迁移
 migrate = Migrate()
@@ -59,9 +55,6 @@ def init_extensions(app):
     # 初始化数据库
     db.init_app(app)
     
-    # 初始化缓存
-    cache.init_app(app)
-
     # 绑定数据库模型到应用
     bind_db_to_app(app)
     
@@ -97,28 +90,18 @@ def init_extensions(app):
 
 # 配置日志
 def configure_logging(app):
-    # 防止重复配置日志
-    if hasattr(app, '_logging_configured'):
-        return
-
-    # 清除现有处理器，防止重复
-    app.logger.handlers.clear()
-
     # 设置日志级别
     app.logger.setLevel(logging.INFO)
-
+    
     # 创建控制台处理器
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
-
+    
     # 创建格式化器
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     console_handler.setFormatter(formatter)
-
+    
     # 添加处理器
     app.logger.addHandler(console_handler)
-
-    # 标记为已配置
-    app._logging_configured = True
-
+    
     app.logger.info("日志系统配置完成") 

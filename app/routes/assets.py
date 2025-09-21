@@ -11,8 +11,7 @@ from app.models.asset import AssetStatus, AssetType
 from app.models.trade import Trade, TradeType, TradeStatus  # 添加Trade和交易状态枚举
 from app.models.referral import UserReferral as NewUserReferral  # 使用新版UserReferral
 from app.utils import is_admin, save_files
-from app.utils.auth import eth_address_required, admin_required
-from app.routes.admin.auth import permission_required
+from app.utils.decorators import eth_address_required, admin_required, permission_required
 from app.utils.storage import storage
 import os
 import json
@@ -60,53 +59,37 @@ def list_assets_page():
         page = request.args.get('page', 1, type=int)
         per_page = 9  # 每页显示9个资产
 
-        # 使用QueryOptimizer进行优化查询
-        from app.services.query_optimizer import query_optimizer
+        # 构建基础查询
+        query = Asset.query
         
-        # 确定查询状态过滤条件
+        # 根据用户身份过滤资产
         if current_user_address and is_admin_user:
             current_app.logger.info('管理员用户：显示所有未删除资产')
-            # 管理员可以看到所有状态的资产（通过None表示不过滤状态）
-            status_filter = None
+            # 管理员可以看到所有未删除的资产
+            query = query.filter(Asset.deleted_at.is_(None))
         else:
             current_app.logger.info('普通用户或未登录用户：只显示已上链且未删除的资产')
-            # 普通用户只能看到已上链的资产
-            status_filter = AssetStatus.ON_CHAIN.value
+            # 普通用户或未登录用户：只显示已上链且未删除的资产
+            query = query.filter(
+                Asset.status == AssetStatus.ON_CHAIN.value,
+                Asset.deleted_at.is_(None)
+            )
+            
+            # 额外日志记录，确保过滤器有效
+            count_before = Asset.query.count()
+            count_after = query.count()
+            current_app.logger.info(f'过滤前总资产数: {count_before}, 过滤后资产数: {count_after}')
         
-        current_app.logger.info(f'状态过滤条件: {status_filter}')
-        
-        # 使用优化查询获取资产列表
-        result = query_optimizer.get_optimized_asset_list(
-            page=page,
-            per_page=per_page,
-            status=status_filter
-        )
-        
-        assets_data = result.get('assets', [])
-        pagination_info = result.get('pagination', {})
-        
-        # 转换为Asset对象以保持兼容性
-        assets = []
-        for asset_data in assets_data:
-            # 从数据库获取完整的Asset对象
-            asset = Asset.query.get(asset_data['id'])
-            if asset:
-                assets.append(asset)
-        
-        # 创建兼容的分页对象
-        class PaginationCompat:
-            def __init__(self, pagination_info):
-                self.page = pagination_info.get('page', 1)
-                self.pages = pagination_info.get('pages', 1)
-                self.per_page = pagination_info.get('per_page', per_page)
-                self.total = pagination_info.get('total', 0)
-                self.has_prev = pagination_info.get('has_prev', False)
-                self.has_next = pagination_info.get('has_next', False)
-                self.items = assets
-        
-        pagination = PaginationCompat(pagination_info)
-        
-        current_app.logger.info(f'优化查询完成，返回 {len(assets)} 个资产')
+        # 记录过滤后的查询结果数量
+        filtered_count = query.count()
+        current_app.logger.info(f'过滤后的资产数量: {filtered_count}')
+
+        # 按创建时间倒序排序
+        query = query.order_by(Asset.created_at.desc())
+
+        # 执行分页查询
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        assets = pagination.items
 
         # 记录每个资产的详细信息
         current_app.logger.info(f'当前页面资产列表 ({len(assets)} 个):')
@@ -203,39 +186,22 @@ def asset_detail_by_symbol(token_symbol):
             else:
                 is_owner = current_user_address == asset.owner_address
             
-        try:
-            # 使用DataConsistencyManager获取实时资产数据
-            # from app.services.data_consistency_manager import DataConsistencyManager # <-- 已删除
-            # data_manager = DataConsistencyManager()
-
-            # 获取实时资产数据
-            # real_time_data = data_manager.get_real_time_asset_data(asset.id)
-            real_time_data = {} # 临时禁用实时数据获取
-        except Exception as data_e:
-            current_app.logger.error(f"获取实时数据失败: {data_e}")
-            real_time_data = {}
-
-        # 计算剩余供应量（优先使用实时数据）
-        if real_time_data and 'remaining_supply' in real_time_data:
-            remaining_supply = real_time_data['remaining_supply']
-        elif asset.remaining_supply is not None:
+        # 计算剩余供应量
+        if asset.remaining_supply is not None:
             remaining_supply = asset.remaining_supply
         else:
             remaining_supply = asset.token_supply
-
-        # 获取资产累计分红数据（优先使用实时数据）
-        if real_time_data and 'total_dividends' in real_time_data:
-            total_dividends = real_time_data['total_dividends']
-        else:
-            total_dividends = 0
-            try:
-                # 直接使用SQL查询，避免payment_token字段不存在的问题
-                sql = text("SELECT SUM(amount) FROM dividends WHERE asset_id = :asset_id AND status = 'confirmed'")
-                result = db.session.execute(sql, {"asset_id": asset.id}).fetchone()
-                total_dividends = result[0] if result[0] else 0
-            except Exception as div_e:
-                current_app.logger.error(f'[DETAIL_PAGE_DIVIDEND_ERROR] 获取累计分红数据失败: {str(div_e)}')
-
+        
+        # 获取资产累计分红数据
+        total_dividends = 0
+        try:
+            # 直接使用SQL查询，避免payment_token字段不存在的问题
+            sql = text("SELECT SUM(amount) FROM dividends WHERE asset_id = :asset_id AND status = 'confirmed'")
+            result = db.session.execute(sql, {"asset_id": asset.id}).fetchone()
+            total_dividends = result[0] if result[0] else 0
+        except Exception as div_e:
+            current_app.logger.error(f'[DETAIL_PAGE_DIVIDEND_ERROR] 获取累计分红数据失败: {str(div_e)}')
+        
         # Log right before rendering
         current_app.logger.info(f'[DETAIL_PAGE_RENDER_START] 准备渲染模板 detail.html for {token_symbol}.')
         context = {
@@ -245,7 +211,6 @@ def asset_detail_by_symbol(token_symbol):
             'is_admin_user': is_admin_user,
             'current_user_address': current_user_address,
             'total_dividends': total_dividends,
-            'real_time_data': real_time_data,  # 添加实时数据到模板上下文
             'platform_fee_address': ConfigManager.get_platform_fee_address(),
             'PLATFORM_FEE_RATE': getattr(Config, 'PLATFORM_FEE_RATE', 0.035)
         }
@@ -253,7 +218,7 @@ def asset_detail_by_symbol(token_symbol):
 
         # 直接返回渲染的HTML，避免任何重定向
         return render_template('assets/detail.html', **context)
-                  
+                              
     except Exception as e:
         # Log the exception
         current_app.logger.error(f'[DETAIL_PAGE_EXCEPTION] 访问资产详情页面 {token_symbol} 时捕获到异常!')
@@ -264,7 +229,7 @@ def asset_detail_by_symbol(token_symbol):
         current_app.logger.error(f'[DETAIL_PAGE_ERROR] 详细错误信息:\n{tb_info}')
         
         # 渲染错误页面而不是重定向
-        return render_template('error.html', error=_('Asset not found')), 500
+        return render_template('error.html', error=_('Error accessing asset details')), 500
 
 @assets_bp.route('/create')
 @eth_address_required
@@ -494,34 +459,17 @@ def proxy_image(image_path):
 def generate_token_symbol():
     """生成代币代码"""
     try:
-        # 获取请求数据
-        data = request.get_json() if request.is_json else {}
-        asset_type = data.get('type') if data else None
+        data = request.get_json()
+        asset_type = data.get('type')
         
-        current_app.logger.info(f"收到代币符号生成请求，原始asset_type: {asset_type}, 类型: {type(asset_type)}")
-        
-        # 如果没有提供资产类型，使用默认值
         if not asset_type:
-            current_app.logger.warning("未提供资产类型，使用默认值10")
-            asset_type = '10'  # 默认为不动产
-        else:
-            # 转换为字符串格式，支持整数和字符串输入
-            asset_type = str(asset_type)
-            current_app.logger.info(f"转换后的asset_type: {asset_type}")
-            
-        # 验证资产类型格式
-        if asset_type not in ['10', '20']:
-            current_app.logger.error(f"无效的资产类型: {asset_type}")
-            return jsonify({
-                'success': False,
-                'error': '无效的资产类型，必须是10或20'
-            }), 400
+            return jsonify({'error': '缺少资产类型'}), 400
             
         # 尝试多次生成唯一的token_symbol
         max_attempts = 10
         for attempt in range(max_attempts):
-            # 生成随机数 - 使用资产类型 + 4位随机数字的格式
-            random_num = f"{random.randint(1000, 9999)}"  # 使用4位数字
+            # 生成随机数
+            random_num = f"{random.randint(0, 9999):04d}"
             token_symbol = f"RH-{asset_type}{random_num}"
             
             # 检查是否已存在
@@ -539,25 +487,13 @@ def generate_token_symbol():
                 current_app.logger.warning(f"token_symbol已存在: {token_symbol}，重新生成")
         
         # 如果达到最大尝试次数仍未生成唯一符号，返回错误
-        current_app.logger.error("达到最大尝试次数，无法生成唯一代币符号")
         return jsonify({
             'success': False,
             'error': '无法生成唯一的代币符号，请稍后重试'
         }), 500
-        
     except Exception as e:
-        current_app.logger.error(f'生成代币代码失败: {str(e)}', exc_info=True)
-        # 提供更详细的错误信息用于调试
-        error_details = {
-            'error_type': type(e).__name__,
-            'error_message': str(e),
-            'asset_type': locals().get('asset_type', 'unknown')
-        }
-        current_app.logger.error(f'错误详情: {error_details}')
-        return jsonify({
-            'success': False, 
-            'error': f'服务器内部错误: {str(e)}'
-        }), 500
+        current_app.logger.error(f'生成代币代码失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @assets_api_bp.route('/calculate-tokens', methods=['POST'])
 def calculate_tokens():
@@ -898,7 +834,7 @@ def check_token_symbol():
         return jsonify({'error': 'Symbol is required'}), 400
     
     # 验证符号格式：必须以RH-开头，后面跟10或20，然后是4位数字
-    if not re.match(r'^RH-(?:10|20)\d{4}$', symbol):
+    if not re.match(r'^RH-(10|20)\d{4}$', symbol):
         return jsonify({'error': 'Invalid symbol format', 'available': False}), 400
     
     # 检查数据库中是否已存在该符号
@@ -1000,60 +936,6 @@ def get_asset_qrcode(asset_id):
         current_app.logger.warning(f"生成资产二维码失败: {str(e)}")
         return jsonify({'success': False, 'message': f'生成二维码失败: {str(e)}'}), 500
 
-@assets_api_bp.route('/<int:asset_id>', methods=['GET'])
-def get_asset_by_id(asset_id):
-    """获取资产信息 - 通过ID"""
-    try:
-        asset = Asset.query.get(asset_id)
-        if not asset:
-            return jsonify({'success': False, 'message': 'Asset not found'}), 404
-        
-        return jsonify({
-            'success': True,
-            'asset': {
-                'id': asset.id,
-                'name': asset.name,
-                'token_symbol': asset.token_symbol,
-                'token_price': float(asset.token_price),
-                'total_supply': asset.token_supply or 0,
-                'remaining_supply': getattr(asset, 'remaining_supply', asset.token_supply or 0),
-                'description': asset.description or '',
-                'creator_address': getattr(asset, 'creator_address', ''),
-                'status': asset.status,
-                'created_at': asset.created_at.isoformat() if asset.created_at else None
-            }
-        })
-    except Exception as e:
-        current_app.logger.error(f"获取资产信息失败: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@assets_api_bp.route('/symbol/<string:token_symbol>', methods=['GET'])
-def get_asset_by_symbol(token_symbol):
-    """获取资产信息 - 通过token_symbol"""
-    try:
-        asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-        if not asset:
-            return jsonify({'success': False, 'message': 'Asset not found'}), 404
-        
-        return jsonify({
-            'success': True,
-            'asset': {
-                'id': asset.id,
-                'name': asset.name,
-                'token_symbol': asset.token_symbol,
-                'token_price': float(asset.token_price),
-                'total_supply': asset.token_supply or 0,
-                'remaining_supply': getattr(asset, 'remaining_supply', asset.token_supply or 0),
-                'description': asset.description or '',
-                'creator_address': getattr(asset, 'creator_address', ''),
-                'status': asset.status,
-                'created_at': asset.created_at.isoformat() if asset.created_at else None
-            }
-        })
-    except Exception as e:
-        current_app.logger.error(f"获取资产信息失败: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
 @assets_api_bp.route('/create', methods=['POST'])
 @eth_address_required
 def create_asset_api():
@@ -1093,7 +975,7 @@ def create_asset_api():
             
         # 验证代币符号格式和可用性
         token_symbol = data.get('token_symbol')
-        if not re.match(r'^RH-(?:10|20)\d{4}$', token_symbol):
+        if not re.match(r'^RH-(10|20)\d{4}$', token_symbol):
             current_app.logger.error(f"资产创建API：代币符号格式无效 {token_symbol}")
             return jsonify({
                 'success': False,
@@ -1119,17 +1001,17 @@ def create_asset_api():
             new_asset = Asset(
                 name=data.get('name'),
                 description=data.get('description', ''),
-                asset_type=int(data.get('asset_type')),
+                asset_type=data.get('asset_type'),
                 location=data.get('location', ''),
                 token_symbol=token_symbol,
-                token_supply=int(data.get('token_supply', 0)),
-                token_price=float(data.get('token_price', 0)),
-                remaining_supply=int(data.get('token_supply', 0)),  # 初始剩余供应量等于总供应量
-                total_value=float(data.get('total_value', 0)),  # 添加 total_value 字段
-                area=float(data.get('area', 0)) if data.get('area') else None,  # 添加 area 字段（不动产需要）
+                token_supply=data.get('token_supply'),
+                token_price=data.get('token_price'),
+                remaining_supply=data.get('token_supply'),  # 初始剩余供应量等于总供应量
+                total_value=data.get('total_value'),  # 添加 total_value 字段
+                area=data.get('area'),  # 添加 area 字段（不动产需要）
                 images=json.dumps(images) if images else None,
                 documents=json.dumps(documents) if documents else None,
-                annual_revenue=float(data.get('annual_revenue', 1)),
+                annual_revenue=data.get('annual_revenue', 1),
                 status=1,  # 默认状态：待审核
                 creator_address=creator_address,
                 owner_address=creator_address,
@@ -1142,35 +1024,6 @@ def create_asset_api():
             db.session.commit()
             
             current_app.logger.info(f"资产创建API：成功创建资产 {new_asset.id}, {token_symbol}")
-            
-            # 暂时不生成合约地址，等待真实部署
-            # 创建区块链数据结构，准备后续部署
-            try:
-                # 生成区块链数据结构（不包含假地址）
-                blockchain_data = {
-                    'created_at': datetime.now().isoformat(),
-                    'status': 'pending_deployment',
-                    'creator_address': creator_address,
-                    'asset_name': data.get('name', ''),
-                    'asset_symbol': token_symbol,
-                    'total_supply': int(data.get('token_supply', 0)),
-                    'price_per_token': float(data.get('token_price', 1.0))
-                }
-                
-                # 保存区块链数据，但不设置假地址
-                new_asset.blockchain_data = json.dumps(blockchain_data)
-                new_asset.status = 1  # 设置为待审核状态，需要部署后才能购买
-                
-                db.session.commit()
-                current_app.logger.info(f"资产 {new_asset.id} 合约地址已分配，可以被购买")
-                current_app.logger.info(f"代币地址: {new_asset.token_address}")
-                current_app.logger.info(f"合约地址: {new_asset.contract_address}")
-                    
-            except Exception as contract_error:
-                current_app.logger.error(f"资产 {new_asset.id} 合约地址分配异常: {str(contract_error)}", exc_info=True)
-                # 发生异常时，保持资产为待审核状态
-                new_asset.status = 1
-                db.session.commit()
             
             # 添加: 触发支付确认监控任务
             if new_asset.payment_tx_hash:
@@ -1196,24 +1049,13 @@ def create_asset_api():
                     import traceback
                     current_app.logger.error(traceback.format_exc())
             
-            # 返回成功响应，包含智能合约部署信息
-            response_data = {
+            # 返回成功响应
+            return jsonify({
                 'success': True,
                 'message': '资产创建成功',
-                'asset_id': new_asset.id,
                 'id': new_asset.id,
-                'token_symbol': token_symbol,
-                'contract_ready': True,  # 合约地址已分配
-                'status': new_asset.status,
-                'contract_deployment': {
-                    'token_address': new_asset.token_address,
-                    'contract_address': new_asset.contract_address,
-                    'vault_address': new_asset.vault_address,
-                    'deployment_message': '资产智能合约地址已分配，可以开始交易'
-                }
-            }
-                
-            return jsonify(response_data), 201
+                'token_symbol': token_symbol
+            }), 201
             
         except Exception as db_error:
             db.session.rollback()
@@ -1224,9 +1066,8 @@ def create_asset_api():
             }), 500
             
     except Exception as e:
-        import traceback
         current_app.logger.error(f"资产创建API：处理请求失败 {str(e)}")
-        current_app.logger.error(traceback.format_exc())
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': f'处理请求失败: {str(e)}'

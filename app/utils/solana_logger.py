@@ -1,91 +1,117 @@
-"""
-Solana日志记录工具
-用于记录Solana相关的交易、API调用和错误信息
-"""
-
 import os
 import json
 import logging
 from datetime import datetime
-from typing import Dict, Any, Optional
+from pathlib import Path
 
-# 创建日志目录
-SOLANA_LOG_DIR = 'logs/solana'
-os.makedirs(SOLANA_LOG_DIR, exist_ok=True)
-
-# 日志文件路径
-TRANSACTION_LOG_FILE = os.path.join(SOLANA_LOG_DIR, 'transactions.log')
-API_LOG_FILE = os.path.join(SOLANA_LOG_DIR, 'api_calls.log')
-ERROR_LOG_FILE = os.path.join(SOLANA_LOG_DIR, 'errors.log')
-
+# 确保日志目录存在
 def init_solana_logger():
     """初始化Solana日志系统"""
-    loggers = {}
+    log_dir = Path('logs/solana')
+    log_dir.mkdir(parents=True, exist_ok=True)
     
-    # 交易日志器
-    transaction_logger = logging.getLogger('solana.transactions')
-    transaction_handler = logging.FileHandler(TRANSACTION_LOG_FILE)
-    transaction_formatter = logging.Formatter('%(asctime)s - %(message)s')
-    transaction_handler.setFormatter(transaction_formatter)
-    transaction_logger.addHandler(transaction_handler)
-    transaction_logger.setLevel(logging.INFO)
-    loggers['transactions'] = transaction_logger
+    # 创建交易日志文件
+    if not (log_dir / 'transactions.log').exists():
+        with open(log_dir / 'transactions.log', 'w') as f:
+            pass
     
-    # API调用日志器
-    api_logger = logging.getLogger('solana.api_calls')
-    api_handler = logging.FileHandler(API_LOG_FILE)
-    api_formatter = logging.Formatter('%(asctime)s - %(message)s')
-    api_handler.setFormatter(api_formatter)
-    api_logger.addHandler(api_handler)
-    api_logger.setLevel(logging.INFO)
-    loggers['api_calls'] = api_logger
+    # 创建API调用日志文件
+    if not (log_dir / 'api_calls.log').exists():
+        with open(log_dir / 'api_calls.log', 'w') as f:
+            pass
     
-    # 错误日志器
-    error_logger = logging.getLogger('solana.errors')
-    error_handler = logging.FileHandler(ERROR_LOG_FILE)
-    error_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    error_handler.setFormatter(error_formatter)
-    error_logger.addHandler(error_handler)
-    error_logger.setLevel(logging.ERROR)
-    loggers['errors'] = error_logger
+    # 创建错误日志文件
+    if not (log_dir / 'errors.log').exists():
+        with open(log_dir / 'errors.log', 'w') as f:
+            pass
     
-    return loggers
+    return log_dir
 
-def log_transaction(transaction_data: Dict[str, Any]):
-    """记录交易日志"""
-    try:
-        logger = logging.getLogger('solana.transactions')
-        log_entry = {
-            'timestamp': datetime.now().isoformat(),
-            'type': 'transaction',
-            'data': transaction_data
-        }
-        logger.info(json.dumps(log_entry, ensure_ascii=False))
-    except Exception as e:
-        print(f"记录交易日志时出错: {e}")
+# 初始化日志目录
+log_dir = init_solana_logger()
 
-def log_api_call(api_data: Dict[str, Any]):
-    """记录API调用日志"""
+def log_transaction(transaction_data):
+    """记录交易日志
+    
+    Args:
+        transaction_data (dict): 包含交易信息的字典，必须包含以下字段:
+            - transaction_id: 交易ID
+            - wallet_address: 钱包地址
+            - type: 交易类型 (transfer, mint, burn等)
+            - amount: 金额
+            - token: 代币类型
+            - status: 状态 (success, failed等)
+            - block_number: 区块编号
+    """
     try:
-        logger = logging.getLogger('solana.api_calls')
-        log_entry = {
-            'timestamp': datetime.now().isoformat(),
-            'type': 'api_call',
-            'data': api_data
-        }
-        logger.info(json.dumps(log_entry, ensure_ascii=False))
+        log_entry = transaction_data.copy()
+        
+        # 添加时间戳
+        if 'timestamp' not in log_entry:
+            log_entry['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 写入日志文件
+        with open(log_dir / 'transactions.log', 'a') as f:
+            f.write(json.dumps(log_entry) + '\n')
+            
     except Exception as e:
-        print(f"记录API调用日志时出错: {e}")
+        logging.error(f"记录交易日志时出错: {str(e)}")
 
-def log_error(error_data: Dict[str, Any]):
-    """记录错误日志"""
+def log_api_call(api_data):
+    """记录API调用日志
+    
+    Args:
+        api_data (dict): 包含API调用信息的字典，必须包含以下字段:
+            - request_id: 请求ID
+            - method: 请求方法 (GET, POST等)
+            - endpoint: API端点
+            - params: 请求参数
+            - response_time: 响应时间(秒)
+            - status_code: HTTP状态码
+            - client_ip: 客户端IP地址
+    """
     try:
-        logger = logging.getLogger('solana.errors')
-        log_entry = {
-            'timestamp': datetime.now().isoformat(),
-            'type': 'error',
-            'data': error_data
-        }
-        logger.error(json.dumps(log_entry, ensure_ascii=False))
+        log_entry = api_data.copy()
+        
+        # 添加时间戳
+        if 'timestamp' not in log_entry:
+            log_entry['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 将params字段转为字符串
+        if 'params' in log_entry and not isinstance(log_entry['params'], str):
+            log_entry['params'] = json.dumps(log_entry['params'])
+        
+        # 写入日志文件
+        with open(log_dir / 'api_calls.log', 'a') as f:
+            f.write(json.dumps(log_entry) + '\n')
+            
     except Exception as e:
-        print(f"记录错误日志时出错: {e}")
+        logging.error(f"记录API调用日志时出错: {str(e)}")
+
+def log_error(error_data):
+    """记录错误日志
+    
+    Args:
+        error_data (dict): 包含错误信息的字典，必须包含以下字段:
+            - error_id: 错误ID
+            - level: 错误级别 (ERROR, WARNING, CRITICAL等)
+            - message: 错误消息
+            - component: 出错的组件
+            - stack_trace: 堆栈跟踪(可选)
+    """
+    try:
+        log_entry = error_data.copy()
+        
+        # 添加时间戳
+        if 'timestamp' not in log_entry:
+            log_entry['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 写入日志文件
+        with open(log_dir / 'errors.log', 'a') as f:
+            f.write(json.dumps(log_entry) + '\n')
+            
+    except Exception as e:
+        logging.error(f"记录错误日志时出错: {str(e)}")
+
+# 初始化日志系统
+init_solana_logger() 

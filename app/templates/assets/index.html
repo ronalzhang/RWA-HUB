@@ -75,43 +75,28 @@
                                 <h5 class="card-title text-truncate mb-0 text-dark">{{ asset.name }}</h5>
                                 <span class="badge bg-secondary">{{ asset.token_symbol }}</span>
                             </div>
-                            <p class="card-text text-muted small mb-2 text-truncate">
+                            <p class="card-text text-muted small mb-2">
                                 <i class="fas fa-map-marker-alt me-1"></i>{{ asset.location }}
                             </p>
                             {% if asset.asset_type == 10 %}
                             <p class="card-text mb-2">
                                 <span class="text-muted">面积：</span>
-                                <span class="fw-bold text-dark text-nowrap">{{ asset.area|number_format }} ㎡</span>
-                            </p>
-                            {% elif asset.asset_type in [20, 30] %}
-                            <p class="card-text mb-2">
-                                <span class="text-muted">总价值：</span>
-                                <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|compact_number(field_name='total_value', asset_type=asset.asset_type) }} USDC</span>
+                                <span class="fw-bold text-dark">{{ asset.area|number_format }} ㎡</span>
                             </p>
                             {% else %}
                             <p class="card-text mb-2">
                                 <span class="text-muted">总价值：</span>
-                                <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|number_format }} USDC</span>
+                                <span class="fw-bold text-dark">{{ asset.total_value|number_format }} USDC</span>
                             </p>
                             {% endif %}
-                            <p class="card-text mb-3">
+                            <p class="card-text mb-2">
                                 <span class="text-muted">代币价格：</span>
-                                <span class="fw-bold text-primary text-nowrap">{{ asset.token_price|number_format }} USDC</span>
+                                <span class="fw-bold text-dark">{{ asset.token_price|number_format }} USDC</span>
                             </p>
-
-                            <!-- Progress bar for remaining supply -->
-                            <div class="d-flex justify-content-between align-items-center text-muted small mb-1">
-                                <span>可用</span>
-                                <span>{{ asset.remaining_supply|number_format }}/{{ asset.token_supply|number_format }}</span>
-                            </div>
-                            <div class="progress" style="height: 6px;">
-                                {% set progress_percentage = ((asset.token_supply - asset.remaining_supply) / asset.token_supply * 100) if asset.token_supply > 0 else 0 %}
-                                <div class="progress-bar bg-success" role="progressbar"
-                                     style="width: {{ progress_percentage }}%"
-                                     aria-valuenow="{{ progress_percentage }}"
-                                     aria-valuemin="0"
-                                     aria-valuemax="100"></div>
-                            </div>
+                            <p class="card-text">
+                                <span class="text-muted">预期年收益：</span>
+                                <span class="fw-bold text-success">{{ asset.annual_revenue|number_format }} USDC</span>
+                            </p>
                         </div>
                     </div>
                 </a>

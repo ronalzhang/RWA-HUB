@@ -54,4 +54,4 @@ if __name__ == "__main__":
     username = sys.argv[2]
     role = sys.argv[3] if len(sys.argv) > 3 else 'admin'
     
-    add_admin(wallet_address, username, role)
+    add_admin(wallet_address, username, role) 

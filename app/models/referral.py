@@ -1,7 +1,6 @@
 from datetime import datetime
 from app.extensions import db
 from sqlalchemy.orm import validates
-from app.utils.validation_utils import ValidationUtils, ValidationError
 
 class UserReferral(db.Model):
     """用户推荐关系模型"""
@@ -20,14 +19,14 @@ class UserReferral(db.Model):
     
     @validates('user_address', 'referrer_address')
     def validate_address(self, key, address):
-        """统一的地址验证和标准化"""
+        """在保存前处理地址，保持ETH地址小写，SOL地址保持原始大小写"""
         if not address:
             return address
-        
-        if not ValidationUtils.validate_wallet_address(address):
-            raise ValidationError(f'无效的{key}格式', field=key)
-        
-        return ValidationUtils.normalize_address(address)
+            
+        # ETH地址转小写，SOL地址保持原样
+        if address.startswith('0x'):
+            return address.lower()
+        return address
     
     def to_dict(self):
         """转换为字典"""

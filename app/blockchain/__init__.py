@@ -4,6 +4,7 @@
 """
 
 # 导出主要的类
+from .solana import SolanaClient
 from .asset_service import AssetService
 
-__all__ = ['AssetService']
+__all__ = ['SolanaClient', 'AssetService']

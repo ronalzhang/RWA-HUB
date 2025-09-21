@@ -15,9 +15,15 @@ ETH_RPC_URL = Config.ETH_RPC_URL or "https://ethereum.publicnode.com"  # 使用�
 USDC_CONTRACT = Config.ETH_USDC_CONTRACT or "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
 
 # 初始化Web3
-# 2025-08-21: 根据用户要求，暂时禁用以太坊网络功能，始终使用模拟模式
-logger.info("以太坊功能当前已禁用，将使用模拟模式进行操作。")
-web3 = None
+try:
+    web3 = Web3(Web3.HTTPProvider(ETH_RPC_URL))
+    # 测试连接
+    chain_id = web3.eth.chain_id
+    logger.info(f"已连接到以太坊网络: {ETH_RPC_URL}，链ID: {chain_id}")
+except Exception as e:
+    logger.error(f"连接以太坊网络失败: {str(e)}")
+    logger.warning("将使用模拟模式进行以太坊操作")
+    web3 = None
 
 # 模拟函数，实际项目中应使用web3.py与以太坊交互
 def get_usdc_balance(wallet_address: str) -> float:

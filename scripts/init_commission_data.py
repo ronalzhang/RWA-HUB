@@ -20,7 +20,7 @@ def init_commission_settings():
             'min_amount': 0.01,
             'max_amount': 10000.0,
             'is_active': True,
-            'created_by': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
+            'created_by': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
             'description': '全局默认佣金设置'
         }
     ]
@@ -33,7 +33,7 @@ def init_commission_settings():
             'min_amount': 100.0,
             'max_amount': 2000000.0,
             'is_active': True,
-            'created_by': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
+            'created_by': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
             'description': '不动产上链佣金设置'
         },
         {
@@ -42,7 +42,7 @@ def init_commission_settings():
             'min_amount': 100.0,
             'max_amount': 3000000.0,
             'is_active': True,
-            'created_by': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
+            'created_by': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
             'description': '类不动产上链佣金设置'
         }
     ]
@@ -121,7 +121,7 @@ def init_sample_users():
                 {
                     'username': 'admin_user',
                     'email': 'admin@rwahub.com',
-                    'eth_address': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
+                    'eth_address': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
                     'role': 'admin',
                     'status': 'active'
                 },
@@ -174,7 +174,7 @@ def init_sample_commission_records():
                 {
                     'transaction_id': 'sample_tx_001',
                     'asset_id': 1,
-                    'recipient_address': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
+                    'recipient_address': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
                     'amount': 100.50,
                     'currency': 'USDC',
                     'commission_type': 'platform',

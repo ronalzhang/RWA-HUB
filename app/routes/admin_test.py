@@ -1,11 +1,11 @@
 from flask import Blueprint, jsonify, current_app, g, request
-from app.utils.decorators import require_wallet_address
+from app.utils.decorators import eth_address_required
 from app.utils.admin import get_admin_permissions, is_admin, has_permission
 
 admin_test_bp = Blueprint('admin_test', __name__, url_prefix='/api/admin/test')
 
 @admin_test_bp.route('/config')
-@require_wallet_address
+@eth_address_required
 def get_admin_config():
     """测试获取管理员配置"""
     try:
@@ -13,7 +13,7 @@ def get_admin_config():
         admin_config = current_app.config.get('ADMIN_CONFIG', {})
         
         # 获取当前连接的钱包地址
-        current_address = g.wallet_address
+        current_address = g.eth_address
         
         # 检查是否是管理员
         admin_info = get_admin_permissions(current_address)
@@ -40,7 +40,7 @@ def get_admin_config():
         return jsonify({'error': '获取管理员配置失败', 'message': str(e)}), 500
         
 @admin_test_bp.route('/permission')
-@require_wallet_address
+@eth_address_required
 def check_permission():
     """测试检查特定权限"""
     try:
@@ -48,7 +48,7 @@ def check_permission():
         permission = request.args.get('permission', '')
         
         # 获取当前连接的钱包地址
-        current_address = g.wallet_address
+        current_address = g.eth_address
         
         # 检查是否有该权限
         has_perm = has_permission(permission, current_address)

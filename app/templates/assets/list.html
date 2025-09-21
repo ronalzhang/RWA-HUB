@@ -2,22 +2,6 @@
 
 {% block title %}{{ _('Asset List') }} - RWA-HUB{% endblock %}
 
-{% block styles %}
-<style>
-.asset-value-text {
-    display: inline-block;
-    max-width: 150px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    vertical-align: middle;
-    white-space: nowrap;
-}
-.card-body {
-    min-height: 180px; /* 确保卡片最小高度一致 */
-}
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="container py-5 asset-list-page">
     <!-- 标题和创建按钮 -->
@@ -76,17 +60,9 @@
                             <!-- 资产类型标签 -->
                             <div class="position-absolute top-0 end-0 m-2">
                                 {% if asset.asset_type == 10 %}
-                                <span class="badge bg-primary">{{ _('Real Property') }}</span>
-                                {% elif asset.asset_type == 20 %}
-                                <span class="badge bg-info">{{ _('Securities') }}</span>
-                                {% elif asset.asset_type == 30 %}
-                                <span class="badge bg-warning">{{ _('Quasi Property') }}</span>
-                                {% elif asset.asset_type == 40 %}
-                                <span class="badge bg-dark">{{ _('Land') }}</span>
-                                {% elif asset.asset_type == 50 %}
-                                <span class="badge bg-secondary">{{ _('Industrial') }}</span>
+                                <span class="badge bg-primary">{{ _('Real Estate') }}</span>
                                 {% else %}
-                                <span class="badge bg-light text-dark">{{ _('Other Assets') }}</span>
+                                <span class="badge bg-info">{{ _('Similar Assets') }}</span>
                                 {% endif %}
                             </div>
                         </div>
@@ -97,43 +73,28 @@
                                 <h5 class="card-title text-truncate mb-0 text-dark">{{ asset.name }}</h5>
                                 <span class="badge bg-secondary">{{ asset.token_symbol }}</span>
                             </div>
-                            <p class="card-text text-muted small mb-2 text-truncate">
+                            <p class="card-text text-muted small mb-2">
                                 <i class="fas fa-map-marker-alt me-1"></i>{{ asset.location }}
                             </p>
                             {% if asset.asset_type == 10 %}
                             <p class="card-text mb-2">
                                 <span class="text-muted">{{ _('Area') }}：</span>
-                                <span class="fw-bold text-dark text-nowrap">{{ asset.area|number_format(field_name='area') }} ㎡</span>
-                            </p>
-                            {% elif asset.asset_type in [20, 30] %}
-                            <p class="card-text mb-2">
-                                <span class="text-muted">{{ _('Total Value') }}：</span>
-                                <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|compact_number(field_name='total_value', asset_type=asset.asset_type) }} USDC</span>
+                                <span class="fw-bold text-dark">{{ asset.area|number_format(field_name='area') }} ㎡</span>
                             </p>
                             {% else %}
                             <p class="card-text mb-2">
                                 <span class="text-muted">{{ _('Total Value') }}：</span>
-                                <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|number_format(field_name='total_value') }} USDC</span>
+                                <span class="fw-bold text-dark">{{ asset.total_value|number_format(field_name='total_value') }} USDC</span>
                             </p>
                             {% endif %}
-                            <p class="card-text mb-3">
+                            <p class="card-text mb-2">
                                 <span class="text-muted">{{ _('Token Price') }}：</span>
-                                <span class="fw-bold text-primary text-nowrap">{{ asset.token_price|number_format(field_name='token_price') }} USDC</span>
+                                <span class="fw-bold text-dark">{{ asset.token_price|number_format(field_name='token_price') }} USDC</span>
                             </p>
-
-                            <!-- Progress bar for remaining supply -->
-                            <div class="d-flex justify-content-between align-items-center text-muted small mb-1">
-                                <span>{{ _('Available') }}</span>
-                                <span>{{ asset.remaining_supply|number_format }}/{{ asset.token_supply|number_format }}</span>
-                            </div>
-                            <div class="progress" style="height: 6px;">
-                                {% set progress_percentage = ((asset.token_supply - asset.remaining_supply) / asset.token_supply * 100) if asset.token_supply > 0 else 0 %}
-                                <div class="progress-bar bg-success" role="progressbar"
-                                     style="width: {{ progress_percentage }}%"
-                                     aria-valuenow="{{ progress_percentage }}"
-                                     aria-valuemin="0"
-                                     aria-valuemax="100"></div>
-                            </div>
+                            <p class="card-text">
+                                <span class="text-muted">{{ _('Expected Annual Revenue') }}：</span>
+                                <span class="fw-bold text-success">{{ asset.annual_revenue|number_format(field_name='annual_revenue') }} USDC</span>
+                            </p>
                         </div>
                     </div>
                 </a>

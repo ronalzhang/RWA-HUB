@@ -1,8 +1,8 @@
 import os
 from flask import jsonify, current_app, Blueprint, request
 from app.blockchain.asset_service import AssetService
-from app.blockchain.solana_service import validate_solana_address, check_transaction
-# from app.blockchain.solana_service import SolanaClient  # 暂时注释掉，类不存在
+from app.blockchain.solana import SolanaClient
+from app.blockchain.solana_service import execute_transfer_transaction, validate_solana_address, check_transaction
 from . import service_bp  # 从__init__.py导入正确的蓝图
 import json
 import logging
@@ -40,13 +40,14 @@ def service_wallet_status_with_address(wallet_address):
         }), 400
         
     try:
-        # 暂时返回基本的钱包状态信息
-        # TODO: 实现完整的SolanaClient类
-        status = {
-            'wallet_address': wallet_address,
-            'is_valid': validate_solana_address(wallet_address),
-            'success': True
-        }
+        # 初始化Solana客户端
+        solana_client = SolanaClient(wallet_address=wallet_address)
+        
+        # 获取钱包状态
+        status = solana_client.get_wallet_status()
+        
+        # 添加成功标志
+        status['success'] = True
         
         return jsonify(status)
     except Exception as e:
@@ -101,6 +102,39 @@ def wallet_token_balance():
             'success': False,
             'error': str(e)
         }), 500
+
+@service_bp.route('/user/assets')
+def get_user_assets():
+    """
+    获取用户的资产列表
+    
+    Query参数:
+        address: 钱包地址
+        wallet_type: 钱包类型（默认为metamask）
+    """
+    address = request.args.get('address')
+    wallet_type = request.args.get('wallet_type', 'metamask')
+    
+    if not address:
+        return jsonify({
+            'success': False,
+            'error': '未提供钱包地址'
+        }), 400
+    
+    try:
+        # 调用AssetService获取用户资产
+        assets = AssetService.get_user_assets(address, wallet_type)
+        
+        return jsonify({
+            'success': True,
+            'assets': assets
+        })
+    except Exception as e:
+        current_app.logger.error(f"获取用户资产出错: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500 
 
 @service_bp.route('/wallet/commission_balance')
 def wallet_commission_balance():
@@ -196,7 +230,66 @@ def get_payment_settings():
         logger.error(f"获取支付设置失败: {str(e)}")
         return jsonify({'success': False, 'message': f'获取支付设置失败: {str(e)}'}), 500
 
-
+@service_bp.route('/solana/execute_transfer_v2', methods=['POST'])
+def execute_transfer_v2():
+    """执行代币转账"""
+    try:
+        data = request.json
+        logger.info(f"收到转账请求: {data}")
+        
+        # 验证必要参数 - 修复参数名称不匹配问题
+        required_fields = ['from_address', 'to_address', 'amount', 'token_symbol']
+        
+        # 前端传来的参数名称可能有所不同，进行兼容处理
+        mapped_data = {
+            'from_address': data.get('from_address') or data.get('fromAddress'),
+            'to_address': data.get('to_address') or data.get('toAddress'),
+            'amount': data.get('amount'),
+            'token_symbol': data.get('token_symbol') or data.get('token'),
+            'purpose': data.get('purpose'),
+            'metadata': data.get('metadata')
+        }
+        
+        # 检查必填字段
+        missing_fields = []
+        for field in required_fields:
+            if not mapped_data.get(field):
+                missing_fields.append(field)
+        
+        if missing_fields:
+            return jsonify({
+                'success': False,
+                'message': f'缺少必要字段: {", ".join(missing_fields)}'
+            }), 400
+        
+        # 执行转账
+        signature = execute_transfer_transaction(
+            token_symbol=mapped_data['token_symbol'],
+            from_address=mapped_data['from_address'],
+            to_address=mapped_data['to_address'],
+            amount=float(mapped_data['amount'])
+        )
+        
+        if signature:
+            return jsonify({
+                'success': True,
+                'signature': signature,
+                'message': '转账已提交到Solana网络'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '转账执行失败，未获取到签名'
+            }), 500
+            
+    except Exception as e:
+        error_msg = f"执行转账失败: {str(e)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'message': error_msg
+        }), 500
 
 @service_bp.route('/blockchain/solana/check-transaction', methods=['GET'])
 def check_solana_transaction():

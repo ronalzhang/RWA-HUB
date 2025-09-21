@@ -15,158 +15,81 @@
 {% block content %}
 <div x-data="settingsManager()" x-init="init()" class="space-y-6">
     
-    {# Display flashed messages #}
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="bg-white shadow rounded-lg p-4 mb-6">
+    <!-- 系统配置 -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-6">支付配置</h2>
+
+        {# Display flashed messages #}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="mb-4">
                 {% for category, message in messages %}
                     <div class="alert alert-{{ 'danger' if category == 'error' else category }} mb-2">
                         {{ message }}
                     </div>
                 {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
-
-    <!-- 系统主密钥管理 -->
-    <div class="bg-white shadow rounded-lg p-6">
-        <h2 class="text-xl font-semibold text-gray-800 mb-6">系统主密钥管理</h2>
-        
-        <div class="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
-            <div class="flex">
-                <div class="flex-shrink-0">
-                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-                    </svg>
                 </div>
-                <div class="ml-3">
-                    <h3 class="text-sm font-medium text-red-800">重要安全提醒</h3>
-                    <div class="mt-2 text-sm text-red-700">
-                        <p>系统主密钥用于加密存储用户密码，是系统安全的根基。</p>
-                        <p class="mt-1">请务必记住此密钥，丢失将导致无法访问所有已保存的私钥！</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+            {% endif %}
+        {% endwith %}
 
-        <div class="space-y-4">
-            <!-- 当前系统密钥状态 -->
-            <div class="bg-gray-50 rounded-md p-4">
-                <h3 class="text-sm font-medium text-gray-700 mb-2">系统密钥状态</h3>
-                <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm text-gray-600">配置状态:</span>
-                        <span id="system-key-status" class="text-sm font-medium">检查中...</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm text-gray-600">创建时间:</span>
-                        <span id="system-key-created" class="text-sm text-gray-600">-</span>
-                    </div>
-                    <!-- 显示当前密钥（已配置时） -->
-                    <div x-show="currentSystemKey" class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-sm font-medium text-blue-800">当前系统密钥:</span>
-                            <button type="button" 
-                                    @click="showCurrentKey = !showCurrentKey"
-                                    class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors">
-                                <span x-text="showCurrentKey ? '隐藏' : '显示'"></span>
-                            </button>
-                        </div>
-                        <div x-show="showCurrentKey" class="relative">
-                            <input type="text" 
-                                   :value="currentSystemKey" 
-                                   readonly 
-                                   class="w-full px-3 py-2 pr-20 text-xs font-mono bg-white border border-blue-300 rounded-md">
-                            <div class="absolute inset-y-0 right-0 flex items-center space-x-1 pr-2">
-                                <button type="button" 
-                                        @click="copyToClipboard(currentSystemKey, '系统密钥')"
-                                        class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors">
-                                    复制
-                                </button>
-                            </div>
-                        </div>
-                        <div x-show="!showCurrentKey" class="text-xs text-blue-600 font-mono">
-                            ●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●
-                        </div>
-                        <p class="text-xs text-blue-600 mt-2">
-                            <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            请将此密钥安全保存到密码管理器或其他安全地方作为备份
-                        </p>
-                    </div>
-                </div>
-                <button type="button" 
-                        @click="checkSystemKeyStatus()"
-                        class="mt-3 px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors">
-                    刷新状态
-                </button>
-            </div>
-
-            <!-- 系统密钥设置 -->
+        <form method="POST" action="{{ url_for('admin.update_settings_v2') }}" class="space-y-4">
+            
+            <!-- 平台费率 -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    <span x-text="currentSystemKey ? '更新系统主密钥' : '系统主密钥'"></span>
-                    <span class="text-xs text-gray-500 ml-1">(用于加密用户密码)</span>
+                    平台费率（基点）
                 </label>
-                <div class="relative">
-                    <input :type="showSystemKey ? 'text' : 'password'" 
-                           x-model="systemMasterKey"
-                           class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                           :placeholder="currentSystemKey ? '输入新的系统主密钥（留空保持不变）' : '请输入系统主密钥'">
-                    <button type="button" 
-                            @click="showSystemKey = !showSystemKey"
-                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
-                        <svg x-show="!showSystemKey" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                        <svg x-show="showSystemKey" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                        </svg>
-                    </button>
-                </div>
-                <div class="mt-2 flex space-x-2">
-                    <button type="button" 
-                            @click="generateSystemKey()"
-                            class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors">
-                        <span x-text="currentSystemKey ? '生成新密钥' : '生成安全密钥'"></span>
-                    </button>
-                    <button type="button" 
-                            x-show="systemMasterKey && showSystemKey" 
-                            @click="copyToClipboard(systemMasterKey, '生成的系统密钥')"
-                            class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors">
-                        复制密钥
-                    </button>
-                </div>
-                <!-- 密钥更新警告 -->
-                <div x-show="currentSystemKey" class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <svg class="h-4 w-4 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-                            </svg>
-                        </div>
-                        <div class="ml-2">
-                            <p class="text-xs text-yellow-700">
-                                <strong>密钥更新说明：</strong><br>
-                                • 更新系统密钥将重新加密所有用户密码<br>
-                                • 请务必在更新前备份当前密钥<br>
-                                • 更新过程中请勿关闭页面或中断操作
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                <input type="number" 
+                       name="platform_fee_basis_points" 
+                       value="{{ configs.get('PLATFORM_FEE_BASIS_POINTS', '250') }}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       min="0" max="10000">
+                <p class="text-sm text-gray-500 mt-1">1基点 = 0.01%%，默认250（2.5%%）</p>
             </div>
 
-            <div class="flex justify-end space-x-3">
-                <button type="button" 
-                        @click="saveSystemKey()"
-                        class="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
-                    <span x-text="currentSystemKey ? '更新系统主密钥' : '保存系统主密钥'"></span>
+            <!-- 平台收款地址 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    平台收款地址
+                </label>
+                <input type="text" 
+                       name="platform_fee_address" 
+                       value="{{ configs.get('PLATFORM_FEE_ADDRESS', '') }}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="Solana钱包地址">
+            </div>
+
+            <!-- 资产创建费用 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    资产创建费用（USDC）
+                </label>
+                <input type="number" 
+                       name="asset_creation_fee_amount" 
+                       value="{{ configs.get('ASSET_CREATION_FEE_AMOUNT', '100') }}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       min="0" step="0.01">
+            </div>
+
+            <!-- 资产创建收款地址 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    资产创建收款地址
+                </label>
+                <input type="text" 
+                       name="asset_creation_fee_address" 
+                       value="{{ configs.get('ASSET_CREATION_FEE_ADDRESS', '') }}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="Solana钱包地址">
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" 
+                        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    保存设置
                 </button>
             </div>
-        </div>
+        </form>
     </div>
 
     <!-- 私钥管理 -->
@@ -199,58 +122,19 @@
                     <p class="text-sm text-gray-600">
                         地址: <span x-text="walletInfo?.address" class="font-mono"></span>
                     </p>
-                    <div class="flex space-x-4">
-                        <p class="text-sm text-gray-600">
-                            SOL余额: <span x-text="walletInfo?.sol_balance || '0.0'" class="font-mono"></span> SOL
-                        </p>
-                        <p class="text-sm text-gray-600">
-                            USDC余额: <span x-text="walletInfo?.usdc_balance || '0.0'" class="font-mono"></span> USDC
-                        </p>
-                    </div>
+                    <p class="text-sm text-gray-600">
+                        余额: <span x-text="walletInfo?.balance" class="font-mono"></span> SOL
+                    </p>
                 </div>
                 <div x-show="!walletInfo || walletInfo.status !== 'configured'" class="text-sm text-red-600">
                     未配置钱包或无法加载钱包信息
                 </div>
             </div>
 
-            <!-- 安全配置状态 -->
-            <div class="bg-gray-50 rounded-md p-4 mb-4">
-                <h4 class="text-sm font-medium text-gray-700 mb-3 flex items-center">
-                    <svg class="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                    </svg>
-                    当前安全配置状态
-                </h4>
-                <div id="security-status" class="space-y-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm text-gray-600">加密密码强度:</span>
-                        <span id="password-strength" class="text-sm font-medium">检查中...</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm text-gray-600">盐值配置:</span>
-                        <span id="salt-status" class="text-sm font-medium">检查中...</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm text-gray-600">私钥状态:</span>
-                        <span id="key-status" class="text-sm font-medium">检查中...</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm text-gray-600">安全等级:</span>
-                        <span id="security-level" class="text-sm font-medium">检查中...</span>
-                    </div>
-                </div>
-                <button type="button" 
-                        @click="checkSecurityStatus()"
-                        class="mt-3 px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors">
-                    刷新状态
-                </button>
-            </div>
-
             <!-- 加密密码 -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     加密密码
-                    <span class="text-xs text-gray-500 ml-1">(用于加密私钥)</span>
                 </label>
                 <div class="relative">
                     <input :type="showCryptoPassword ? 'text' : 'password'" 
@@ -269,55 +153,7 @@
                         </svg>
                     </button>
                 </div>
-                <div class="mt-2 flex space-x-2">
-                    <button type="button" 
-                            @click="generateSecurePassword()"
-                            class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors">
-                        生成强密码
-                    </button>
-                    <button type="button" 
-                            @click="checkPasswordStrength()"
-                            class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors">
-                        检查强度
-                    </button>
-                </div>
-            </div>
-
-            <!-- 盐值配置 -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    加密盐值
-                    <span class="text-xs text-gray-500 ml-1">(增强加密安全性)</span>
-                </label>
-                <div class="relative">
-                    <input type="text" 
-                           x-model="cryptoSalt"
-                           class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                           placeholder="32字节十六进制盐值"
-                           readonly>
-                    <button type="button" 
-                            @click="generateSecureSalt()"
-                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                    </button>
-                </div>
-                <div class="mt-2">
-                    <button type="button" 
-                            @click="generateSecureSalt()"
-                            class="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors">
-                        生成新盐值
-                    </button>
-                </div>
-                <div class="mt-2 p-2 bg-yellow-50 rounded-md">
-                    <p class="text-xs text-yellow-700">
-                        <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        盐值用于增强密码加密安全性，每个系统应使用唯一的盐值
-                    </p>
-                </div>
+                <p class="text-sm text-gray-500 mt-1">用于加密/解密私钥</p>
             </div>
 
             <!-- 私钥输入 -->
@@ -366,12 +202,7 @@ function settingsManager() {
         walletInfo: null,
         cryptoPassword: '',
         privateKey: '',
-        cryptoSalt: '',
         showCryptoPassword: false,
-        systemMasterKey: '',
-        showSystemKey: false,
-        currentSystemKey: '',  // 存储当前系统密钥
-        showCurrentKey: false, // 控制当前密钥显示/隐藏
 
         
         // 获取URL参数中的钱包地址
@@ -396,49 +227,6 @@ function settingsManager() {
         init() {
             console.log('设置管理器已初始化');
             this.loadWalletInfo();
-            this.checkSecurityStatus();
-            this.loadSavedCryptoConfig(); // 加载已保存的配置
-            this.checkSystemKeyStatus(); // 检查系统密钥状态
-            
-            // 只有在没有保存配置时才初始化盐值
-            // 这个逻辑移到loadSavedCryptoConfig中处理
-        },
-        
-        async loadSavedCryptoConfig() {
-            try {
-                const response = await this.authFetch('/admin/v2/api/crypto/get-config');
-                if (response.ok) {
-                    const result = await response.json();
-                    if (result.success) {
-                        // 只有在有保存的配置时才填充
-                        if (result.crypto_password) {
-                            this.cryptoPassword = result.crypto_password;
-                        }
-                        if (result.crypto_salt) {
-                            this.cryptoSalt = result.crypto_salt;
-                        } else if (!this.cryptoSalt) {
-                            // 只有在没有盐值时才生成新的
-                            this.generateSecureSalt();
-                        }
-                    } else {
-                        // 如果没有保存的配置，生成新盐值
-                        if (!this.cryptoSalt) {
-                            this.generateSecureSalt();
-                        }
-                    }
-                } else {
-                    // 如果API失败，也生成新盐值
-                    if (!this.cryptoSalt) {
-                        this.generateSecureSalt();
-                    }
-                }
-            } catch (error) {
-                console.error('加载保存的配置失败:', error);
-                // 如果出错，也生成新盐值
-                if (!this.cryptoSalt) {
-                    this.generateSecureSalt();
-                }
-            }
         },
         
         async loadWalletInfo() {
@@ -539,8 +327,7 @@ function settingsManager() {
                     },
                     body: JSON.stringify({
                         private_key: this.privateKey,
-                        crypto_password: this.cryptoPassword,
-                        crypto_salt: this.cryptoSalt
+                        crypto_password: this.cryptoPassword
                     })
                 });
                 
@@ -548,302 +335,14 @@ function settingsManager() {
                 if (result.success) {
                     alert('私钥加密并保存成功!\n钱包地址: ' + result.wallet_address + '\n' + result.message);
                     this.privateKey = '';
+                    this.cryptoPassword = '';
                     this.loadWalletInfo();
-                    this.checkSecurityStatus();
                 } else {
                     alert('加密失败: ' + result.error);
                 }
                 
             } catch (error) {
                 alert('加密失败: ' + error.message);
-            }
-        },
-
-        generateSecurePassword() {
-            // 生成64字符的强密码
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-            let password = '';
-            for (let i = 0; i < 64; i++) {
-                password += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            this.cryptoPassword = password;
-            this.checkPasswordStrength();
-        },
-
-        generateSecureSalt() {
-            // 生成32字节的随机盐值
-            const array = new Uint8Array(32);
-            crypto.getRandomValues(array);
-            this.cryptoSalt = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-        },
-
-        checkPasswordStrength() {
-            const password = this.cryptoPassword;
-            if (!password) return;
-
-            let score = 0;
-            let feedback = [];
-
-            // 长度检查 - 更注重长密码
-            if (password.length >= 64) score += 35; // 64位+密码给更高分
-            else if (password.length >= 32) score += 25;
-            else if (password.length >= 16) score += 15;
-            else feedback.push('密码长度至少16字符');
-
-            // 复杂度检查
-            if (/[A-Z]/.test(password)) score += 10; // 大写字母
-            if (/[a-z]/.test(password)) score += 10; // 小写字母
-            if (/[0-9]/.test(password)) score += 10; // 数字
-            if (/[^A-Za-z0-9]/.test(password)) score += 10; // 特殊字符
-
-            // 随机性和复杂性检查
-            const uniqueChars = new Set(password).size;
-            const uniquenessRatio = uniqueChars / password.length;
-            if (uniquenessRatio > 0.8) score += 20; // 高随机性
-            else if (uniquenessRatio > 0.6) score += 15; // 中等随机性
-            else if (uniquenessRatio > 0.4) score += 10; // 低随机性
-
-            // 检查是否有明显的模式
-            let hasWeakPattern = false;
-            const weakPatterns = [
-                '123456', '654321', 'abcdef', 'qwerty', 'password', 
-                '000000', '111111', 'admin', 'root'
-            ];
-            
-            for (const pattern of weakPatterns) {
-                if (password.toLowerCase().includes(pattern)) {
-                    score = Math.max(0, score - 30); // 减分而不是清零
-                    hasWeakPattern = true;
-                    feedback.push(`包含弱密码模式: ${pattern}`);
-                    break;
-                }
-            }
-
-            // 额外加分：如果密码很长且很随机
-            if (password.length >= 32 && uniquenessRatio > 0.7 && !hasWeakPattern) {
-                score += 5; // 额外奖励分
-            }
-
-            // 确保最大值不超过100
-            score = Math.min(score, 100);
-
-            let level, color;
-            if (score >= 85) { level = '极强'; color = 'text-green-700'; }
-            else if (score >= 70) { level = '强'; color = 'text-green-600'; }
-            else if (score >= 55) { level = '中等'; color = 'text-yellow-600'; }
-            else if (score >= 30) { level = '弱'; color = 'text-orange-600'; }
-            else { level = '极弱'; color = 'text-red-600'; }
-
-            const strengthElement = document.getElementById('password-strength');
-            if (strengthElement) {
-                strengthElement.textContent = `${level} (${score}/100)`;
-                strengthElement.className = `text-sm font-medium ${color}`;
-            }
-
-            // 只在分数很低时显示建议
-            if (feedback.length > 0 && score < 50) {
-                alert('密码强度建议:\n' + feedback.join('\n'));
-            }
-        },
-
-        async checkSecurityStatus() {
-            try {
-                const response = await this.authFetch('/admin/v2/api/crypto/security-status');
-                const result = await response.json();
-                
-                if (result.success) {
-                    const status = result.status;
-                    
-                    // 更新密码强度显示
-                    const strengthElement = document.getElementById('password-strength');
-                    if (strengthElement) {
-                        let color = status.password_strength === '强' ? 'text-green-600' : 
-                                   status.password_strength === '中' ? 'text-yellow-600' : 'text-red-600';
-                        strengthElement.textContent = status.password_strength;
-                        strengthElement.className = `text-sm font-medium ${color}`;
-                    }
-                    
-                    // 更新盐值状态
-                    const saltElement = document.getElementById('salt-status');
-                    if (saltElement) {
-                        let color = status.has_custom_salt ? 'text-green-600' : 'text-red-600';
-                        saltElement.textContent = status.has_custom_salt ? '已配置' : '使用默认';
-                        saltElement.className = `text-sm font-medium ${color}`;
-                    }
-                    
-                    // 更新私钥状态
-                    const keyElement = document.getElementById('key-status');
-                    if (keyElement) {
-                        let color = status.key_status === '正常' ? 'text-green-600' : 'text-red-600';
-                        keyElement.textContent = status.key_status;
-                        keyElement.className = `text-sm font-medium ${color}`;
-                    }
-                    
-                    // 更新安全等级
-                    const levelElement = document.getElementById('security-level');
-                    if (levelElement) {
-                        let color = status.security_level === '高' ? 'text-green-600' : 
-                                   status.security_level === '中' ? 'text-yellow-600' : 'text-red-600';
-                        levelElement.textContent = `${status.security_level} (${status.security_score}/100)`;
-                        levelElement.className = `text-sm font-medium ${color}`;
-                    }
-                }
-            } catch (error) {
-                console.error('检查安全状态失败:', error);
-            }
-        },
-
-        // 系统密钥管理功能
-        async checkSystemKeyStatus() {
-            try {
-                const response = await this.authFetch('/admin/v2/api/system-key/status');
-                const result = await response.json();
-                
-                if (result.success) {
-                    const statusElement = document.getElementById('system-key-status');
-                    const createdElement = document.getElementById('system-key-created');
-                    
-                    if (statusElement) {
-                        let color = result.configured ? 'text-green-600' : 'text-red-600';
-                        statusElement.textContent = result.configured ? '已配置' : '未配置';
-                        statusElement.className = `text-sm font-medium ${color}`;
-                    }
-                    
-                    if (createdElement && result.created_at) {
-                        createdElement.textContent = result.created_at;
-                    }
-                    
-                    // 如果已配置，获取当前系统密钥用于显示
-                    if (result.configured) {
-                        await this.loadCurrentSystemKey();
-                    }
-                }
-            } catch (error) {
-                console.error('检查系统密钥状态失败:', error);
-            }
-        },
-
-        async loadCurrentSystemKey() {
-            try {
-                const response = await this.authFetch('/admin/v2/api/system-key/get');
-                const result = await response.json();
-                
-                if (result.success && result.system_key) {
-                    this.currentSystemKey = result.system_key;
-                }
-            } catch (error) {
-                console.error('获取当前系统密钥失败:', error);
-                // 不显示错误，静默失败
-            }
-        },
-
-        generateSystemKey() {
-            // 生成64字符的强密钥
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+';
-            let key = '';
-            for (let i = 0; i < 64; i++) {
-                key += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            this.systemMasterKey = key;
-        },
-
-        // 复制到剪贴板功能
-        async copyToClipboard(text, type = '内容') {
-            try {
-                await navigator.clipboard.writeText(text);
-                alert(`${type}已复制到剪贴板！\n\n请将其保存到安全的地方作为备份。`);
-            } catch (error) {
-                // 回退方案
-                const textArea = document.createElement('textarea');
-                textArea.value = text;
-                textArea.style.position = 'fixed';
-                textArea.style.left = '-999999px';
-                textArea.style.top = '-999999px';
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                
-                try {
-                    document.execCommand('copy');
-                    alert(`${type}已复制到剪贴板！\n\n请将其保存到安全的地方作为备份。`);
-                } catch (err) {
-                    alert(`复制失败，请手动复制：\n\n${text}`);
-                } finally {
-                    document.body.removeChild(textArea);
-                }
-            }
-        },
-
-        async saveSystemKey() {
-            if (!this.systemMasterKey) {
-                if (this.currentSystemKey) {
-                    alert('请输入新的系统主密钥，或留空保持现有密钥不变');
-                } else {
-                    alert('请输入或生成系统主密钥');
-                }
-                return;
-            }
-            
-            if (this.systemMasterKey.length < 32) {
-                alert('系统主密钥长度至少需要32字符');
-                return;
-            }
-            
-            let confirmationMessage = '';
-            if (this.currentSystemKey) {
-                confirmationMessage = '警告：更新系统主密钥后，所有用户密码将使用新密钥重新加密！\n\n' +
-                    '更新前请确保：\n' +
-                    '1. 已备份当前系统密钥\n' +
-                    '2. 已备份新生成的系统密钥\n' +
-                    '3. 在更新过程中不要关闭页面\n\n' +
-                    '确定要更新系统主密钥吗？';
-            } else {
-                confirmationMessage = '警告：保存系统主密钥后，请务必记住此密钥！\n\n' +
-                    '如果忘记系统主密钥，将无法访问所有已保存的私钥！\n\n' +
-                    '建议：\n' +
-                    '1. 复制密钥到剪贴板\n' +
-                    '2. 保存到密码管理器\n' +
-                    '3. 写在纸上存放在安全地方\n\n' +
-                    '确定要保存吗？';
-            }
-            
-            const confirmation = confirm(confirmationMessage);
-            if (!confirmation) {
-                return;
-            }
-            
-            try {
-                const response = await this.authFetch('/admin/v2/api/system-key/save', {
-                    method: 'POST',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: JSON.stringify({
-                        system_key: this.systemMasterKey,
-                        is_update: !!this.currentSystemKey
-                    })
-                });
-                
-                const result = await response.json();
-                if (result.success) {
-                    // 显示成功消息，提醒用户备份
-                    const successMessage = this.currentSystemKey ? 
-                        '系统主密钥更新成功！\n\n所有用户密码已使用新密钥重新加密。' :
-                        '系统主密钥保存成功！\n\n请务必将此密钥安全保存，建议：\n1. 写在纸上存放在安全地方\n2. 使用密码管理器保存\n3. 不要存储在电脑或网络上';
-                    
-                    alert(successMessage);
-                    
-                    // 更新当前密钥显示
-                    this.currentSystemKey = this.systemMasterKey;
-                    this.systemMasterKey = ''; // 清空输入框
-                    this.showSystemKey = false; // 隐藏输入
-                    this.checkSystemKeyStatus();
-                } else {
-                    alert('保存失败: ' + result.error);
-                }
-                
-            } catch (error) {
-                alert('保存失败: ' + error.message);
             }
         }
     }

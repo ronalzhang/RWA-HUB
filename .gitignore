@@ -349,7 +349,6 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-.codebuddy/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -532,10 +531,9 @@ security_*.py
 analyze_*.py
 crypto_password_solution.py
 
-# 文档和说明文件（保留README.md和部署指南）
+# 文档和说明文件（保留README.md）
 *.md
 !README.md
-!DEPLOYMENT_GUIDE.md
 docs/
 *.doc
 *.docx
@@ -571,11 +569,3 @@ security_*.log
 *CHECKLIST*.md
 *OPTIMIZATION*.md
 *POLICY*.md
-
-# 部署配置文件（包含敏感信息）
-deploy.config
-*.config
-deploy_*.sh
-!deploy.sh
-*.md
-GEMINI.md

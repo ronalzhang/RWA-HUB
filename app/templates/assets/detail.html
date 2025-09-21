@@ -17,27 +17,11 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- Solana Web3.js 库由 base.html 统一加载，避免版本冲突 -->
+<!-- Solana库 -->
+<script src="{{ url_for('static', filename='js/contracts/solana-web3.iife.js') }}"></script>
 <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
 
-<!-- 钱包和购买处理 -->
-<script src="{{ url_for('static', filename='js/wallet_manager.js') }}"></script>
-<script src="{{ url_for('static', filename='js/smart_contract_deployment.js') }}"></script>
-<!-- 统一购买处理器已在base.html中加载 -->
-
 <style>
-/* 固定宽度布局样式 */
-body {
-    min-width: 1200px;
-    overflow-x: auto;
-}
-
-.container {
-    width: 1200px;
-    max-width: none;
-    margin: 0 auto;
-}
-
 .asset-detail-page .card {
     border-radius: 12px;
     box-shadow: 0 3px 15px rgba(0,0,0,0.08);
@@ -114,15 +98,7 @@ body {
                         {% if asset.images and asset.images|length > 0 %}
                         {% for image in asset.images %}
                         <div class="carousel-item {% if loop.first %}active{% endif %}">
-                            {% if image.startswith('/static/') %}
-                            <img src="{{ image }}" 
-                                 class="d-block w-100" alt="Asset Image"
-                                 onerror="this.src='{{ url_for('static', filename='images/placeholder.jpg') }}'; this.onerror=null;">
-                            {% else %}
-                            <img src="{{ url_for('static', filename='uploads/' + image) }}" 
-                                 class="d-block w-100" alt="Asset Image"
-                                 onerror="this.src='{{ url_for('static', filename='images/placeholder.jpg') }}'; this.onerror=null;">
-                            {% endif %}
+                            <img src="{{ image }}" class="d-block w-100" alt="Asset Image">
                         </div>
                         {% endfor %}
                         {% else %}
@@ -166,23 +142,6 @@ body {
                                         <i class="far fa-copy"></i>
                                     </button>
                                 </li>
-                                {% if asset.spl_mint_address %}
-                                <li class="mb-2">
-                                    <i class="fas fa-coins text-muted me-2"></i>
-                                    <strong>SPL Token Address:</strong>
-                                    <span id="splTokenAddressFullDetails" style="display: none;">{{ asset.spl_mint_address }}</span>
-                                    <span title="{{ asset.spl_mint_address }}">{{ asset.spl_mint_address[:6] }}...{{ asset.spl_mint_address[-4:] }}</span>
-                                    <button class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1"
-                                            onclick="copyToClipboard('splTokenAddressFullDetails', this)">
-                                        <i class="far fa-copy"></i>
-                                    </button>
-                                    <a href="https://solscan.io/token/{{ asset.spl_mint_address }}"
-                                       target="_blank" class="btn btn-sm btn-outline-info ms-1 py-0 px-1"
-                                       title="View on Solscan">
-                                        <i class="fas fa-external-link-alt"></i>
-                                    </a>
-                                </li>
-                                {% endif %}
                             </ul>
                         </div>
                     </div>
@@ -217,67 +176,6 @@ body {
                     <div class="card-body">
                         <div class="mb-4">
                             <h4 class="mb-3">{{ asset.token_symbol }}</h4>
-
-                            <!-- SPL Token信息 -->
-                            {% if asset.spl_mint_address %}
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="text-muted small">SPL Token Address:</span>
-                                <div class="text-end">
-                                    <span id="splTokenAddressFull" style="display: none;">{{ asset.spl_mint_address }}</span>
-                                    <a href="https://solscan.io/token/{{ asset.spl_mint_address }}" target="_blank" class="text-decoration-none small text-primary" title="{{ asset.spl_mint_address }}">
-                                        {{ asset.spl_mint_address[:6] }}...{{ asset.spl_mint_address[-4:] }}
-                                    </a>
-                                    <button class="btn btn-sm btn-outline-secondary ms-1 py-0 px-1"
-                                            onclick="copyToClipboard('splTokenAddressFull', this)">
-                                        <i class="far fa-copy"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- SPL Token详细信息 -->
-                            <div class="spl-token-details mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="text-muted small">Total Supply:</span>
-                                    <div class="text-end">
-                                        <span id="onChainSupply" class="small">
-                                            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="text-muted small">Token Status:</span>
-                                    <div class="text-end">
-                                        <span id="tokenStatus" class="badge bg-secondary">
-                                            <div class="spinner-border spinner-border-sm text-white" role="status" style="width: 0.8rem; height: 0.8rem;"></div>
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- SPL Token健康检查按钮 -->
-                            <div class="mb-2">
-                                <button type="button" class="btn btn-sm btn-outline-info w-100" onclick="performTokenHealthCheck('{{ asset.spl_mint_address }}')">
-                                    <i class="fas fa-heartbeat me-1"></i>Token Health Check
-                                </button>
-                            </div>
-                            {% else %}
-                            <div class="alert alert-info small mb-3">
-                                <i class="fas fa-info-circle me-2"></i>
-                                This asset doesn't have an SPL Token yet. SPL Tokens are automatically created when the first purchase is made.
-                            </div>
-                            {% endif %}
-
-                            {% if asset.metadata_uri %}
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="text-muted small">Token Metadata:</span>
-                                <div class="text-end">
-                                    <a href="{{ asset.metadata_uri }}" target="_blank" class="btn btn-sm btn-outline-info py-0 px-2">
-                                        <i class="fas fa-info-circle me-1"></i>View
-                                    </a>
-                                </div>
-                            </div>
-                            {% endif %}
                             <div class="d-flex justify-content-between mb-2">
                                 <span class="text-muted">Asset Name:</span>
                                 <span>{{ asset.name }}</span>
@@ -286,9 +184,13 @@ body {
                                 <span class="text-muted">Token Price:</span>
                                 <span class="fw-bold fs-5">{{ asset.token_price }} USDC</span>
                             </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Token Supply:</span>
+                                <span>{{ asset.token_supply }}</span>
+                            </div>
                             <div class="d-flex justify-content-between mb-4">
                                 <span class="text-muted">Available:</span>
-                                <span data-field="remaining_supply">{{ "{:,}".format(remaining_supply|int) }}</span>
+                                <span>{{ remaining_supply }}</span>
                             </div>
                         </div>
 
@@ -309,24 +211,10 @@ body {
                         
                         <div id="buy-error" class="alert alert-danger" style="display: none;"></div>
                         
-                        {% if asset.contract_address and asset.status == 2 %}
                         <button type="button" id="buy-button" class="btn btn-primary w-100 py-2" 
-                                data-token-price="{{ asset.token_price }}" 
-                                data-asset-id="{{ asset.id }}">
-                            <i class="fas fa-shopping-cart me-2"></i>Buy Tokens
+                                data-token-price="{{ asset.token_price }}" data-asset-id="{{ asset.id }}">
+                            <i class="fas fa-shopping-cart me-2"></i>Purchase
                         </button>
-                        {% elif asset.status != 2 %}
-                        <button type="button" class="btn btn-warning w-100 py-2" 
-                                onclick="deploySmartContract({{ asset.id }})">
-                            <i class="fas fa-rocket me-2"></i>Deploy Smart Contract
-                        </button>
-                        <small class="text-muted mt-2 d-block">Smart contract must be deployed before trading</small>
-                        {% else %}
-                        <button type="button" class="btn btn-secondary w-100 py-2" disabled>
-                            <i class="fas fa-hourglass-half me-2"></i>Processing...
-                        </button>
-                        <small class="text-muted mt-2 d-block">Asset is being processed. Please refresh shortly.</small>
-                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -413,10 +301,21 @@ window.ASSET_CONFIG = {
     tokenPrice: parseFloat("{{ asset.token_price }}"),
     totalSupply: parseInt("{{ asset.token_supply }}"),
     remainingSupply: parseInt("{{ remaining_supply }}"),
-    platformFeeRate: 0.035,
-    splMintAddress: "{{ asset.spl_mint_address or '' }}",
-    metadataUri: "{{ asset.metadata_uri or '' }}"
+    platformFeeRate: 0.035
 };
+
+// 调试模板变量
+console.log('模板变量调试:');
+console.log('is_admin_user:', "{{ is_admin_user|default('None') }}");
+console.log('is_owner:', "{{ is_owner|default('None') }}"); 
+console.log('current_user_address:', "{{ current_user_address|default('None') }}");
+console.log('asset.owner_address:', "{{ asset.owner_address|default('None') }}");
+
+// 详细的权限检查调试
+console.log('权限检查详情:');
+console.log('- is_admin_user类型:', typeof("{{ is_admin_user|default('None') }}"));
+console.log('- is_owner类型:', typeof("{{ is_owner|default('None') }}"));
+console.log('- 分红按钮应该显示:', "{{ (is_admin_user or is_owner)|string }}");
 
 // 分享功能
 window.shareAsset = function() {
@@ -515,8 +414,28 @@ window.shareAsset = function() {
     }
 };
 
+// 检查DOM中是否存在分红按钮
+document.addEventListener('DOMContentLoaded', function() {
+    const dividendBtn = document.getElementById('dividendManagementBtn');
+    console.log('分红按钮DOM检查:');
+    console.log('- 分红按钮存在:', !!dividendBtn);
+    if (dividendBtn) {
+        console.log('- 分红按钮可见:', dividendBtn.style.display !== 'none');
+        console.log('- 分红按钮HTML:', dividendBtn.outerHTML);
+    }
+});
+
 // 页面初始化函数
 document.addEventListener('DOMContentLoaded', function() {
+    // 初始化Solana库
+    if (typeof SolanaWeb3 !== 'undefined') {
+        window.solanaWeb3 = SolanaWeb3;
+    }
+    if (typeof SolanaToken !== 'undefined') {
+        window.spl_token = SolanaToken;
+        window.splToken = SolanaToken;
+    }
+    
     // 初始化页面功能
     initializePage();
 });
@@ -525,136 +444,11 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializePage() {
     console.log('开始初始化页面...');
     setupTradeForm();
-    loadRealTimeAssetData();
     loadTradeHistory();
     loadTotalDividends();
     checkDividendAccess();
-
-    // 加载SPL Token信息
-    if (window.ASSET_CONFIG && window.ASSET_CONFIG.splMintAddress) {
-        loadSplTokenInfo();
-    }
-
-    // 设置定期更新
-    setInterval(loadRealTimeAssetData, 30000); // 每30秒更新一次资产数据
-    setInterval(loadTradeHistory, 60000); // 每分钟更新一次交易历史
-
-    // 每5分钟更新一次SPL Token信息
-    if (window.ASSET_CONFIG && window.ASSET_CONFIG.splMintAddress) {
-        setInterval(loadSplTokenInfo, 300000);
-    }
-
+    updateBuyButtonState();
     console.log('页面初始化完成');
-}
-
-// 加载实时资产数据
-async function loadRealTimeAssetData() {
-    try {
-        console.log(`开始加载实时资产数据，资产ID: ${window.ASSET_CONFIG.id}`);
-        
-        const response = await fetch(`/api/assets/${window.ASSET_CONFIG.id}/status`, {
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('实时资产数据API返回:', data);
-        
-        if (data.success && data.asset) {
-            updateAssetDisplay(data.asset);
-        } else {
-            console.error('获取实时资产数据失败:', data.error);
-        }
-        
-    } catch (error) {
-        console.error('加载实时资产数据失败:', error);
-    }
-}
-
-// 更新资产显示（防抖版本，避免频繁更新冲突）
-let updateDisplayTimeout = null;
-function updateAssetDisplay(assetData) {
-    // 清除之前的更新计时器
-    if (updateDisplayTimeout) {
-        clearTimeout(updateDisplayTimeout);
-    }
-    
-    // 延迟执行更新，避免短时间内多次更新
-    updateDisplayTimeout = setTimeout(() => {
-        try {
-            console.log('开始更新资产显示数据:', assetData);
-            
-            // 验证数据有效性
-            if (!assetData || typeof assetData !== 'object') {
-                console.error('无效的资产数据:', assetData);
-                return;
-            }
-            
-            // 计算剩余供应量，优先使用服务器返回的值
-            let remainingSupply = assetData.remaining_supply;
-            if (remainingSupply === null || remainingSupply === undefined) {
-                remainingSupply = assetData.token_supply || 0;
-            }
-            
-            // 确保是正整数
-            remainingSupply = Math.max(0, parseInt(remainingSupply) || 0);
-            
-            // 更新剩余供应量显示
-            const remainingSupplyElements = document.querySelectorAll('[data-field="remaining_supply"]');
-            remainingSupplyElements.forEach(element => {
-                const currentValue = element.textContent.replace(/,/g, '');
-                const newValue = remainingSupply.toLocaleString();
-                
-                // 只有值真正改变时才更新DOM
-                if (currentValue !== remainingSupply.toString()) {
-                    element.textContent = newValue;
-                    console.log(`更新剩余供应量显示: ${currentValue} -> ${newValue}`);
-                }
-            });
-            
-            // 更新交易表单中的最大值
-            const purchaseAmountInput = document.getElementById('purchase-amount');
-            if (purchaseAmountInput && purchaseAmountInput.max != remainingSupply) {
-                purchaseAmountInput.max = remainingSupply;
-                console.log(`更新购买数量最大值: ${remainingSupply}`);
-            }
-            
-            // 更新全局配置（只有值改变时才更新）
-            if (window.ASSET_CONFIG && window.ASSET_CONFIG.remainingSupply !== remainingSupply) {
-                window.ASSET_CONFIG.remainingSupply = remainingSupply;
-                console.log(`更新全局配置剩余供应量: ${remainingSupply}`);
-            }
-            
-            // 更新统计信息（如果页面有显示的话）
-            if (assetData.total_trades !== undefined) {
-                const totalTradesElement = document.querySelector('[data-field="total_trades"]');
-                if (totalTradesElement && totalTradesElement.textContent != assetData.total_trades) {
-                    totalTradesElement.textContent = assetData.total_trades;
-                }
-            }
-            
-            if (assetData.total_volume !== undefined) {
-                const totalVolumeElement = document.querySelector('[data-field="total_volume"]');
-                if (totalVolumeElement) {
-                    const newVolumeText = `${parseFloat(assetData.total_volume).toFixed(2)} USDC`;
-                    if (totalVolumeElement.textContent !== newVolumeText) {
-                        totalVolumeElement.textContent = newVolumeText;
-                    }
-                }
-            }
-            
-            console.log('资产显示数据更新完成');
-            
-        } catch (error) {
-            console.error('更新资产显示失败:', error);
-        }
-    }, 100); // 100ms防抖延迟
 }
 
 // 设置交易表单
@@ -675,17 +469,56 @@ function setupTradeForm() {
     }
 }
 
+// 更新购买按钮状态
+function updateBuyButtonState() {
+    const buyButton = document.getElementById('buy-button');
+    if (!buyButton) return;
+    
+    const isConnected = checkWalletConnection();
+    
+    if (isConnected) {
+        buyButton.disabled = false;
+        buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Purchase';
+        buyButton.classList.remove('btn-secondary');
+        buyButton.classList.add('btn-primary');
+    } else {
+        buyButton.disabled = true;
+        buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>Please Connect Wallet';
+        buyButton.classList.remove('btn-primary');
+        buyButton.classList.add('btn-secondary');
+    }
+}
 
-
-// 获取钱包地址（简化版本）
-function getWalletAddress() {
-    // 从walletState获取
-    if (window.walletState && window.walletState.address) {
-        return window.walletState.address;
+// 检查钱包连接状态
+function checkWalletConnection() {
+    if (window.walletState && (window.walletState.connected || window.walletState.isConnected)) {
+        return true;
     }
     
-    // 从localStorage获取
-    return localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+    const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+    return storedAddress && storedAddress.length > 10;
+}
+
+// 处理购买按钮点击
+function handleBuyClick() {
+    const address = getWalletAddress();
+    if (!address) {
+        alert('Please Connect Wallet');
+        if (typeof window.openWalletSelector === 'function') {
+            window.openWalletSelector();
+        }
+        return;
+    }
+    
+    if (typeof window.handleBuy === 'function') {
+        const assetId = document.getElementById('buy-button').getAttribute('data-asset-id');
+        const amountInput = document.getElementById('purchase-amount');
+        const buyButton = document.getElementById('buy-button');
+        window.handleBuy(assetId, amountInput, buyButton);
+    } else {
+        console.error('Purchase Function Unavailable');
+        alert('Purchase Function Temporarily Unavailable, Please Refresh Page and Try Again');
+    }
 }
 
 // 检查分红管理权限
@@ -702,7 +535,7 @@ function checkDividendAccess() {
     console.log('Dividend Button URL Updated:', correctUrl);
 }
 
-// 加载交易历史（使用实时数据API）
+// 加载交易历史
 async function loadTradeHistory(page = 1) {
     const container = document.getElementById('trade-history');
     if (!container) {
@@ -711,11 +544,10 @@ async function loadTradeHistory(page = 1) {
     }
     
     try {
-        console.log(`开始加载交易历史，页码: ${page}, 资产: ${window.ASSET_CONFIG.tokenSymbol}`);
+        console.log(`开始加载交易历史，页码: ${page}, 资产ID: ${window.ASSET_CONFIG.id}`);
         container.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p class="mt-2">Loading trading history...</p></div>';
         
-        // 使用新的V2 API
-        const response = await fetch(`/api/v2/trades/${window.ASSET_CONFIG.tokenSymbol}?page=${page}&per_page=5`, {
+        const response = await fetch(`/api/trades?asset_id=${window.ASSET_CONFIG.id}&page=${page}&per_page=5`, {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
@@ -730,10 +562,6 @@ async function loadTradeHistory(page = 1) {
 
         const data = await response.json();
         console.log('交易历史API返回数据:', data);
-        
-        if (!data.success) {
-            throw new Error(data.error || '获取交易历史失败');
-        }
         
         if (!data.trades || data.trades.length === 0) {
             container.innerHTML = '<div class="text-center text-muted my-4">No Trade Records</div>';
@@ -782,19 +610,8 @@ async function loadTradeHistory(page = 1) {
 function createTradeRow(trade) {
     const tr = document.createElement('tr');
     
-    // 安全的时间处理，避免显示1970年
-    let formattedDate = 'N/A';
-    if (trade.created_at && trade.created_at !== null) {
-        try {
-            const date = new Date(trade.created_at);
-            // 检查日期是否有效
-            if (!isNaN(date.getTime()) && date.getFullYear() > 2020) {
-                formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-            }
-        } catch (error) {
-            console.warn('时间格式化失败:', error, trade.created_at);
-        }
-    }
+    const date = new Date(trade.created_at);
+    const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
     
     const typeClass = trade.type === 'buy' ? 'text-success' : 'text-danger';
     const typeText = trade.type === 'buy' ? 'Buy' : 'Sell';
@@ -820,7 +637,7 @@ function createTradeRow(trade) {
     tr.innerHTML = `
         <td>${formattedDate}</td>
         <td><span class="${typeClass}">${typeText}</span></td>
-        <td>${parseInt(trade.amount).toLocaleString()}</td>
+        <td>${trade.amount}</td>
         <td>${parseFloat(total).toFixed(2)} USDC</td>
         <td><span class="${statusClass}">${statusText}</span></td>
         <td>${txHashDisplay}</td>
@@ -907,9 +724,23 @@ async function copyToClipboard(elementId, button) {
     }
 }
 
+// 钱包事件监听
+window.addEventListener('walletConnected', function() {
+    updateBuyButtonState();
+    checkDividendAccess();
+});
 
+window.addEventListener('walletDisconnected', function() {
+    updateBuyButtonState();
+});
 
-// 复制分享链接
+// 绑定购买按钮事件
+document.addEventListener('DOMContentLoaded', function() {
+    const buyButton = document.getElementById('buy-button');
+    if (buyButton) {
+        buyButton.addEventListener('click', handleBuyClick);
+    }
+});
 
 // 复制分享链接
 window.copyShareLink = async function() {
@@ -1028,282 +859,5 @@ document.addEventListener('keydown', function(event) {
         closeShareModal();
     }
 });
-
-// ============================================================================
-// SPL Token 相关函数
-// ============================================================================
-
-// 加载SPL Token信息
-async function loadSplTokenInfo() {
-    if (!window.ASSET_CONFIG.splMintAddress) {
-        console.log('资产尚未创建SPL Token');
-        return;
-    }
-
-    console.log('开始加载SPL Token信息:', window.ASSET_CONFIG.splMintAddress);
-
-    try {
-        // 并行加载各种信息
-        const [supplyResult, holdersResult, activityResult] = await Promise.allSettled([
-            loadTokenSupply(),
-            loadTokenHolders(),
-            loadTokenActivity()
-        ]);
-
-        // 处理供应量信息
-        if (supplyResult.status === 'fulfilled' && supplyResult.value.success) {
-            updateSupplyDisplay(supplyResult.value.data);
-        } else {
-            updateSupplyDisplay(null, 'Error loading');
-        }
-
-        // 处理持有者信息
-        if (holdersResult.status === 'fulfilled' && holdersResult.value.success) {
-            updateHoldersDisplay(holdersResult.value.data);
-        } else {
-            updateHoldersDisplay(null, 'Error loading');
-        }
-
-        // 处理活动信息
-        if (activityResult.status === 'fulfilled' && activityResult.value.success) {
-            updateActivityDisplay(activityResult.value.data);
-        } else {
-            updateActivityDisplay(null, 'Error loading');
-        }
-
-        // 更新Token状态
-        updateTokenStatus('healthy');
-
-    } catch (error) {
-        console.error('加载SPL Token信息失败:', error);
-        updateTokenStatus('error');
-    }
-}
-
-// 加载Token供应量
-async function loadTokenSupply() {
-    const response = await fetch(`/api/spl-token/supply-info/${window.ASSET_CONFIG.splMintAddress}`);
-    return await response.json();
-}
-
-// 加载Token持有者数量
-async function loadTokenHolders() {
-    const response = await fetch(`/api/spl-token/holder-count/${window.ASSET_CONFIG.splMintAddress}`);
-    return await response.json();
-}
-
-// 加载Token活动信息
-async function loadTokenActivity() {
-    const response = await fetch(`/api/spl-token/activity/${window.ASSET_CONFIG.splMintAddress}?hours=24`);
-    return await response.json();
-}
-
-// 更新供应量显示
-function updateSupplyDisplay(data, errorMsg = null) {
-    const element = document.getElementById('onChainSupply');
-    if (!element) return;
-
-    if (errorMsg) {
-        element.innerHTML = `<span class="text-danger">${errorMsg}</span>`;
-        return;
-    }
-
-    if (data && data.formatted_supply) {
-        element.innerHTML = `${data.formatted_supply}`;
-    } else {
-        element.innerHTML = '<span class="text-muted">--</span>';
-    }
-}
-
-// 更新持有者显示
-function updateHoldersDisplay(data, errorMsg = null) {
-    const element = document.getElementById('tokenHolders');
-    if (!element) return;
-
-    if (errorMsg) {
-        element.innerHTML = `<span class="text-danger">${errorMsg}</span>`;
-        return;
-    }
-
-    if (data && typeof data.holder_count === 'number') {
-        element.innerHTML = `${data.holder_count} holders`;
-    } else {
-        element.innerHTML = '<span class="text-muted">--</span>';
-    }
-}
-
-// 更新活动显示
-function updateActivityDisplay(data, errorMsg = null) {
-    const element = document.getElementById('tokenActivity');
-    if (!element) return;
-
-    if (errorMsg) {
-        element.innerHTML = `<span class="text-danger">${errorMsg}</span>`;
-        return;
-    }
-
-    if (data && data.activity_summary) {
-        const activity = data.activity_summary;
-        element.innerHTML = `${activity.total_transactions} txs / $${activity.total_volume_usdc.toFixed(0)}`;
-    } else {
-        element.innerHTML = '<span class="text-muted">No activity</span>';
-    }
-}
-
-// 更新Token状态
-function updateTokenStatus(status) {
-    const element = document.getElementById('tokenStatus');
-    if (!element) return;
-
-    let badgeClass = 'bg-secondary';
-    let statusText = 'Unknown';
-
-    switch (status) {
-        case 'healthy':
-            badgeClass = 'bg-success';
-            statusText = 'Healthy';
-            break;
-        case 'degraded':
-            badgeClass = 'bg-warning';
-            statusText = 'Degraded';
-            break;
-        case 'error':
-            badgeClass = 'bg-danger';
-            statusText = 'Error';
-            break;
-    }
-
-    element.className = `badge ${badgeClass}`;
-    element.textContent = statusText;
-}
-
-// Token健康检查
-async function performTokenHealthCheck(mintAddress) {
-    if (!mintAddress) {
-        alert('No SPL Token address available');
-        return;
-    }
-
-    const button = event.target;
-    const originalHtml = button.innerHTML;
-
-    try {
-        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Checking...';
-        button.disabled = true;
-
-        const response = await fetch(`/api/spl-token/health-check/${mintAddress}`);
-        const result = await response.json();
-
-        if (result.success) {
-            const healthData = result.data;
-            const overallStatus = healthData.overall_status;
-
-            // 创建健康检查结果模态框
-            showHealthCheckModal(healthData);
-
-            // 更新Token状态
-            updateTokenStatus(overallStatus.status);
-
-        } else {
-            alert(`Health check failed: ${result.message}`);
-        }
-
-    } catch (error) {
-        console.error('健康检查失败:', error);
-        alert('Health check failed due to network error');
-    } finally {
-        button.innerHTML = originalHtml;
-        button.disabled = false;
-    }
-}
-
-// 显示健康检查结果模态框
-function showHealthCheckModal(healthData) {
-    const modalHtml = `
-        <div class="modal fade" id="healthCheckModal" tabindex="-1" style="z-index: 10000;">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-heartbeat me-2"></i>Token Health Check Results
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <strong>Overall Status:</strong>
-                                <span class="badge bg-${getStatusColor(healthData.overall_status.status)} ms-2">
-                                    ${healthData.overall_status.status.toUpperCase()}
-                                </span>
-                            </div>
-                            <div class="col-md-6">
-                                <strong>Health Score:</strong> ${healthData.overall_status.health_score}%
-                            </div>
-                        </div>
-
-                        <h6>Check Details:</h6>
-                        <div class="list-group">
-                            ${Object.entries(healthData.checks).map(([checkName, checkData]) => `
-                                <div class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>${formatCheckName(checkName)}:</strong>
-                                        <div class="small text-muted">${checkData.message}</div>
-                                    </div>
-                                    <span class="badge bg-${getCheckStatusColor(checkData.status)}">
-                                        ${checkData.status.toUpperCase()}
-                                    </span>
-                                </div>
-                            `).join('')}
-                        </div>
-
-                        <div class="mt-3 small text-muted">
-                            Checked at: ${new Date(healthData.timestamp * 1000).toLocaleString()}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // 移除现有模态框
-    const existingModal = document.getElementById('healthCheckModal');
-    if (existingModal) {
-        existingModal.remove();
-    }
-
-    // 添加新模态框
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-    // 显示模态框
-    const modal = new bootstrap.Modal(document.getElementById('healthCheckModal'));
-    modal.show();
-}
-
-// 辅助函数
-function getStatusColor(status) {
-    switch (status) {
-        case 'healthy': return 'success';
-        case 'degraded': return 'warning';
-        case 'unhealthy': return 'danger';
-        default: return 'secondary';
-    }
-}
-
-function getCheckStatusColor(status) {
-    switch (status) {
-        case 'pass': return 'success';
-        case 'fail': return 'danger';
-        case 'error': return 'warning';
-        default: return 'secondary';
-    }
-}
-
-function formatCheckName(checkName) {
-    return checkName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-}
-
 </script>
-
-
 {% endblock %}

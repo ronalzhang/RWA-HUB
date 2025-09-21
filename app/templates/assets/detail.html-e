@@ -1,0 +1,3417 @@
+{% extends "base.html" %}
+
+{% block title %}{{ asset.token_symbol }} - {{ asset.name }} | RWA-HUB{% endblock %}
+
+{% block head %}
+<!-- 费用计算函数的定义 - 放在最前面 -->
+<script>
+// 定义全局常量和函数
+window.PLATFORM_FEE_RATE = 0.035; // 3.5%平台费率
+window.ACTUAL_PAYMENT_RATE = 0.965; // 96.5%实际支付率
+
+window.calculatePlatformFee = function(amount) {
+    return amount * window.PLATFORM_FEE_RATE;
+};
+
+window.calculateActualPayment = function(amount) {
+    return amount * window.ACTUAL_PAYMENT_RATE;
+};
+
+// 确保函数已经定义
+console.log('费用计算函数已定义:', {
+    calculatePlatformFee: typeof window.calculatePlatformFee === 'function',
+    calculateActualPayment: typeof window.calculateActualPayment === 'function'
+});
+
+// 验证函数是否正确定义
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOMContentLoaded - 验证费用计算函数:', {
+        calculatePlatformFee: typeof window.calculatePlatformFee === 'function',
+        calculateActualPayment: typeof window.calculateActualPayment === 'function'
+    });
+});
+</script>
+
+<!-- 添加jQuery库 -->
+<script src="{{ url_for('static', filename='vendor/jquery.min.js') }}"></script>
+<!-- 使用内置bs58实现 -->
+<!-- <script src="https://unpkg.com/bs58@5.0.0/dist/index.js"></script> -->
+<!-- 添加Solana Web3 SDK -->
+<script src="{{ url_for('proxy.cached_vendor', filename='solana-web3-stable.js') }}"></script>
+<!-- 添加SPL Token库 -->
+<script src="{{ url_for('proxy.cached_vendor', filename='solana-spl-token.js') }}"></script>
+<!-- 初始化Solana库 -->
+<script>
+    // 创建全局对象 - 仅在未定义时初始化，避免重复
+    if (!window.solanaLibInitialized) {
+        window.solanaLibInitialized = true;
+        window.splToken = window.splToken || {};
+        window.solanaWeb3 = window.solanaWeb3 || {};
+        
+        console.log('初始化Solana库...');
+        
+        // 标记用于调试
+        window.spl_token_initialized = false;
+        
+        // 初始化函数
+        window.initSolanaLibs = async function() {
+            try {
+                // 避免重复初始化
+                if (window.solanaWeb3.Connection && window.splToken.TOKEN_PROGRAM_ID) {
+                    console.log('Solana库已初始化，跳过重复初始化');
+                    return true;
+                }
+                
+                // 检查Solana Web3.js
+                if (typeof SolanaWeb3 === 'undefined') {
+                    throw new Error('Solana Web3.js未加载');
+                }
+                
+                // 复制Solana Web3.js到全局对象
+                for (const key in SolanaWeb3) {
+                    window.solanaWeb3[key] = SolanaWeb3[key];
+                }
+                console.log('Solana Web3.js初始化成功');
+                
+                // 检查SPL Token
+                if (typeof SolanaToken === 'undefined') {
+                    throw new Error('SPL Token库未加载');
+                }
+                
+                // 复制SPL Token到全局对象
+                for (const key in SolanaToken) {
+                    window.splToken[key] = SolanaToken[key];
+                }
+                console.log('SPL Token库初始化成功');
+                
+                // 确保solanaWeb3.SPL存在
+                window.solanaWeb3.SPL = window.splToken;
+                window.spl_token_initialized = true;
+                
+                return true;
+            } catch (error) {
+                console.error('Solana库初始化失败:', error);
+                
+                // 如果初始化失败，创建基本对象
+                if (window.solanaWeb3 && window.solanaWeb3.PublicKey) {
+                    window.splToken = {
+                        TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+                        ASSOCIATED_TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
+                        createTransferInstruction: function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
+                            const keys = [
+                                { pubkey: fromPubkey, isSigner: false, isWritable: true },
+                                { pubkey: toPubkey, isSigner: false, isWritable: true },
+                                { pubkey: ownerPubkey, isSigner: multiSigners.length === 0, isWritable: false }
+                            ];
+                            multiSigners.forEach(signer => {
+                                keys.push({ pubkey: signer.publicKey, isSigner: true, isWritable: false });
+                            });
+                            return new window.solanaWeb3.TransactionInstruction({
+                                keys,
+                                programId,
+                                data: new Uint8Array([3, ...new Array(8).fill(0)]) // 3是transfer指令的代码
+                            });
+                        }
+                    };
+                    window.solanaWeb3.SPL = window.splToken;
+                    window.spl_token_initialized = true;
+                    console.log('使用基本SPL Token对象');
+                    return true;
+                }
+                
+                throw error;
+            }
+        };
+    } else {
+        console.log('Solana库初始化函数已存在，跳过重新定义');
+    }
+    
+    // 在页面加载时初始化 - 添加防重复初始化逻辑
+    let solanaInitialized = false;
+    document.addEventListener('DOMContentLoaded', async function() {
+        if (solanaInitialized) return;
+        solanaInitialized = true;
+        
+        console.log('DOMContentLoaded 事件触发，初始化Solana库');
+        try {
+            // 尝试初始化Solana库
+            await window.initSolanaLibs();
+            console.log('Solana库初始化完成');
+        } catch (error) {
+            console.error('Solana库初始化过程中发生错误:', error);
+        }
+    });
+</script>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<style>
+    /* 主要容器样式 */
+    /* 修复详情页卡片样式 */
+    .asset-detail-page .card {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 3px 15px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+    }
+    
+    .asset-detail-page .card-header {
+        background-color: rgba(248, 249, 250, 0.5);
+        border-bottom: 1px solid rgba(0,0,0,0.08);
+        padding: 1rem 1.25rem;
+    }
+    
+    .asset-detail-page .card-body {
+        padding: 1.25rem;
+    }
+    
+    /* 修复Asset Trading模块样式 */
+    .asset-detail-page .trade-card .card-body {
+        padding: 1.2rem;
+    }
+    
+    /* 确保表单元素样式正确 */
+    .asset-detail-page .form-label {
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        color: #495057;
+    }
+    
+    .asset-detail-page .form-control {
+        border-radius: 0.375rem;
+        border: 1px solid #ced4da;
+        padding: 0.375rem 0.75rem;
+    }
+    
+    .asset-detail-page .form-text {
+        color: #6c757d;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+    
+    /* 修复分页控件样式 */
+    #pagination-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 1rem;
+    }
+    
+    /* 交易历史表格样式 */
+    .trade-history-section table {
+        margin-bottom: 0;
+    }
+    
+    .trade-history-section th, 
+    .trade-history-section td {
+        padding: 0.75rem;
+        vertical-align: middle;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="asset-detail-page">
+    <!-- Solana Web3.js (注释掉，在模拟模式下不需要)
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@project-serum/sol-wallet-adapter@latest/dist/index.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>
+    -->
+
+    <!-- 确保Solana库正确初始化 (这段代码是多余且冲突的，将被删除) -->
+    <!-- 
+    <script>
+        // 初始化全局对象
+        function initSolanaLibs() {
+            // 确保solanaWeb3对象可用
+            if (typeof solanaWeb3 === 'undefined' && typeof SolanaWeb3 !== 'undefined') {
+                window.solanaWeb3 = SolanaWeb3;
+                console.log('已将SolanaWeb3设置到window.solanaWeb3');
+            }
+            
+            // 确保splToken对象可用
+            if (typeof splToken === 'undefined' && typeof SolanaToken !== 'undefined') {
+                window.splToken = SolanaToken;
+                console.log('已将SolanaToken设置到window.splToken');
+                
+                // 同时设置到solanaWeb3.SPL上
+                if (window.solanaWeb3 && !window.solanaWeb3.SPL) {
+                    window.solanaWeb3.SPL = SolanaToken;
+                }
+            }
+        }
+        
+        // 页面加载完成后执行初始化
+        document.addEventListener('DOMContentLoaded', initSolanaLibs);
+        
+        // 同时在window加载完成后再次检查
+        window.addEventListener('load', initSolanaLibs);
+    </script>
+    -->
+    
+    <!-- 紧急全局修复 - 确保在交易前可获取必要对象 -->
+    <script>
+        // 创建空对象，保证任何时候对象属性访问不会报错
+        window.solanaWeb3 = window.solanaWeb3 || {};
+        window.splToken = window.splToken || {};
+        
+        // 标记用于调试
+        window.spl_token_initialized = false;
+        
+        // 返回Promise的初始化函数，用于交易前
+        window.initSplTokenLib = async function() {
+            console.log('执行SPL Token库初始化');
+            
+            if (window.spl_token_initialized) {
+                console.log('SPL Token库已初始化，跳过');
+                return;
+            }
+            
+            try {
+                // 检测全局对象
+                if (typeof SolanaToken !== 'undefined') {
+                    window.splToken = SolanaToken;
+                    window.spl_token_initialized = true;
+                    console.log('通过全局SolanaToken对象初始化SPL成功');
+                } else {
+                    console.warn('全局SolanaToken对象未定义，SPL Token库可能未加载或加载失败');
+                }
+
+                // 再次检查并确保关键对象存在，如果需要，从 solanaWeb3 中获取
+                if (!window.splToken || Object.keys(window.splToken).length === 0) {
+                    if (window.solanaWeb3 && window.solanaWeb3.SPL) {
+                         window.splToken = window.solanaWeb3.SPL;
+                         console.log('从 solanaWeb3.SPL 恢复 splToken 对象');
+                    } else {
+                         console.error('无法初始化 SPL Token 库，缺少必要的对象');
+                         throw new Error('SPL Token library initialization failed.');
+                    }
+                }
+
+                // 确保关键方法存在
+                if (typeof window.splToken.getAssociatedTokenAddress !== 'function') {
+                     console.error('splToken.getAssociatedTokenAddress 不是一个函数');
+                     throw new Error('splToken.getAssociatedTokenAddress is not a function');
+                }
+                 if (typeof window.splToken.createAssociatedTokenAccountInstruction !== 'function') {
+                     console.error('splToken.createAssociatedTokenAccountInstruction 不是一个函数');
+                     throw new Error('splToken.createAssociatedTokenAccountInstruction is not a function');
+                }
+
+                console.log('SPL Token库初始化成功');
+                window.spl_token_initialized = true;
+
+            } catch (error) {
+                console.error('SPL Token库初始化失败:', error);
+                throw error;
+            }
+        };
+    </script>
+
+    <div class="container mt-4">
+        <!-- 添加脚本配置 -->
+        <script type="text/javascript">
+            // 初始化资产配置
+            var ASSET_CONFIG = {};
+            ASSET_CONFIG.id = parseInt("{{ asset.id }}");
+            ASSET_CONFIG.tokenSymbol = "{{ asset.token_symbol }}";
+            ASSET_CONFIG.tokenSupply = parseFloat("{{ asset.token_supply }}");
+            ASSET_CONFIG.remainingSupply = parseFloat("{{ remaining_supply }}");
+            ASSET_CONFIG.pricePerToken = parseFloat("{{ asset.price_per_token }}");
+            ASSET_CONFIG.status = parseInt("{{ asset.status }}");
+            ASSET_CONFIG.platformFeeAddress = "{{ platform_fee_address }}";
+            ASSET_CONFIG.platformFeeRate = parseFloat("{{ PLATFORM_FEE_RATE }}");
+
+            // 当前资产对象，用于全局引用
+            var currentAsset = {
+                id: parseInt("{{ asset.id }}"),
+                symbol: "{{ asset.token_symbol }}",
+                name: "{{ asset.name }}",
+                token_price: parseFloat("{{ asset.token_price }}"),
+                token_address: "{{ asset.token_address }}"
+            };
+
+            var SOLANA_CONFIG = {
+                endpoint: "https://api.devnet.solana.com"
+            };
+
+            // 设置全局变量
+            window.balance = 1000000; // 默认余额，将通过API更新
+
+            // 全局变量
+            // 使用字符串方式包裹Jinja2变量，避免linter错误
+            const assetId = "{{ asset.id|default(0) }}";
+            const assetPrice = "{{ asset.token_price|default(0) }}";
+            const totalSupply = "{{ asset.token_supply|default(0) }}";
+            
+            // 从后端获取正确计算的剩余供应量
+            let remainingSupply = "{{ remaining_supply|default(0) }}";
+            
+            // 保持actualPurchasable和maxPurchaseAmount与remainingSupply一致
+            let actualPurchasable = parseFloat(remainingSupply);
+            let maxPurchaseAmount = parseFloat(remainingSupply);
+            
+            console.log('页面初始化值:', {
+                assetId,
+                totalSupply,
+                remainingSupply
+            });
+            
+            // 添加全局余额变量
+            let walletPublicKey = null;
+
+            // 初始化 Solana 连接
+            let solanaConnection;
+
+            // 页面初始化
+            document.addEventListener('DOMContentLoaded', function() {
+                // 创建更健壮的资产ID处理机制
+                let assetId = '{{ asset.id }}';
+                const assetSymbol = '{{ asset.token_symbol }}';
+                
+                // 如果存在资产符号且以RH-开头，优先使用它
+                if (assetSymbol && assetSymbol.startsWith('RH-')) {
+                    assetId = assetSymbol;
+                    console.log('使用资产符号作为ID:', assetId);
+                }
+                
+                // 全局资产配置
+                window.ASSET_CONFIG = {
+                    id: assetId,
+                    numericalId: '{{ asset.id }}',
+                    tokenSymbol: assetSymbol || assetId,
+                    totalSupply: '{{ asset.token_supply }}',
+                    remainingSupply: '{{ asset.remaining_supply }}',
+                    apiPrefix: assetSymbol && assetSymbol.startsWith('RH-') ? '/api/assets/symbol/' : '/api/assets/'
+                };
+                
+                console.log('页面初始化值:', {
+                    assetId: assetId,
+                    totalSupply: '{{ asset.token_supply }}',
+                    remainingSupply: '{{ asset.remaining_supply }}'
+                });
+                
+                // 确保全局钱包状态变量存在
+                if (!window.walletState) {
+                    console.log('警告: window.walletState未初始化，创建临时对象');
+                    window.walletState = {
+                        connected: false,
+                        isConnected: false,
+                        address: null,
+                        _isTemporary: true  // 添加标记表示这是临时对象
+                    };
+                } else {
+                    console.log('使用已初始化的window.walletState对象');
+                }
+                
+                // 同步window.walletState和window.wallet中的数据
+                function syncWalletState() {
+                    if (window.wallet) {
+                        // 从wallet对象同步状态
+                        const connected = window.wallet.connected || !!window.wallet.getAddress();
+                        const address = window.wallet.getAddress();
+                        
+                        if (!window.walletState) {
+                            window.walletState = {};
+                        }
+                        
+                        window.walletState.connected = connected;
+                        window.walletState.isConnected = connected;
+                        window.walletState.address = address;
+                        
+                        // 更新购买按钮状态
+                        if (typeof updateBuyButtonState === 'function') {
+                            updateBuyButtonState();
+                        }
+                    }
+                }
+                
+                // 初次同步
+                syncWalletState();
+                
+                // 每秒检查钱包状态，确保状态同步
+                const walletStateInterval = setInterval(syncWalletState, 2000);
+                
+                // 页面卸载时清除定时器
+                window.addEventListener('beforeunload', function() {
+                    clearInterval(walletStateInterval);
+                });
+                
+                // 设置交易表单
+                setupTradeForm();
+                
+                // 设置资产信息刷新
+                setupAssetInfoRefresh();
+                
+                // 调用加载分红历史函数（如果存在）
+                if (typeof loadDividendHistory === 'function') {
+                    loadDividendHistory();
+                }
+                
+                // 添加延迟检查，确保wallet.js完全加载
+                setTimeout(function() {
+                    console.log('执行钱包功能检查和修复');
+                    
+                    // 检查全局钱包状态
+                    if (window.walletState && window.walletState._isTemporary) {
+                        console.warn('检测到临时钱包状态对象，尝试恢复正确状态');
+                        // 尝试重新初始化wallet.js
+                        if (typeof window.walletState.init === 'function') {
+                            window.walletState.init().catch(e => console.error('钱包重新初始化失败:', e));
+                        }
+                    }
+                    
+                    // 确保updateBuyButtonState函数存在
+                    if (typeof window.updateBuyButtonState !== 'function' && typeof updateBuyButtonState === 'function') {
+                        console.log('将本地updateBuyButtonState函数复制到全局作用域');
+                        window.updateBuyButtonState = updateBuyButtonState;
+                    }
+                    
+                    // 强制更新购买按钮状态
+                    if (typeof updateBuyButtonState === 'function') {
+                        console.log('强制更新购买按钮状态');
+                        updateBuyButtonState();
+                    }
+                }, 1500);
+                
+                console.log('页面初始化完成');
+            });
+            
+            /**
+             * 更新钱包余额
+             * 调用walletState中的updateWalletBalance方法
+             */
+            window.updateWalletBalance = async function() {
+                try {
+                    console.log('资产详情页更新钱包余额');
+                    if (window.walletState && typeof window.walletState.updateWalletBalance === 'function') {
+                        // 调用wallet.js中的方法
+                        await window.walletState.updateWalletBalance();
+                        
+                        // 更新页面上显示的余额
+                        const walletBalanceDisplay = document.getElementById('currentWalletBalance');
+                        if (walletBalanceDisplay && window.walletState.connected) {
+                            walletBalanceDisplay.textContent = window.walletState.balance.toFixed(2) + ' USDC';
+                        } else if (walletBalanceDisplay) {
+                            walletBalanceDisplay.textContent = '0.00 USDC';
+                        }
+                    } else {
+                        console.warn('walletState.updateWalletBalance方法不可用');
+                    }
+                } catch (error) {
+                    console.error('更新钱包余额失败:', error);
+                }
+            }
+            
+            /**
+             * 初始化刷新按钮
+             */
+            function initRefreshButton() {
+                const refreshButton = document.getElementById('manualRefreshButton');
+                if (refreshButton) {
+                    refreshButton.addEventListener('click', function() {
+                        this.disabled = true;
+                        this.innerHTML = '<i class="fas fa-sync fa-spin me-1"></i> 刷新中...';
+                        
+                        // 执行刷新
+                        refreshAssetInfo().then(() => {
+                            // 刷新完成后恢复按钮状态
+                            setTimeout(() => {
+                                this.disabled = false;
+                                this.innerHTML = '<i class="fas fa-sync-alt me-1"></i> 刷新数据';
+                            }, 1000);
+                        }).catch(() => {
+                            // 出错时也恢复按钮状态
+                            setTimeout(() => {
+                                this.disabled = false;
+                                this.innerHTML = '<i class="fas fa-sync-alt me-1"></i> 刷新数据';
+                            }, 1000);
+                        });
+                    });
+                }
+            }
+            
+            /**
+             * 检查是否有权限访问分红管理
+             */
+            async function checkDividendManagementAccess() {
+                const functionStartTime = Date.now();
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 开始执行`);
+                    
+                // 获取所有分红按钮
+                const dividendBtns = [
+                    document.getElementById('dividendManagementBtn'),
+                    document.getElementById('dividendManagementBtnMobile'),
+                    document.getElementById('dividendManagementBtnMedium')
+                ].filter(btn => btn); // 过滤掉null值
+                
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 找到 ${dividendBtns.length} 个分红按钮`);
+
+                // **核心逻辑：默认强制隐藏**
+                dividendBtns.forEach(btn => {
+                    btn.style.display = 'none';
+                });
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 已强制隐藏所有按钮`);
+                
+                // 检查钱包连接状态
+                const connectedAddress = localStorage.getItem('walletAddress') || 
+                                        (window.walletState && window.walletState.address) || 
+                                        '';
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 钱包连接状态: ${connectedAddress}`);
+                
+                if (!connectedAddress) {
+                    console.log(`[${functionStartTime}] checkDividendManagementAccess: 钱包未连接，结束执行`);
+                    return; 
+                }
+                
+                // 钱包已连接，检查权限
+                const isWalletAdmin = window.walletState && window.walletState.isAdmin === true;
+                const isOwnerFrontend = "{{ is_owner|lower }}" === "true";
+                const isAdminFrontend = "{{ is_admin_user|lower }}" === "true";
+                const currentAddress = '{{ current_user_address|default("", true) }}'; // 后端渲染时的地址
+                
+                let hasPermission = false;
+                let permissionSource = '无';
+                    
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 权限检查输入: isWalletAdmin=${isWalletAdmin}, isOwnerFrontend=${isOwnerFrontend}, isAdminFrontend=${isAdminFrontend}, currentAddress=${currentAddress}, connectedAddress=${connectedAddress}`);
+                
+                if (isWalletAdmin) {
+                    permissionSource = '钱包状态';
+                    hasPermission = true;
+                } else if (currentAddress.toLowerCase() === connectedAddress.toLowerCase() && (isOwnerFrontend || isAdminFrontend)) {
+                    permissionSource = '后端渲染';
+                    hasPermission = true;
+                } else {
+                    // 尝试API检查 (即使地址匹配也检查，作为备用或强制实时验证)
+                    permissionSource = 'API检查中';
+                    
+                    // 安全地获取资产ID
+                    let assetId = '';
+                    if (window.ASSET_CONFIG && window.ASSET_CONFIG.id) {
+                        assetId = window.ASSET_CONFIG.id;
+                    } else {
+                        // 备用方式获取资产ID
+                        const pathMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
+                        if (pathMatch && pathMatch[1]) {
+                            assetId = pathMatch[1];
+                        } else {
+                            assetId = '{{ asset.id }}' || '{{ asset.token_symbol }}';
+                        }
+                    }
+                    
+                    console.log(`[${functionStartTime}] checkDividendManagementAccess: 调用API检查权限: ${connectedAddress}，资产ID: ${assetId}`);
+                    try {
+                        const response = await fetch(`/api/assets/${assetId}/check_owner`, {
+                            headers: { 'X-Eth-Address': connectedAddress },
+                            cache: 'no-cache' // 避免缓存
+                        });
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.is_owner || data.is_admin) {
+                                permissionSource = 'API确认';
+                                hasPermission = true;
+                            } else {
+                                permissionSource = 'API拒绝';
+                            }
+                        } else {
+                             permissionSource = `API错误(${response.status})`;
+                        }
+                    } catch (apiError) {
+                        console.error('API权限检查失败:', apiError);
+                        permissionSource = 'API异常';
+                    }
+                }
+                
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 权限检查结果: hasPermission=${hasPermission}, 来源=${permissionSource}`);
+                
+                // **核心逻辑：仅在有权限时显示**
+                if (hasPermission) {
+                    console.log(`[${functionStartTime}] checkDividendManagementAccess: 权限通过，准备显示按钮`);
+                    
+                    // 安全获取资产符号用于构建URL
+                    let tokenSymbol = '';
+                    if (window.ASSET_CONFIG && window.ASSET_CONFIG.tokenSymbol) {
+                        tokenSymbol = window.ASSET_CONFIG.tokenSymbol;
+                    } else {
+                        tokenSymbol = '{{ asset.token_symbol }}';
+                    }
+                    
+                    const dividendUrl = `/assets/${tokenSymbol}/dividend?eth_address=${connectedAddress}`;
+                    dividendBtns.forEach(btn => {
+                        btn.href = dividendUrl;
+                        btn.classList.remove('disabled'); 
+                        btn.style.pointerEvents = 'auto';
+                        btn.removeAttribute('title');
+                        if (btn.id === 'dividendManagementBtn') {
+                            btn.style.display = 'inline-flex';
+                        } else {
+                            btn.style.display = 'block';
+                        }
+                        console.log(`[${functionStartTime}] checkDividendManagementAccess: 已显示按钮 ${btn.id}`);
+                    });
+                } else {
+                    console.log(`[${functionStartTime}] checkDividendManagementAccess: 权限未通过，保持按钮隐藏`);
+                    // 再次确认隐藏（理论上不需要，因为开头已隐藏）
+                    dividendBtns.forEach(btn => { btn.style.display = 'none'; });
+                }
+                
+                const functionEndTime = Date.now();
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 执行完毕 (耗时: ${functionEndTime - functionStartTime}ms)`);
+            }
+
+            // 翻页相关变量
+            let currentPage = 1;
+            let totalPages = 1;
+            let tradesPerPage = 5;
+            let allTrades = [];
+            let totalTradeCount = 0;
+
+            // 加载交易历史
+            async function loadTradeHistory(page = 1) {
+                try {
+                    // 内部验证函数
+                    function validateTradeHistoryParams(params) {
+                        // 验证asset_id
+                        if (!params.asset_id || typeof params.asset_id !== 'number') {
+                            return {
+                                isValid: false,
+                                errors: ['资产ID必须是数字']
+                            };
+                        }
+
+                        // 验证page
+                        if (!params.page || typeof params.page !== 'number' || params.page < 1) {
+                            return {
+                                isValid: false,
+                                errors: ['页码必须是大于0的数字']
+                            };
+                        }
+
+                        // 验证per_page
+                        if (!params.per_page || typeof params.per_page !== 'number' || params.per_page < 1 || params.per_page > 100) {
+                            return {
+                                isValid: false,
+                                errors: ['每页数量必须是1-100之间的数字']
+                            };
+                        }
+
+                        return {
+                            isValid: true,
+                            errors: []
+                        };
+                    }
+
+                    function validateApiResponse(response, endpoint) {
+                        if (endpoint === 'GET_TRADE_HISTORY') {
+                            // 验证trades数组
+                            if (!response.trades || !Array.isArray(response.trades)) {
+                                return {
+                                    isValid: false,
+                                    errors: ['响应必须包含trades数组']
+                                };
+                            }
+
+                            // 验证pagination对象
+                            if (!response.pagination || typeof response.pagination !== 'object') {
+                                return {
+                                    isValid: false,
+                                    errors: ['响应必须包含pagination对象']
+                                };
+                            }
+
+                            return {
+                                isValid: true,
+                                errors: []
+                            };
+                        }
+
+                        return {
+                            isValid: true,
+                            errors: []
+                        };
+                    }
+
+                    function validateTradeRecord(trade) {
+                        const errors = [];
+
+                        // 验证必需字段
+                        if (!trade.id || typeof trade.id !== 'number') {
+                            errors.push('{{ _("Invalid transaction ID") }}');
+                        }
+
+                        if (!trade.created_at) {
+                            errors.push('{{ _("Invalid creation time") }}');
+                        }
+
+                        if (!trade.type || !['buy', 'sell'].includes(trade.type)) {
+                            errors.push('{{ _("Invalid transaction type") }}');
+                        }
+
+                        if (!trade.amount || isNaN(parseFloat(trade.amount))) {
+                            errors.push('{{ _("Invalid transaction amount") }}');
+                        }
+
+                        if (!trade.price || isNaN(parseFloat(trade.price))) {
+                            errors.push('{{ _("Invalid transaction price") }}');
+                        }
+
+                        if (!trade.status) {
+                            errors.push('{{ _("Invalid transaction status") }}');
+                        }
+
+                        return {
+                            isValid: errors.length === 0,
+                            errors: errors
+                        };
+                    }
+
+                    // 获取交易历史容器
+                    const tradeHistoryContainer = document.getElementById('trade-history');
+                    if (!tradeHistoryContainer) {
+                        console.warn('{{ _("Transaction history container does not exist, creating new container") }}');
+                        const container = document.createElement('div');
+                        container.id = 'trade-history';
+                        const section = document.querySelector('.trade-history-section');
+                        if (!section) {
+                            console.error('{{ _("Cannot find transaction history section") }}');
+                            return;
+                        }
+                        section.appendChild(container);
+                    }
+                    
+                    // 获取当前页码和每页数量
+                    const perPage = 5;
+                    
+                    // 准备API请求参数
+                    const queryParams = {
+                        asset_id: parseInt("{{ asset.id }}"),
+                        page: page,
+                        per_page: perPage
+                    };
+
+                    // 验证请求参数
+                    const validation = validateTradeHistoryParams(queryParams);
+                    if (!validation.isValid) {
+                        throw new Error('参数验证失败: ' + validation.errors.join(', '));
+                    }
+                    
+                    // 发起API请求
+                    const response = await fetch(`/api/trades?asset_id=${queryParams.asset_id}&page=${queryParams.page}&per_page=${queryParams.per_page}`);
+                    if (!response.ok) {
+                        throw new Error('{{ _("Failed to load transaction history") }}: ' + (response.status === 404 ? '{{ _("API service temporarily unavailable") }}' : response.statusText));
+                    }
+
+                    // 解析JSON响应
+                    const data = await response.json();
+                    if (!data || !data.trades) {
+                        throw new Error('{{ _("Invalid API response format") }}');
+                    }
+                    
+                    const responseValidation = validateApiResponse(data, 'GET_TRADE_HISTORY');
+                    if (!responseValidation.isValid) {
+                        throw new Error('{{ _("API response format error") }}: ' + responseValidation.errors.join(', '));
+                    }
+                    
+                    // 获取交易历史容器（再次确认）
+                    const container = document.getElementById('trade-history');
+                    if (!container) {
+                        throw new Error('{{ _("Cannot find transaction history container") }}');
+                    }
+                    
+                    // 清空现有内容
+                    container.innerHTML = '';
+                    
+                    // 如果没有交易记录
+                    if (data.trades.length === 0) {
+                        const noTradesMessage = document.createElement('div');
+                        noTradesMessage.className = 'text-center text-muted my-4';
+                        noTradesMessage.textContent = '{{ _("No transaction records") }}';
+                        container.appendChild(noTradesMessage);
+                    return;
+                }
+                
+                    // 创建交易记录表格
+                    const table = document.createElement('table');
+                    table.className = 'table table-striped';
+                    table.innerHTML = `
+                        <thead>
+                            <tr>
+                                <th>{{ _("Time") }}</th>
+                                <th>{{ _("Type") }}</th>
+                                <th>{{ _("Quantity") }}</th>
+                                <th>{{ _("Amount") }}</th>
+                                <th>{{ _("Status") }}</th>
+                                <th style="width: 25%;">{{ _("Transaction Hash") }}</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    `;
+                    
+                    // 添加交易记录
+                    const tbody = table.querySelector('tbody');
+                    data.trades.forEach(trade => {
+                        // 验证每条交易记录的格式
+                        const tradeValidation = validateTradeRecord(trade);
+                        if (!tradeValidation.isValid) {
+                            console.warn('交易记录格式错误:', trade, tradeValidation.errors);
+                            return;
+                        }
+
+                        // 格式化日期
+                        const date = new Date(trade.created_at);
+                        // -- 修改：包含年份 --
+                        const formattedDate = date.toLocaleString('zh-CN', {
+                            year: 'numeric', // 添加年份
+                            month: 'numeric',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        
+                        // 计算总金额
+                        const price = parseFloat(trade.price).toFixed(2);
+                        const amount = parseInt(trade.amount);
+                        const total = trade.total ? parseFloat(trade.total).toFixed(2) : (amount * parseFloat(trade.price)).toFixed(2);
+                        
+                        // 处理交易类型
+                        const typeClass = trade.type === 'buy' ? 'text-success' : 'text-danger';
+                        const typeText = trade.type === 'buy' ? '{{ _("Buy") }}' : '{{ _("Sell") }}';
+                        
+                        // 处理交易状态
+                        let statusText = '{{ _("Processing") }}';
+                        let statusClass = 'text-warning';
+                        if (trade.status === 'completed' || trade.status === 2 || trade.status === '2') {
+                            statusText = '{{ _("Completed") }}';
+                            statusClass = 'text-success';
+                        } else if (trade.status === 'failed' || trade.status === 3 || trade.status === '3') {
+                            statusText = '{{ _("Failed") }}';
+                            statusClass = 'text-danger';
+                        } else if (trade.status === 'pending_payment') {
+                            // -- 修改：增加过期状态判断 --
+                            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+                            if (date < twentyFourHoursAgo) {
+                                statusText = '{{ _("Expired") }}';
+                                statusClass = 'text-muted'; // 使用灰色表示过期
+                            } else {
+                            statusText = '{{ _("Waiting Payment") }}';
+                            statusClass = 'text-info';
+                            }
+                        } else if (trade.status === 'pending_confirmation') {
+                            statusText = '{{ _("Confirming") }}';
+                            statusClass = 'text-warning';
+                        }
+                        
+                        // 处理交易哈希
+                        let txHashDisplay = 'N/A';
+                        if (trade.tx_hash) {
+                            const shortHash = trade.tx_hash.substring(0, 8) + '...' + trade.tx_hash.substring(trade.tx_hash.length - 8);
+                            txHashDisplay = `<a href="https://solscan.io/tx/${trade.tx_hash}" target="_blank" title="${trade.tx_hash}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:100%;">${shortHash}</a>`;
+                        }
+                        
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${formattedDate}</td>
+                            <td class="${typeClass}">${typeText}</td>
+                            <td>${amount}</td>
+                            <td>${total} USDC</td>
+                            <td class="${statusClass}">${statusText}</td>
+                            <td style="max-width:25%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${txHashDisplay}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    
+                    // 添加表格到容器
+                    container.appendChild(table);
+                    
+                    // 更新分页信息
+                    if (data.pagination) {
+                        totalPages = data.pagination.pages;
+                        totalTradeCount = data.pagination.total;
+                    setupPagination();
+                    }
+                } catch (error) {
+                    console.error('{{ _("Failed to load transaction history") }}:', error);
+                    // 显示错误信息
+                    const container = document.getElementById('trade-history');
+                    if (container) {
+                    const errorMessage = document.createElement('div');
+                    errorMessage.className = 'alert alert-danger';
+                        errorMessage.textContent = error.message || '{{ _("Failed to load transaction history, please try again later") }}';
+                        container.innerHTML = '';
+                        container.appendChild(errorMessage);
+                    }
+                }
+            }
+
+            // 格式化交易状态
+            function getTradeStatus(status) {
+                const statusMap = {
+                    'pending': '{{ _("Processing") }}',
+                    'completed': '{{ _("Completed") }}',
+                    'failed': '{{ _("Failed") }}',
+                    'cancelled': '{{ _("Cancelled") }}',
+                    'pending_payment': '{{ _("Waiting Payment") }}',
+                    'pending_confirmation': '{{ _("Confirming") }}'
+                };
+                return statusMap[status] || status;
+            }
+
+            // 加载更多交易记录
+            async function loadMoreTrades(page, perPage) {
+                try {
+                    // 更新当前页码
+                    currentPage = page;
+                    
+                    // 发起API请求
+                    const response = await fetch(`/api/trades?asset_id={{ asset.id }}&page=${page}&per_page=${perPage}`);
+                    const data = await response.json();
+                    
+                    if (!data || !Array.isArray(data.trades)) {
+                        throw new Error('{{ _("Invalid trade data") }}');
+                    }
+                    
+                    // 没有更多数据
+                    if (data.trades.length === 0) {
+                        showMessage('{{ _("No more transactions") }}', 'info');
+                        return;
+                    }
+                    
+                    // 处理分页信息
+                    if (data.pagination) {
+                        totalPages = data.pagination.pages;
+                        totalTradeCount = data.pagination.total;
+                    }
+                    
+                    // 获取表格元素
+                    const tradeHistoryContainer = document.getElementById('trade-history');
+                    if (!tradeHistoryContainer) return;
+                    
+                    // 清空现有内容
+                    tradeHistoryContainer.innerHTML = '';
+                    
+                    // 创建交易记录表格
+                    const table = document.createElement('table');
+                    table.className = 'table table-striped';
+                    table.innerHTML = `
+                        <thead>
+                            <tr>
+                                <th>{{ _("Time") }}</th>
+                                <th>{{ _("Type") }}</th>
+                                <th>{{ _("Quantity") }}</th>
+                                <th>{{ _("Amount") }}</th>
+                                <th>{{ _("Status") }}</th>
+                                <th style="width: 25%;">{{ _("Transaction Hash") }}</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    `;
+                    
+                    // 添加交易记录
+                    const tbody = table.querySelector('tbody');
+                    data.trades.forEach(trade => {
+                        // 格式化日期
+                        const date = new Date(trade.created_at);
+                        // -- 修改：包含年份 (在 loadMoreTrades 函数中也应用修改) --
+                        const formattedDate = date.toLocaleString('zh-CN', {
+                            year: 'numeric', // 添加年份
+                            month: 'numeric',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                        });
+                        
+                        // 计算总金额
+                    const price = parseFloat(trade.price).toFixed(2);
+                    const amount = parseInt(trade.amount);
+                    const total = trade.total ? parseFloat(trade.total).toFixed(2) : (amount * parseFloat(trade.price)).toFixed(2);
+                        
+                        // 处理交易类型
+                        const typeClass = trade.type === 'buy' ? 'text-success' : 'text-danger';
+                        const typeText = trade.type === 'buy' ? '{{ _("Buy") }}' : '{{ _("Sell") }}';
+                        
+                        // 处理交易状态
+                        let statusText = '{{ _("Processing") }}';
+                    let statusClass = 'text-warning';
+                    if (trade.status === 'completed' || trade.status === 2 || trade.status === '2') {
+                            statusText = '{{ _("Completed") }}';
+                        statusClass = 'text-success';
+                    } else if (trade.status === 'failed' || trade.status === 3 || trade.status === '3') {
+                            statusText = '{{ _("Failed") }}';
+                        statusClass = 'text-danger';
+                    } else if (trade.status === 'pending_payment') {
+                        // -- 修改：增加过期状态判断 (在 loadMoreTrades 函数中也应用修改) --
+                        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+                        if (date < twentyFourHoursAgo) {
+                            statusText = '{{ _("Expired") }}';
+                            statusClass = 'text-muted';
+                        } else {
+                        statusText = '{{ _("Waiting Payment") }}';
+                        statusClass = 'text-info';
+                        }
+                    } else if (trade.status === 'pending_confirmation') {
+                        statusText = '{{ _("Confirming") }}';
+                        statusClass = 'text-warning';
+                        }
+                        
+                        // 处理交易哈希 - 确保不会太长导致换行
+                        let txHashDisplay = '{{ _("N/A") }}';
+                        if (trade.tx_hash) {
+                            const shortHash = trade.tx_hash.substring(0, 8) + '...' + trade.tx_hash.substring(trade.tx_hash.length - 8);
+                            txHashDisplay = `<a href="https://solscan.io/tx/${trade.tx_hash}" target="_blank" title="${trade.tx_hash}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:100%;">${shortHash}</a>`;
+                        }
+                        
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${formattedDate}</td>
+                            <td class="${typeClass}">${typeText}</td>
+                            <td>${amount}</td>
+                            <td>${total} USDC</td>
+                            <td class="${statusClass}">${statusText}</td>
+                            <td style="max-width:20%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${txHashDisplay}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    
+                    // 添加表格到容器
+                    tradeHistoryContainer.appendChild(table);
+                    
+                    // 更新分页
+                    setupPagination();
+                    
+                } catch (error) {
+                    console.error('{{ _("Failed to load more trades") }}:', error);
+                    showMessage('{{ _("Failed to load more transaction records") }}', 'error');
+                }
+            }
+
+            // 页面加载完成后自动加载交易历史
+            document.addEventListener('DOMContentLoaded', () => {
+                loadTradeHistory();
+            });
+            
+            // 设置翻页按钮事件
+            function setupPagination() {
+                const prevButton = document.getElementById('prevPageBtn');
+                const nextButton = document.getElementById('nextPageBtn');
+                const paginationControls = document.getElementById('pagination-controls');
+                
+                if (!paginationControls) return;
+                
+                // 确保分页控件可见
+                paginationControls.style.display = 'flex !important';
+                
+                if (prevButton) {
+                    prevButton.onclick = () => {
+                        if (currentPage > 1) {
+                            currentPage--;
+                            loadMoreTrades(currentPage, tradesPerPage);
+                        }
+                    };
+                }
+                
+                if (nextButton) {
+                    nextButton.onclick = () => {
+                        if (currentPage < totalPages) {
+                            currentPage++;
+                            loadMoreTrades(currentPage, tradesPerPage);
+                        }
+                    };
+                }
+                
+                // 更新分页信息
+                const currentPageDisplay = document.getElementById('currentPageDisplay');
+                const totalPagesDisplay = document.getElementById('totalPagesDisplay');
+                
+                if (currentPageDisplay) {
+                    currentPageDisplay.textContent = currentPage;
+                }
+                
+                if (totalPagesDisplay) {
+                    totalPagesDisplay.textContent = totalPages || 1;
+                }
+                
+                // 启用或禁用翻页按钮
+                if (prevButton) {
+                    prevButton.disabled = (currentPage <= 1);
+                }
+                
+                if (nextButton) {
+                    nextButton.disabled = (currentPage >= totalPages);
+                }
+                
+                // 强制显示分页控件
+                paginationControls.removeAttribute('style');
+                paginationControls.style.display = 'flex';
+            }
+            
+            /* renderTrades函数已删除，改用表格方式实现 */
+
+            // 更新交易状态
+            function updateTradeStatus(tradeId, status) {
+                const statusElement = document.querySelector(`#trade-${tradeId} .trade-status`);
+                if (!statusElement) {
+                    console.warn(`{{ _("Cannot find status element for transaction") }} ${tradeId}`);
+                    return;
+                }
+                
+                console.log(`{{ _("Update transaction") }} ${tradeId} {{ _("status to") }}:`, status);
+                
+                // 更新状态文本和颜色
+                let statusText = '{{ _("Unknown") }}';
+                let statusClass = 'text-secondary';
+                
+                // 状态可能是字符串或数字
+                const statusValue = typeof status === 'string' ? status.toLowerCase() : status;
+                
+                switch (statusValue) {
+                    case 'pending':
+                    case 0:
+                        statusText = '{{ _("Processing") }}';
+                        statusClass = 'text-warning';
+                        break;
+                    case 'completed':
+                    case 1:
+                    case 2:
+                        statusText = '{{ _("Completed") }}';
+                        statusClass = 'text-success';
+                        break;
+                    case 'failed':
+                    case 3:
+                        statusText = '{{ _("Failed") }}';
+                        statusClass = 'text-danger';
+                        break;
+                    default:
+                        console.warn(`{{ _("Unknown transaction status") }}: ${status}`);
+                }
+                
+                statusElement.textContent = statusText;
+                
+                
+                // 移除所有可能的状态类
+                statusElement.classList.remove('text-warning', 'text-success', 'text-danger', 'text-secondary');
+                statusElement.classList.add(statusClass);
+                
+                // 如果交易完成，刷新资产信息
+                if (statusValue === 'completed' || statusValue === 1 || statusValue === 2) {
+                    console.log(`交易 ${tradeId} 已完成，刷新资产信息`);
+                    // 延迟刷新以确保后端数据已更新
+                    setTimeout(() => {
+                        refreshAssetInfoNow();
+                    }, 1000);
+                }
+            }
+
+            // 资产信息自动刷新功能
+            let lastKnownData = {
+                remainingSupply: parseInt("{{ remaining_supply|default(asset.token_supply) }}"),
+                tokenSupply: parseInt("{{ asset.token_supply }}"),
+                tokenPrice: parseFloat("{{ asset.token_price }}")
+            };
+
+            // 设置自动刷新
+            function setupAssetInfoRefresh() {
+                console.log('{{ _("Setting up asset information refresh - using unified refresh function") }}');
+                
+                // 不再设置新的刷新定时器，只初始化一次数据
+                
+                // 添加高亮样式
+                const style = document.createElement('style');
+                style.textContent = `
+                    .highlight-change {
+                        animation: highlight 2s ease-in-out;
+                    }
+                    @keyframes highlight {
+                        0%, 100% { background-color: transparent; }
+                        50% { background-color: rgba(255, 215, 0, 0.3); }
+                    }
+                `;
+                document.head.appendChild(style);
+                
+                // 使用全局ASSET_CONFIG设置lastKnownData
+                if (!window.lastKnownData) {
+                    window.lastKnownData = {
+                        assetId: window.ASSET_CONFIG ? window.ASSET_CONFIG.id : '{{ asset.id }}',
+                        tokenSymbol: window.ASSET_CONFIG ? window.ASSET_CONFIG.tokenSymbol : '{{ asset.token_symbol }}',
+                        remainingSupply: parseInt(window.ASSET_CONFIG ? window.ASSET_CONFIG.remainingSupply : "{{ remaining_supply|default(asset.token_supply) }}"),
+                        tokenSupply: parseInt(window.ASSET_CONFIG ? window.ASSET_CONFIG.totalSupply : "{{ asset.token_supply }}"),
+                        tokenPrice: parseFloat("{{ asset.token_price }}")
+                    };
+                    console.log('初始化lastKnownData:', window.lastKnownData);
+                }
+                
+                // 初始调用一次刷新函数，但不设置重复刷新
+                console.log('{{ _("Calling unified refresh function once during initialization") }}');
+                try {
+                if (typeof refreshAssetInfo === 'function') {
+                    refreshAssetInfo();
+                    } else {
+                        console.warn('{{ _("refreshAssetInfo function not defined, attempting to use safe refresh method") }}');
+                        // 如果refreshAssetInfo不存在，尝试执行最基本的刷新
+                        safeRefreshAssetInfo();
+                    }
+                } catch (error) {
+                    console.error('{{ _("Asset information refresh failed") }}:', error);
+                    // 尝试使用安全的资产刷新方法
+                    safeRefreshAssetInfo();
+                }
+            }
+
+            // 安全的资产信息刷新函数（作为后备）
+            function safeRefreshAssetInfo() {
+                try {
+                    console.log('{{ _("Performing safe asset information refresh") }}');
+                    
+                    // 更新剩余可购买量
+                    if (typeof updateRemainingSupply === 'function') {
+                        updateRemainingSupply();
+                    }
+                    
+                    // 更新总分红信息
+                    if (typeof loadTotalDividends === 'function') {
+                        loadTotalDividends();
+                    }
+                    
+                } catch (error) {
+                    console.error('{{ _("Safe asset information refresh failed") }}:', error);
+                }
+            }
+
+            // 设置交易表单
+            function setupTradeForm() {
+                // 获取必要的DOM元素
+                const amountInput = document.getElementById('purchase-amount');
+                const totalPriceDisplay = document.getElementById('totalPrice');
+                const buyButton = document.getElementById('buy-button');
+                
+                // 日志记录，帮助调试
+                console.log('setupTradeForm 元素状态:', {
+                    amountInput: !!amountInput,
+                    totalPriceDisplay: !!totalPriceDisplay,
+                    buyButton: !!buyButton
+                });
+                
+                // 获取分红按钮
+                const dividendBtn = document.getElementById('dividendManagementBtn');
+                const dividendBtnMobile = document.getElementById('dividendManagementBtnMobile');
+                const dividendBtnMedium = document.getElementById('dividendManagementBtnMedium');
+                
+                if (!amountInput || !totalPriceDisplay) {
+                    console.warn('{{ _("Cannot find some trade form elements, but will continue") }}');
+                }
+                
+                if (!buyButton) {
+                    console.error('{{ _("Cannot find buy button, purchase functionality will not work") }}');
+                    return;
+                }
+                
+                // 更新购买按钮状态
+                function updateBuyButtonState() {
+                    console.log('{{ _("Updating buy button status, current wallet status") }}:', window.walletState);
+                    
+                    // 尝试使用统一的按钮状态更新函数
+                    if (window.updateBuyButtonStateGlobal && typeof window.updateBuyButtonStateGlobal === 'function') {
+                        // 如果全局函数可用，则使用它
+                        console.log('使用全局统一的updateBuyButtonState函数');
+                        return window.updateBuyButtonStateGlobal();
+                    }
+                    
+                    // 获取购买按钮 - 已经有了buyButton变量，不需要重新获取
+                    // 更全面地检查钱包连接状态，增加多种检查方式
+                    let isConnected = false;
+                    
+                    // 方法1: 检查window.walletState (主要方法)
+                    if (window.walletState && (window.walletState.isConnected || window.walletState.connected)) {
+                        isConnected = true;
+                    }
+                    
+                    // 方法2: 检查本地存储 (备用方法)
+                    if (!isConnected) {
+                        const storedAddress = localStorage.getItem('walletAddress');
+                        const storedType = localStorage.getItem('walletType');
+                        if (storedAddress && storedType) {
+                            isConnected = true;
+                            // 同步到walletState对象
+                            if (window.walletState) {
+                                window.walletState.connected = true;
+                                window.walletState.address = storedAddress;
+                                window.walletState.type = storedType;
+                            }
+                        }
+                    }
+                    
+                    // 方法3: 检查window.wallet对象
+                    if (!isConnected && window.wallet && (
+                        window.wallet.connected ||
+                        window.wallet.getAddress && window.wallet.getAddress() ||
+                        window.wallet.getConnectionStatus && window.wallet.getConnectionStatus())
+                    ) {
+                        isConnected = true;
+                    }
+                    
+                    // 方法4: 检查全局地址变量
+                    if (!isConnected && (window.connectedWalletAddress || window.ethereumAddress || window.solanaAddress)) {
+                        isConnected = true;
+                    }
+                    
+                    // 记录日志
+                    console.log('钱包连接状态检查结果:', isConnected, {
+                        'walletState': window.walletState ? '存在' : '不存在',
+                        'connectedStatus': window.walletState ? (window.walletState.connected || window.walletState.isConnected) : '未知',
+                        'localStorageAddress': localStorage.getItem('walletAddress') || '无',
+                        'globalAddress': window.connectedWalletAddress || window.ethereumAddress || window.solanaAddress || '无'
+                    });
+
+                    // 更新购买按钮
+                    if (buyButton) {
+                        if (isConnected) {
+                            buyButton.disabled = false;
+                            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
+                            buyButton.removeAttribute('title');
+                        } else {
+                            buyButton.disabled = true;
+                            buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>{{ _("Connect Wallet First") }}';
+                            buyButton.title = '{{ _("Please connect wallet first") }}';
+                        }
+                    }
+                    
+                    // 调用检查分红按钮可见性逻辑
+                    if (typeof checkDividendManagementAccess === 'function') {
+                        checkDividendManagementAccess();
+                    }
+                }
+                
+                // 初始状态检查
+                updateBuyButtonState();
+                
+                // 延迟检查一次，确保钱包状态已经加载
+                setTimeout(function() {
+                    console.log('{{ _("Delayed check of wallet status") }}:', window.walletState);
+                    updateBuyButtonState();
+                }, 1000);
+                
+                // 再增加一次额外延迟检查，确保在页面完全加载后检查状态
+                setTimeout(function() {
+                    console.log('最终钱包状态检查，确保购买按钮正确更新');
+                    
+                    // 查找可能的购买按钮元素
+                    if (!buyButton) {
+                        console.log('尝试再次查找购买按钮元素');
+                        const possibleButtons = [
+                            document.getElementById('buy-button'),
+                            document.querySelector('.buy-button'),
+                            document.querySelector('button[data-action="buy"]'),
+                            document.querySelector('button.btn-primary:not([id])')
+                        ];
+                        
+                        for (const btn of possibleButtons) {
+                            if (btn) {
+                                console.log('找到购买按钮:', btn);
+                                buyButton = btn;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // 如果找到了全局统一更新函数，优先使用
+                    if (window.updateBuyButtonStateGlobal && typeof window.updateBuyButtonStateGlobal === 'function') {
+                        console.log('使用全局统一更新函数更新按钮状态');
+                        window.updateBuyButtonStateGlobal();
+                    } else {
+                        // 否则使用本地函数
+                        updateBuyButtonState();
+                    }
+                }, 5000);
+                
+                // 添加事件监听器
+                window.addEventListener('walletConnected', function(event) {
+                    console.log('{{ _("Received wallet connection event, updating buy button") }}');
+                    updateBuyButtonState();
+                });
+                
+                window.addEventListener('walletDisconnected', function() {
+                    console.log('{{ _("Received wallet disconnection event, updating buy button") }}');
+                    updateBuyButtonState();
+                });
+                
+                // 添加状态变化事件监听
+                window.addEventListener('walletStateChanged', function(event) {
+                    console.log('{{ _("Wallet status changed, updating buy button") }}', event.detail);
+                    updateBuyButtonState();
+                });
+                
+                // 添加余额更新事件监听器
+                window.addEventListener('balanceUpdated', function(event) {
+                    console.log('{{ _("Wallet balance updated, checking button status") }}');
+                    updateBuyButtonState();
+                });
+                
+                // 添加购买按钮点击事件
+                if (buyButton) {
+                    // 先移除可能存在的旧事件监听
+                    const newBuyButton = buyButton.cloneNode(true);
+                    if (buyButton.parentNode) {
+                        buyButton.parentNode.replaceChild(newBuyButton, buyButton);
+                    }
+                    
+                    // 在新按钮上添加事件监听
+                    newBuyButton.addEventListener('click', localHandleBuy);
+                    console.log('购买按钮成功绑定点击事件');
+                }
+                
+                // 设置输入金额改变时的处理
+                if (amountInput) {
+                    const newAmountInput = amountInput.cloneNode(true);
+                    if (amountInput.parentNode) {
+                        amountInput.parentNode.replaceChild(newAmountInput, amountInput);
+                    }
+                    
+                    newAmountInput.addEventListener('input', function() {
+                        // 获取购买数量
+                        const amount = parseFloat(this.value) || 0;
+                        // 获取代币价格
+                        const tokenPrice = parseFloat("{{ asset.price_per_token }}");
+                        
+                        // 计算总价
+                        const totalPrice = amount * tokenPrice;
+                        
+                        // 更新显示
+                        if (totalPriceDisplay) {
+                            totalPriceDisplay.value = totalPrice.toFixed(2);
+                        }
+                    });
+                    
+                    // 触发一次初始化
+                    newAmountInput.dispatchEvent(new Event('input'));
+                }
+                
+                // 确保总价在页面初始化时正确显示
+                setTimeout(function() {
+                    const amount = parseFloat(document.getElementById('purchase-amount')?.value) || 0;
+                    const tokenPrice = parseFloat("{{ asset.token_price }}");
+                    const totalPrice = amount * tokenPrice;
+                    const totalPriceEl = document.getElementById('totalPrice');
+                    
+                    if (totalPriceEl) {
+                        totalPriceEl.value = totalPrice.toFixed(2);
+                    }
+                }, 500);
+            }
+
+            // 获取钱包状态
+            function getWalletStatus() {
+                // 使用全局getWalletStatus函数
+                if (typeof window.getWalletStatus === 'function') {
+                    return window.getWalletStatus();
+                }
+                
+                // 备用方案：直接访问全局walletState
+                console.log('使用全局walletState检查钱包状态:', window.walletState?.isConnected);
+                return {
+                    connected: window.walletState && window.walletState.isConnected,
+                    address: window.walletState ? window.walletState.address : null
+                };
+            }
+
+            // 显示错误消息
+            function showError(message) {
+                const errorElement = document.getElementById('buy-error');
+                if (errorElement) {
+                    errorElement.textContent = message;
+                    errorElement.style.display = 'block';
+                } else {
+                    alert(message);
+                }
+            }
+
+            // 显示成功消息
+            function showSuccess(message) {
+                showMessage(message, 'success');
+            }
+
+            // 加载累计分红信息
+            async function loadTotalDividends() {
+                const totalDividendsElement = document.getElementById('totalDividendsDistributed');
+                if (!totalDividendsElement) {
+                    console.error('{{ _("Could not find total dividends display element") }}');
+                    return;
+                }
+                
+                // 设置加载超时
+                const timeout = 10000; // 10秒超时
+                let didTimeout = false;
+                const timeoutId = setTimeout(() => {
+                    didTimeout = true;
+                    console.warn('{{ _("Loading total dividends timed out") }}');
+                    // -- 修改：使用更明确的超时文本 --
+                    totalDividendsElement.innerHTML = '<span class="text-warning">{{ _("加载超时") }}</span>';
+                }, timeout);
+                
+                try {
+                    console.log('{{ _("Loading total dividend information...") }}');
+                    
+                    // 显示加载中状态
+                    totalDividendsElement.innerHTML = `
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                <span class="visually-hidden">{{ _('Loading') }}...</span>
+                            </div>
+                            <span>{{ _('Loading') }}...</span>
+                        </div>
+                    `;
+                    
+                    // 获取资产符号
+                    const tokenSymbol = ASSET_CONFIG.tokenSymbol || "{{ asset.token_symbol }}";
+                    console.log('{{ _("Retrieving asset dividend statistics, asset symbol") }}:', tokenSymbol);
+                    
+                    // 获取资产分红统计信息
+                    const response = await fetch(`/api/assets/symbol/${tokenSymbol}/dividend_stats`);
+                    
+                    // 清除超时定时器
+                    clearTimeout(timeoutId);
+                    
+                    // 如果已经超时，则不更新UI
+                    if (didTimeout) return;
+                    
+                    if (!response.ok) {
+                        console.error('{{ _("Dividend data API request failed") }}:', response.status, response.statusText);
+                        throw new Error(`{{ _("Failed to load dividend stats") }}: ${response.status}`);
+                    }
+                    
+                    const stats = await response.json();
+                    console.log('{{ _("Dividend statistics data") }}:', stats);
+                    
+                    if (stats.total_amount !== undefined) {
+                        // 显示格式化的累计分红金额
+                        totalDividendsElement.innerHTML = `${Number(stats.total_amount).toLocaleString()} USDC`;
+                    } else {
+                        // 如果没有分红数据，显示0
+                        totalDividendsElement.innerHTML = '0 USDC';
+                    }
+                } catch (error) {
+                    // 清除超时定时器
+                    clearTimeout(timeoutId);
+                    
+                    // 如果没有超时，则显示错误信息
+                    if (!didTimeout) {
+                    console.error('{{ _("Failed to load total dividend information") }}:', error);
+                        // -- 修改：使用更明确的错误文本 --
+                        totalDividendsElement.innerHTML = '<span class="text-danger">{{ _("加载失败") }}</span>';
+                    }
+                }
+            }
+
+            // 模拟区块链交易流程
+            async function simulateTransaction() {
+                console.log('{{ _("Simulating blockchain transaction process...") }}');
+                
+                // 模拟交易提交
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                console.log('{{ _("Transaction submitted to network") }}');
+                
+                // 模拟交易确认过程
+                for (let i = 1; i <= 3; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    console.log(`{{ _("Received confirmation") }} ${i}`);
+                }
+                
+                console.log('{{ _("Transaction completed") }}');
+                return {
+                    txHash: 'mock_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15),
+                    confirmations: 3,
+                    status: 'confirmed'
+                };
+            }
+
+            // 缩短地址显示
+            function shortenAddress(address) {
+                if (!address) return '';
+                return address.substring(0, 6) + '...' + address.substring(address.length - 4);
+            }
+
+            // 初始化钱包连接 - 简化版
+
+            // 辅助函数：更新base.html中的钱包UI
+            
+            // 获取Cookie
+            function getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
+            }
+
+            // 通过API检查权限
+            async function checkOwnershipViaApi(address) {
+                console.log(`{{ _("Checking permissions for address") }} ${address} {{ _("via API") }}...`);
+                try {
+                    // 获取所有分红按钮
+                    const dividendBtns = [
+                        document.getElementById('dividendManagementBtn'),         // 正常屏幕
+                        document.getElementById('dividendManagementBtnMobile'),   // 移动版
+                        document.getElementById('dividendManagementBtnMedium')    // 中等屏幕
+                    ];
+                    
+                    // 首先隐藏所有按钮
+                    dividendBtns.forEach(btn => {
+                        if (btn) btn.style.display = 'none';
+                    });
+                    
+                    const response = await fetch(`/api/assets/${ASSET_CONFIG.id}/check_owner`, {
+                        headers: {
+                            'X-Eth-Address': address
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        console.warn('{{ _("API check of asset ownership failed") }}:', response.status);
+                        return; // 已隐藏所有按钮
+                    }
+                    
+                    const data = await response.json();
+                    console.log('{{ _("API asset ownership check result") }}:', data);
+                    
+                    if (data.is_owner || data.is_admin) {
+                        console.log('{{ _("API confirms user has permission to access dividend management functionality") }}');
+                        const dividendUrl = `/assets/${ASSET_CONFIG.token_symbol}/dividend?eth_address=${address}`;
+                        
+                        // 更新所有按钮
+                        dividendBtns.forEach(btn => {
+                            if (btn) {
+                                // 更新URL
+                                btn.href = dividendUrl;
+                                
+                                // 根据按钮类型设置显示样式
+                                if (btn.id === 'dividendManagementBtn') {
+                                    btn.style.display = 'inline-flex';
+                                } else if (btn.id === 'dividendManagementBtnMobile') {
+                                    btn.style.display = 'block';  // 移动版按钮
+                                } else if (btn.id === 'dividendManagementBtnMedium') {
+                                    btn.style.display = 'block';  // 中等屏幕按钮
+                                }
+                            }
+                        });
+                        
+                        console.log('{{ _("Updated and displayed all dividend management buttons") }}');
+                    } else {
+                        console.log('{{ _("API confirms user has no dividend management permissions") }}');
+                        // 已经在函数开始时隐藏了所有按钮
+                    }
+                } catch (error) {
+                    console.error('{{ _("API permission check failed") }}:', error);
+                }
+            }
+
+            // 添加立即刷新功能供交易成功后调用
+            window.refreshAssetInfoNow = async function() {
+                try {
+                    console.log('{{ _("Performing immediate refresh...") }}');
+                    await refreshAssetInfo();
+                    // 同时刷新钱包资产列表 - 使用base.html全局函数
+                    if (typeof loadUserAssets === 'function') {
+                        loadUserAssets();
+                    }
+                } catch (error) {
+                    console.error('{{ _("Immediate refresh failed") }}:', error);
+                    
+                    // 紧急备用刷新逻辑
+                    try {
+                        const asset_id = "{{ asset.id|default(0) }}";
+                        const asset_symbol = "{{ asset.token_symbol|default('') }}";
+                        const assetResponse = await fetch(`/api/assets/symbol/${asset_symbol}`);
+                        if (assetResponse.ok) {
+                            const data = await assetResponse.json();
+                            
+                            // 更新剩余供应量
+                            if (data.data && data.data.remaining_supply !== undefined) {
+                                const newRemainingSupply = data.data.remaining_supply;
+                                
+                                // 更新全局变量
+                                remainingSupply = newRemainingSupply;
+                                actualPurchasable = newRemainingSupply;
+                                maxPurchaseAmount = newRemainingSupply;
+                                
+                                // 更新界面显示
+                                const remainingSupplyElement = document.getElementById('remaining-supply');
+                                const maxPurchaseElement = document.getElementById('max-purchase-amount');
+                                
+                                if (remainingSupplyElement) {
+                                    remainingSupplyElement.textContent = newRemainingSupply;
+                                }
+                                
+                                if (maxPurchaseElement) {
+                                    maxPurchaseElement.textContent = newRemainingSupply;
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('{{ _("Backup refresh failed") }}:', error);
+                    }
+                }
+            };
+
+            // 处理购买按钮点击
+            async function localHandleBuy(e) {
+                e.preventDefault();
+                
+                console.log('[detail.html] localHandleBuy: 点击事件触发');
+                
+                // 高强度多源钱包连接检测
+                let isConnected = false;
+                let walletAddress = '';
+                let walletType = '';
+                
+                // 方法1: 首选检查 - localStorage直接检查(速度最快)
+                walletAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address') || '';
+                walletType = localStorage.getItem('walletType') || 'phantom';
+                
+                if (walletAddress) {
+                    isConnected = true;
+                    console.log('[detail.html] localHandleBuy: 从localStorage直接检测到钱包连接', {address: walletAddress, walletType});
+                }
+                
+                // 方法2: 检查全局walletState (最可靠的方法)
+                if (!isConnected && window.walletState) {
+                    if (typeof window.walletState.isWalletConnected === 'function') {
+                        try {
+                            isConnected = window.walletState.isWalletConnected();
+                            if (isConnected) {
+                                walletAddress = window.walletState.address || '';
+                                walletType = window.walletState.walletType || '';
+                                console.log('[detail.html] localHandleBuy: 从walletState.isWalletConnected检测到钱包连接', {address: walletAddress, walletType});
+                            }
+                        } catch (error) {
+                            console.error('[detail.html] localHandleBuy: 调用isWalletConnected函数错误', error);
+                        }
+                    } else if (window.walletState.isConnected || window.walletState.connected) {
+                        isConnected = true;
+                        walletAddress = window.walletState.address || '';
+                        walletType = window.walletState.walletType || '';
+                        console.log('[detail.html] localHandleBuy: 从walletState属性检测到钱包连接', {address: walletAddress, walletType});
+                    }
+                }
+                
+                // 方法3: 检查window.walletPublicKey (兼容旧版本)
+                if (!isConnected && window.walletPublicKey) {
+                    try {
+                        const pubkeyStr = typeof window.walletPublicKey === 'string' 
+                            ? window.walletPublicKey 
+                            : (typeof window.walletPublicKey.toString === 'function' 
+                                ? window.walletPublicKey.toString() 
+                                : '');
+                        
+                        if (pubkeyStr && pubkeyStr.length > 30) {
+                            isConnected = true;
+                            walletAddress = pubkeyStr;
+                            walletType = 'phantom';
+                            console.log('[detail.html] localHandleBuy: 从walletPublicKey检测到钱包连接', {address: walletAddress});
+                        }
+                    } catch (error) {
+                        console.error('[detail.html] localHandleBuy: 解析walletPublicKey错误', error);
+                    }
+                }
+                
+                // 记录连接状态
+                console.log('[detail.html] localHandleBuy: 钱包连接状态检查结果:', { 
+                    isConnected, 
+                    walletAddress: walletAddress ? `${walletAddress.substring(0,6)}...${walletAddress.substring(walletAddress.length-4)}` : 'none',
+                    walletType
+                });
+                
+                // 如果钱包未连接，显示错误并触发钱包连接
+                if (!isConnected || !walletAddress) {
+                    console.log('[detail.html] localHandleBuy: 钱包未连接，尝试触发连接');
+                    
+                    // 清除任何可能的错误显示
+                    const buyError = document.getElementById('buy-error');
+                    if (buyError) {
+                        buyError.style.display = 'block';
+                        buyError.textContent = '请先连接钱包';
+                    }
+                    
+                    // 尝试打开钱包连接菜单，顺序排列多种可能的方法
+                    try {
+                        // 优先使用全局openWalletSelector函数
+                        if (typeof window.openWalletSelector === 'function') {
+                            window.openWalletSelector();
+                            console.log('[detail.html] localHandleBuy: 已调用window.openWalletSelector()');
+                            return;
+                        }
+                        // 备选：使用toggleWalletMenu函数
+                        else if (typeof window.toggleWalletMenu === 'function') {
+                            window.toggleWalletMenu();
+                            console.log('[detail.html] localHandleBuy: 已调用window.toggleWalletMenu()');
+                            return;
+                        }
+                        // 最后：使用本地connectWallet函数
+                        else if (typeof connectWallet === 'function') {
+                            await connectWallet();
+                            console.log('[detail.html] localHandleBuy: 已调用connectWallet()');
+                            return;
+                        }
+                        
+                        // 如果以上方法都不可用，显示一个更明确的错误
+                        throw new Error('找不到钱包连接方法');
+                    } catch (error) {
+                        console.error('[detail.html] localHandleBuy: 连接钱包失败', error);
+                        if (buyError) {
+                            buyError.textContent = '钱包连接失败，请手动连接钱包后重试';
+                        }
+                    }
+                    return;
+                }
+                
+                // 钱包已连接，继续购买流程
+                console.log('[detail.html] localHandleBuy: 钱包已连接，地址:', walletAddress.substring(0,6) + '...' + walletAddress.substring(walletAddress.length-4));
+                
+                // 获取必要的表单元素
+                const assetId = document.getElementById('buy-button').getAttribute('data-asset-id');
+                const amountInput = document.getElementById('purchase-amount');
+                const buyButton = document.getElementById('buy-button');
+                const tokenPrice = parseFloat(buyButton.getAttribute('data-token-price') || '0');
+                
+                // 清除任何之前的错误
+                const buyError = document.getElementById('buy-error');
+                if (buyError) {
+                    buyError.style.display = 'none';
+                }
+                
+                try {
+                    // 如果存在全局handleBuy函数，优先使用全局函数
+                    if (typeof window.handleBuy === 'function') {
+                        console.log('[detail.html] localHandleBuy: 调用全局handleBuy函数');
+                        // 添加明确的钱包参数
+                        window.handleBuy(assetId, amountInput, buyButton, tokenPrice, {
+                            walletConnected: isConnected,
+                            walletAddress: walletAddress,
+                            walletType: walletType
+                        });
+                    } else {
+                        // 全局函数不可用，显示错误
+                        console.error('[detail.html] localHandleBuy: 全局handleBuy函数不可用');
+                        if (buyError) {
+                            buyError.textContent = '购买功能暂时不可用，请刷新页面重试';
+                            buyError.style.display = 'block';
+                        }
+                    }
+                } catch (error) {
+                    console.error('[detail.html] localHandleBuy: 调用handleBuy失败', error);
+                    if (buyError) {
+                        buyError.textContent = error.message || '购买处理失败，请重试';
+                        buyError.style.display = 'block';
+                    }
+                }
+            }
+
+            // 处理购买确认
+            async function confirmPurchase() {
+                console.log('[detail.html] confirmPurchase: 函数被调用');
+                
+                // 全面且严格检查钱包连接状态
+                let walletConnected = false;
+                let walletAddress = '';
+                let walletType = '';
+                
+                // 1. 首选检查 - localStorage直接检查(速度最快)
+                const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+                const storedType = localStorage.getItem('walletType') || 'phantom';
+                
+                if (storedAddress) {
+                    walletConnected = true;
+                    walletAddress = storedAddress;
+                    walletType = storedType;
+                    console.log('[detail.html] confirmPurchase: 从localStorage检测到钱包连接', {walletAddress, walletType});
+                }
+                
+                // 2. 检查全局walletState对象 (最可靠的方法)
+                if (!walletConnected && window.walletState) {
+                    if (typeof window.walletState.isWalletConnected === 'function') {
+                        try {
+                            walletConnected = window.walletState.isWalletConnected();
+                            if (walletConnected) {
+                                walletAddress = window.walletState.address || '';
+                                walletType = window.walletState.walletType || '';
+                                console.log('[detail.html] confirmPurchase: 从walletState.isWalletConnected检测到钱包连接', 
+                                    {walletAddress, walletType});
+                            }
+                        } catch (err) {
+                            console.warn('[detail.html] confirmPurchase: 调用全局isWalletConnected方法失败', err);
+                        }
+                    } else if ((window.walletState.isConnected || window.walletState.connected) && window.walletState.address) {
+                        walletConnected = true;
+                        walletAddress = window.walletState.address;
+                        walletType = window.walletState.walletType || '';
+                        console.log('[detail.html] confirmPurchase: 从walletState属性检测到钱包连接', {walletAddress, walletType});
+                    }
+                }
+                
+                // 3. 检查window.walletPublicKey (兼容旧版本)
+                if (!walletConnected && window.walletPublicKey) {
+                    try {
+                        const pubkeyStr = typeof window.walletPublicKey === 'string' 
+                            ? window.walletPublicKey 
+                            : (typeof window.walletPublicKey.toString === 'function' 
+                                ? window.walletPublicKey.toString() 
+                                : '');
+                        
+                        if (pubkeyStr && pubkeyStr.length > 30) {
+                            walletConnected = true;
+                            walletAddress = pubkeyStr;
+                            walletType = 'phantom';
+                            console.log('[detail.html] confirmPurchase: 从walletPublicKey检测到钱包连接', {walletAddress});
+                        }
+                    } catch (error) {
+                        console.error('[detail.html] confirmPurchase: 解析walletPublicKey错误', error);
+                    }
+                }
+                
+                // 记录最终状态
+                console.log('[detail.html] confirmPurchase: 钱包连接状态检查结果:', {
+                    connected: walletConnected,
+                    address: walletAddress ? `${walletAddress.substring(0,6)}...${walletAddress.substring(walletAddress.length-4)}` : 'none'
+                });
+                
+                // 如果钱包仍未连接，显示错误
+                if (!walletConnected || !walletAddress) {
+                    console.error('[detail.html] confirmPurchase: 钱包未连接或地址无效');
+                    // 显示错误消息
+                    const modalError = document.getElementById('buyModalError');
+                    if (modalError) {
+                        modalError.textContent = '请先连接钱包';
+                        modalError.style.display = 'block';
+                    }
+                    
+                    // 尝试触发钱包连接器
+                    try {
+                        if (typeof window.openWalletSelector === 'function') {
+                            setTimeout(() => {
+                                window.openWalletSelector();
+                                // 隐藏模态框
+                                const buyModal = document.getElementById('buyModal');
+                                const bsModal = bootstrap.Modal.getInstance(buyModal);
+                                if (bsModal) bsModal.hide();
+                            }, 1500);
+                        }
+                    } catch (error) {
+                        console.error('[detail.html] confirmPurchase: 打开钱包选择器失败', error);
+                    }
+                    return;
+                }
+                
+                // 准备购买数据
+                const pendingPurchase = window.pendingPurchase || {};
+                const assetId = document.getElementById('buy-button').getAttribute('data-asset-id');
+                const amountEl = document.getElementById('purchase-amount');
+                const amount = amountEl ? parseInt(amountEl.value) : 0;
+                const totalCost = document.getElementById('modalTotalCost').textContent;
+                const recipientEl = document.getElementById('modalRecipientAddress');
+                const recipientAddress = recipientEl ? recipientEl.textContent : '';
+                
+                // 构建完整的购买数据对象
+                const purchaseData = {
+                    asset_id: assetId,
+                    amount: amount,
+                    total_cost: totalCost,
+                    recipient_address: recipientAddress,
+                    wallet_address: walletAddress,
+                    wallet_type: walletType,
+                    trade_id: pendingPurchase.trade_id || '',
+                    is_connected: true  // 明确标识钱包已连接
+                };
+                
+                console.log('[detail.html] confirmPurchase: 购买数据', purchaseData);
+                
+                // 准备modal和按钮元素
+                const buyModal = document.getElementById('buyModal');
+                const confirmBtn = document.getElementById('confirmPurchaseBtn');
+                
+                // 显示加载状态
+                if (confirmBtn) {
+                    confirmBtn.innerText = '处理中...';
+                    confirmBtn.disabled = true;
+                    const spinner = confirmBtn.querySelector('.spinner-border');
+                    if (spinner) spinner.style.display = 'inline-block';
+                }
+                
+                try {
+                    // 检查全局确认购买函数
+                    if (typeof window.confirmPurchase === 'function') {
+                        // 调用全局函数，并传入完整的购买数据
+                        await window.confirmPurchase(purchaseData, buyModal, confirmBtn);
+                    } else {
+                        console.error('[detail.html] confirmPurchase: 全局confirmPurchase函数不可用');
+                        throw new Error('全局购买确认功能未加载，请刷新页面重试');
+                    }
+                } catch (error) {
+                    console.error('[detail.html] confirmPurchase: 购买确认失败', error);
+                    
+                    // 显示错误消息
+                    const modalError = document.getElementById('buyModalError');
+                    if (modalError) {
+                        modalError.textContent = error.message || '购买确认失败';
+                        modalError.style.display = 'block';
+                    }
+                } finally {
+                    // 恢复按钮状态
+                    if (confirmBtn) {
+                        confirmBtn.innerText = '确认购买';
+                        confirmBtn.disabled = false;
+                        const spinner = confirmBtn.querySelector('.spinner-border');
+                        if (spinner) spinner.style.display = 'none';
+                    }
+                }
+            }
+
+            // 更新确认模态框，移除平台费和卖家支付信息
+            const buyModalHtml = `
+                <div class="modal fade" id="buyModal" tabindex="-1" aria-labelledby="buyModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                                <h5 class="modal-title" id="buyModalLabel">{{ _("Confirm Purchase") }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                                <p>{{ _('Please review the details before confirming your purchase:') }}</p>
+                                <ul class="list-group list-group-flush mb-3">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Asset') }}: <strong id="modalAssetName"></strong>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Amount (Tokens)') }}: <strong id="modalAmount"></strong>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Price per Token') }}: <span id="modalPricePerToken"></span> USDC
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Subtotal') }}: <span id="modalSubtotal"></span> USDC
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Platform Fee') }}: <span id="modalFee"></span> USDC
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center fs-5">
+                                        <strong>{{ _('Total Cost') }}:</strong> <strong id="modalTotalCost" class="text-primary"></strong> <strong class="text-primary">USDC</strong>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center" style="font-size: 0.8em; color: #6c757d;">
+                                        <span class="me-2">{{ _('Recipient Address') }}:</span> <code id="modalRecipientAddress" class="text-break" style="font-size: 0.9em;"></code>
+                                    </li>
+                                </ul>
+                                <!-- 错误信息显示区域 -->
+                                <div id="buyModalError" class="alert alert-danger" style="display: none;"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _("Cancel") }}</button>
+                                <button type="button" class="btn btn-primary" id="confirmPurchaseBtn">
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                                    {{ _("Confirm Purchase & Pay") }}
+                                </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+
+            // 确保模态框HTML已添加到页面，仅添加一次
+                if (!document.getElementById('buyModal')) {
+                    document.body.insertAdjacentHTML('beforeend', buyModalHtml);
+                
+                // 使用事件监听器而不是内联onclick
+                document.getElementById('confirmPurchaseBtn').addEventListener('click', confirmPurchase);
+                }
+
+            // 添加单独刷新钱包资产列表的函数 - 使用全局loadUserAssets函数替代
+            function refreshWalletAssets() {
+                if (typeof loadUserAssets === 'function') {
+                    console.log('使用全局loadUserAssets函数加载钱包资产');
+                    loadUserAssets();
+                } else {
+                    console.warn('全局loadUserAssets函数不可用');
+                }
+            }
+
+            // 显示消息函数
+            function showMessage(message, type = 'info') {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `alert alert-${type} position-fixed top-0 start-50 translate-middle-x mt-3`;
+                messageDiv.style.zIndex = '9999';
+                messageDiv.innerHTML = message;
+                document.body.appendChild(messageDiv);
+                
+                // 3秒后自动消失
+                setTimeout(() => {
+                    messageDiv.remove();
+                }, 3000);
+            }
+
+            // 显示错误信息
+            function showError(message) {
+                showMessage(message, 'danger');
+            }
+
+            // 获取钱包地址，优先从全局walletState获取
+            function getWalletAddress() {
+                // 优先使用全局钱包状态
+                if (window.walletState && window.walletState.isConnected && window.walletState.address) {
+                    return window.walletState.address;
+                }
+                
+                // 其次使用本地walletPublicKey
+                if (walletPublicKey) {
+                    return walletPublicKey.toString();
+                }
+                
+                // 最后尝试从localStorage获取
+                return localStorage.getItem('walletAddress') || localStorage.getItem('eth_address') || '';
+            }
+
+            // 辅助函数：缩短地址显示
+            function shortenAddress(address) {
+                if (!address) return '';
+                return address.substring(0, 6) + '...' + address.substring(address.length - 4);
+            }
+
+            // 设置页面中的钱包相关元素
+            
+            // 更新页面中的钱包UI - 移到外部作为全局函数
+                // 更新其他元素...
+                // ... 其他代码保持不变
+
+            // 获取Cookie
+            function getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
+            }
+        
+        // 分享资产功能
+        function shareAsset() {
+            // 检查用户是否已连接钱包
+            if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
+                alert('{{ _("Please connect your wallet first to generate your exclusive sharing link") }}');
+                // 调用全局钱包连接函数
+                if (typeof toggleWalletMenu === 'function') {
+                    toggleWalletMenu();
+                }
+                return;
+            }
+            
+            // 获取当前用户的钱包地址
+            const address = window.walletState.address;
+            
+            // 从服务器获取分享文案，如果失败则使用默认文案
+            fetch('/api/share-messages/random')
+                .then(response => response.json())
+                .catch(error => {
+                    console.error('{{ _("Failed to get sharing message") }}:', error);
+                    // 使用默认文案
+                    return {
+                        success: true,
+                        message: "{{ _('📈 Share to earn commission! Invite friends to invest, and you can get up to 30%% promotion commission! The link is exclusively yours, lifetime commission benefits, the more friends, the more rewards!') }}"
+                    };
+                })
+                .then(data => {
+                    const shareMessage = data.message || "{{ _('🔥 Share great opportunities! Invite friends to invest in this quality asset and witness wealth growth together!') }}";
+                    
+                    // 生成分享链接模态框
+                    showShareModal(address, shareMessage);
+                });
+        }
+        
+        // 显示分享模态框
+        function showShareModal(address, shareMessage) {
+            // 生成分享链接模态框
+            const modalHtml = `
+                <div class="modal fade" id="shareModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">分享这个资产</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div id="shareLoading" class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2">正在生成安全的分享链接...</p>
+                                </div>
+                                
+                                <div id="shareContent" style="display:none;">
+                                    <div class="share-message">
+                                        ${shareMessage}
+                                    </div>
+                                    
+                                    <div class="commission-info mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <strong>多级分销收益（永久有效）</strong>
+                                            <span class="info-icon ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<div class='text-start'>
+                                                <p class='mb-1'>您分享链接的收益说明：</p>
+                                                <ul class='ps-3 mb-0'>
+                                                    <li>直接推荐好友购买：您获得30%佣金</li>
+                                                    <li>好友推荐他人购买：您获得15%佣金</li>
+                                                    <li>二级好友再推荐：您仍获得5%佣金</li>
+                                                </ul>
+                                                <p class='mt-1 mb-0 small'>例：好友通过您的链接购买10,000USDC资产，交易佣金250USDC，您立即获得75USDC！</p>
+                                            </div>">
+                                                <i class="fas fa-info-circle text-primary"></i>
+                                            </span>
+                                        </div>
+                                        <div class="commission-tiers mt-2 d-flex justify-content-around text-center">
+                                            <div class="tier">
+                                                <div class="tier-label">一级</div>
+                                                <div class="tier-value">30%</div>
+                                            </div>
+                                            <div class="tier">
+                                                <div class="tier-label">二级</div>
+                                                <div class="tier-value">15%</div>
+                                            </div>
+                                            <div class="tier">
+                                                <div class="tier-label">三级</div>
+                                                <div class="tier-value">5%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">您的专属分享链接:</label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" id="shareLink" readonly>
+                                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('shareLink')">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                        <small class="form-text text-muted">此链接已加密您的钱包地址，保护您的隐私</small>
+                                    </div>
+                                    <div class="d-flex gap-2 mt-4">
+                                        <button class="btn btn-success flex-grow-1" onclick="copyToClipboard('shareLink')">
+                                            <i class="fas fa-copy me-2"></i>复制链接
+                                        </button>
+                                        <button class="btn btn-primary flex-grow-1" onclick="shareViaWhatsApp()">
+                                            <i class="fab fa-whatsapp me-2"></i>WhatsApp
+                                        </button>
+                                        <button class="btn btn-info flex-grow-1" onclick="shareViaTwitter()">
+                                            <i class="fab fa-twitter me-2"></i>Twitter
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div id="shareError" class="alert alert-danger mt-3" style="display:none;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 添加模态框到页面
+            if (!document.getElementById('shareModal')) {
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+            }
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('shareModal'));
+            modal.show();
+            
+            // 生成短链接
+            generateShortLink(address);
+            
+            // 初始化tooltip
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl, {
+                    html: true,
+                    boundary: 'window'
+                });
+            });
+        }
+        
+        // 生成短链接
+        function generateShortLink(address) {
+            // 显示加载状态
+            document.getElementById('shareLoading').style.display = 'block';
+            document.getElementById('shareContent').style.display = 'none';
+            document.getElementById('shareError').style.display = 'none';
+            
+            // 构建带钱包地址的原始URL
+            const currentUrl = window.location.origin + window.location.pathname;
+            const originalUrl = `${currentUrl}?ref=${encodeURIComponent(address)}`;
+            
+            // 调用短链接API
+            fetch('/api/shortlink/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Eth-Address': address
+                },
+                body: JSON.stringify({
+                    url: originalUrl,
+                    expires_days: 365  // 链接一年后过期
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // 隐藏加载状态
+                document.getElementById('shareLoading').style.display = 'none';
+                
+                if (data.success) {
+                    // 设置分享链接并显示内容
+                    document.getElementById('shareLink').value = data.short_url;
+                    document.getElementById('shareContent').style.display = 'block';
+                } else {
+                    // 显示错误
+                    const errorElement = document.getElementById('shareError');
+                    errorElement.style.display = 'block';
+                    errorElement.textContent = data.error || '生成分享链接失败';
+                }
+            })
+            .catch(error => {
+                // 隐藏加载状态，显示错误
+                document.getElementById('shareLoading').style.display = 'none';
+                const errorElement = document.getElementById('shareError');
+                errorElement.style.display = 'block';
+                errorElement.textContent = '生成分享链接失败: ' + error.message;
+            });
+        }
+        
+        // 复制到剪贴板 (修改以支持隐藏元素)
+        function copyToClipboard(elementId, buttonElement) {
+            const copyTextElement = document.getElementById(elementId);
+            let textToCopy = '';
+            
+            if (copyTextElement.tagName === 'INPUT' || copyTextElement.tagName === 'TEXTAREA') {
+                textToCopy = copyTextElement.value;
+                copyTextElement.select(); // 选择输入框内容以便某些浏览器API工作
+                copyTextElement.setSelectionRange(0, 99999); 
+            } else {
+                // 对于非输入元素（如span），直接获取其文本内容
+                textToCopy = copyTextElement.textContent || copyTextElement.innerText;
+            }
+
+            if (!textToCopy) {
+                console.error('无法获取要复制的文本');
+                return;
+            }
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                // 显示成功提示
+                const originalHtml = buttonElement.innerHTML;
+                buttonElement.innerHTML = '<i class="fas fa-check text-success"></i>';
+            setTimeout(() => {
+                    buttonElement.innerHTML = originalHtml;
+            }, 2000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+                // 可以添加错误提示
+                const originalHtml = buttonElement.innerHTML;
+                buttonElement.innerHTML = '<i class="fas fa-times text-danger"></i>';
+                 setTimeout(() => {
+                    buttonElement.innerHTML = originalHtml;
+                }, 2000);
+            });
+        }
+        
+        // 分享到WhatsApp
+        function shareViaWhatsApp() {
+            const shareText = `查看这个有趣的资产: ${document.getElementById('shareLink').value}`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+        }
+        
+        // 分享到Twitter
+        function shareViaTwitter() {
+            const assetName = "{{ asset.name }}";
+            const shareText = `我发现了一个很棒的资产 ${assetName}，感兴趣的朋友可以来看看: `;
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(document.getElementById('shareLink').value)}`, '_blank');
+        }
+    </script>
+
+    <!-- 返回按钮 -->
+    <a href="{{ url_for('assets.list_assets_page') }}" class="btn btn-link text-muted mb-3">
+        <i class="fas fa-arrow-left me-2"></i>{{ _('Back to List') }}
+    </a>
+
+    <!-- 资产状态标签 -->
+    <!-- 宽屏布局 -->
+    <div class="d-none d-lg-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <h2 class="mb-0">{{ asset.name }}</h2>
+            {% if asset.status == 1 or (asset.status is defined and asset.status is string and 'PENDING' in asset.status) %}
+            <span class="badge bg-warning">{{ _('Pending Review') }}</span>
+            {% elif asset.status == 2 or (asset.status is defined and asset.status is string and 'APPROVED' in asset.status) %}
+            <span class="badge bg-success">{{ _('On Chain') }}</span>
+            {% elif asset.status == 3 or (asset.status is defined and asset.status is string and 'REJECTED' in asset.status) %}
+            <span class="badge bg-danger">{{ _('Rejected') }}</span>
+            {% endif %}
+        </div>
+        <!-- 分红管理按钮 - 管理员和资产所有者可见 -->
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-outline-success" id="shareAssetBtn" onclick="shareAsset()">
+                <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
+            </button>
+            {% if is_admin_user or is_owner %}
+            <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary" id="dividendManagementBtn" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
+                <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- 中屏和窄屏布局 -->
+    <div class="d-flex d-lg-none flex-column mb-4">
+        <div class="w-100 mb-2">
+            <h2 class="mb-0">{{ asset.name }}</h2>
+        </div>
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                {% if asset.status == 1 or (asset.status is defined and asset.status is string and 'PENDING' in asset.status) %}
+                <span class="badge bg-warning">{{ _('Pending Review') }}</span>
+                {% elif asset.status == 2 or (asset.status is defined and asset.status is string and 'APPROVED' in asset.status) %}
+                <span class="badge bg-success">{{ _('On Chain') }}</span>
+                {% elif asset.status == 3 or (asset.status is defined and asset.status is string and 'REJECTED' in asset.status) %}
+                <span class="badge bg-danger">{{ _('Rejected') }}</span>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-success d-md-none d-block" id="shareAssetBtnMobile" onclick="shareAsset()">
+                    <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
+                </button>
+                <button class="btn btn-outline-success d-none d-md-block d-lg-none" id="shareAssetBtnMedium" onclick="shareAsset()">
+                    <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
+                </button>
+                {% if is_admin_user or is_owner %}
+                <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-sm btn-outline-primary d-md-none d-block" id="dividendManagementBtnMobile" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
+                    <i class="fas fa-coins me-2"></i>{{ _('Dividend') }}
+                </a>
+                <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary d-none d-md-block d-lg-none" id="dividendManagementBtnMedium" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
+                    <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片轮播 -->
+    <div class="row mb-4">
+        <div class="col-lg-7">
+            <!-- 资产图片轮播 -->
+            <div id="assetImages" class="carousel slide mb-3" data-bs-ride="carousel">
+                <div class="carousel-inner">
+                    {% if asset.images and asset.images|length > 0 %}
+                    {% for image in asset.images %}
+                    <div class="carousel-item {% if loop.first %}active{% endif %}">
+                            <img src="{{ image }}" class="d-block w-100" alt="{{ _('Asset Image') }}" style="border-radius: 12px; height: 400px; object-fit: cover;">
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                        <div class="carousel-item active">
+                            <div class="bg-light d-flex align-items-center justify-content-center" style="height: 400px; border-radius: 12px;">
+                                <i class="fas fa-image fa-4x text-muted"></i>
+                </div>
+                        </div>
+                    {% endif %}
+                </div>
+                {% if asset.images and asset.images|length > 1 %}
+                <button class="carousel-control-prev" type="button" data-bs-target="#assetImages" data-bs-slide="prev">
+                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">{{ _('Previous') }}</span>
+                </button>
+                <button class="carousel-control-next" type="button" data-bs-target="#assetImages" data-bs-slide="next">
+                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">{{ _('Next') }}</span>
+                </button>
+            {% endif %}
+            </div>
+            
+            <!-- 缩略图导航 -->
+            {% if asset.images and asset.images|length > 1 %}
+            <div class="row g-2 mb-4 clearfix">
+                {% for image in asset.images %}
+                <div class="thumbnail-col">
+                    <img src="{{ image }}" class="img-thumbnail thumbnail-nav" alt="{{ _('Thumbnail') }}" 
+                         data-bs-target="#assetImages" 
+                     data-bs-slide-to="{{ loop.index0 }}"
+                         style="height: 65px; object-fit: cover; cursor: pointer;">
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
+            <!-- 资产描述 -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ _('Asset Description') }}</h5>
+                    <div>
+                        <span class="badge bg-primary me-1">{{ asset.token_symbol }}</span>
+                        {% if asset.status == 1 %}
+                        <span class="badge bg-warning">{{ _('Pending Review') }}</span>
+                        {% elif asset.status == 2 %}
+                        <span class="badge bg-success">{{ _('On Chain') }}</span>
+                        {% elif asset.status == 3 %}
+                        <span class="badge bg-danger">{{ _('Rejected') }}</span>
+            {% endif %}
+        </div>
+                </div>
+                <div class="card-body">
+                    <p>{{ asset.description|default(_('No description provided'), true) }}</p>
+                    
+                            {% if asset.asset_type == 10 %}
+                    <div class="mt-4">
+                        <h6 class="fw-bold">{{ _('Property Details') }}</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><i class="fas fa-map-marker-alt text-muted me-2"></i> <strong>{{ _('Location') }}:</strong> {{ asset.location }}</li>
+                            <li class="mb-2"><i class="fas fa-ruler-combined text-muted me-2"></i> <strong>{{ _('Area') }}:</strong> {{ asset.area|number_format(field_name='area') }} ㎡</li>
+                            {# --- 添加发起人地址信息 --- #}
+                            <li class="mb-2">
+                                <i class="fas fa-user-tie text-muted me-2"></i> 
+                                <strong>{{ _('Creator Address') }}:</strong> 
+                                <span id="creatorAddressFull" style="display: none;">{{ asset.creator_address }}</span>
+                                <span title="{{ asset.creator_address }}">{{ asset.creator_address[:6] }}...{{ asset.creator_address[-4:] }}</span>
+                                <button class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1" onclick="copyToClipboard('creatorAddressFull', this)" style="font-size: 0.7em;">
+                                    <i class="far fa-copy"></i>
+                                </button>
+                            </li>
+                            {# --- 结束添加 --- #}
+                        </ul>
+                            </div>
+                            {% else %}
+                    <div class="mt-4">
+                        <h6 class="fw-bold">{{ _('Asset Details') }}</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><i class="fas fa-map-marker-alt text-muted me-2"></i> <strong>{{ _('Location') }}:</strong> {{ asset.location }}</li>
+                            <li class="mb-2"><i class="fas fa-money-bill-wave text-muted me-2"></i> <strong>{{ _('Total Value') }}:</strong> {{ asset.total_value|number_format(field_name='total_value') }} USDC</li>
+                            <li class="mb-2"><i class="fas fa-certificate text-muted me-2"></i> <strong>{{ _('Certification') }}:</strong> {{ asset.certification_type|default('N/A', true) }}</li>
+                            {# --- 添加发起人地址信息 --- #}
+                            <li class="mb-2">
+                                <i class="fas fa-user-tie text-muted me-2"></i> 
+                                <strong>{{ _('Creator Address') }}:</strong> 
+                                <span id="creatorAddressFull" style="display: none;">{{ asset.creator_address }}</span>
+                                <span title="{{ asset.creator_address }}">{{ asset.creator_address[:6] }}...{{ asset.creator_address[-4:] }}</span>
+                                <button class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1" onclick="copyToClipboard('creatorAddressFull', this)" style="font-size: 0.7em;">
+                                    <i class="far fa-copy"></i>
+                                </button>
+                            </li>
+                            {# --- 结束添加 --- #}
+                        </ul>
+                            </div>
+                            {% endif %}
+                    
+                    <!-- 文档下载链接 -->
+                    {% if asset.documents %}
+                    <div class="mt-4">
+                        <h6 class="fw-bold">{{ _('Related Documents') }}</h6>
+                        <div class="list-group">
+                            {% for doc in asset.documents %}
+                            <a href="{{ doc.url }}" class="list-group-item list-group-item-action" target="_blank">
+                                <i class="fas fa-file-pdf me-2 text-danger"></i>{{ doc.name }}
+                            </a>
+                            {% endfor %}
+                                </div>
+                            </div>
+                    {% endif %}
+                        </div>
+                    </div>
+
+            <!-- 累计分红信息 -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">{{ _('Dividend Information') }}</h5>
+                                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>{{ _('Annual Revenue') }}:</strong> {{ asset.annual_revenue|number_format(field_name='annual_revenue') }} USDC</p>
+                            <p><strong>{{ _('Dividend Frequency') }}:</strong> {{ asset.dividend_frequency|default(_('Quarterly'), true) }}</p>
+                            </div>
+                        <div class="col-md-6">
+                            <p><strong>{{ _('Total Distributed') }}:</strong> <span id="totalDividendsDistributed">{{ _('Loading') }}...</span></p>
+                            <p><strong>{{ _('Next Distribution') }}:</strong> {{ asset.next_dividend_date|default('TBA', true) }}</p>
+                                </div>
+                            </div>
+                    
+                    <!-- 分红管理按钮 - 已移到上方按钮组，此处删除 -->
+                            </div>
+                                </div>
+                            </div>
+                            
+        <div class="col-lg-5">
+            <!-- 交易卡片 -->
+            <div class="card sticky-top trade-card" style="top: 90px; z-index: 10;">
+                <div class="card-header">
+                    <h5 class="mb-0">{{ _('Asset Trading') }}</h5>
+                </div>
+                <div class="card-body">
+                    <!-- 资产基本信息 -->
+                    <div class="mb-4">
+                        <h4 class="mb-3">{{ asset.token_symbol }}</h4>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">{{ _('Asset Name') }}:</span>
+                            <span>{{ asset.name }}</span>
+                                            </div>
+                        {% if asset.token_address %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">{{ _('Token Address') }}:</span>
+                            <div>
+                                <span id="tokenAddressFull" style="display: none;">{{ asset.token_address }}</span>
+                                <span title="{{ asset.token_address }}">{{ asset.token_address[:6] }}...{{ asset.token_address[-4:] }}</span>
+                                <button class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1" onclick="copyToClipboard('tokenAddressFull', this)" style="font-size: 0.7em;">
+                                    <i class="far fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">{{ _('Token Price') }}:</span>
+                            <span class="fw-bold fs-5">{{ asset.token_price|number_format(field_name='token_price') }} USDC</span>
+                                </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">{{ _('Token Supply') }}:</span>
+                            <span>{{ asset.token_supply|number_format(field_name='token_supply') }}</span>
+                            </div>
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <span class="text-muted">{{ _('Available Tokens') }}:</span>
+                            <span id="availableTokens">{{ remaining_supply|number_format(field_name='remaining_supply') }}</span>
+                        </div>
+
+                    </div>
+
+                    <!-- 交易表单 -->
+                    <form id="purchase-form">
+                            <div class="mb-3">
+                            <label for="purchase-amount" class="form-label">{{ _('Purchase Amount') }}</label>
+                            <input type="number" class="form-control" id="purchase-amount" min="1" max="{{ remaining_supply }}" value="100" step="1" inputmode="numeric" pattern="\d*" oninput="this.value=this.value.replace(/\D/g,'')">
+                            <div class="form-text">{{ _('Enter the number of tokens you want to purchase') }} ({{ _('Must be a whole number') }})</div>
+                            </div>
+                        
+                        <div class="mb-4">
+                            <label for="totalPrice" class="form-label">{{ _('Total Price') }}</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="totalPrice" readonly>
+                                    <span class="input-group-text">USDC</span>
+                                </div>
+                            </div>
+                        
+                            <div id="buy-error" class="alert alert-danger" style="display: none;"></div>
+                        
+                        <button type="button" id="buy-button" class="btn btn-primary w-100 py-2" data-token-price="{{ asset.token_price }}" data-asset-id="{{ asset.id }}">
+                                <i class="fas fa-shopping-cart me-2"></i>{{ _('Buy') }}
+                            </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 交易历史 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4 trade-history-section">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ _('Transaction History') }}</h5>
+                    <div class="pagination-controls d-flex align-items-center" id="pagination-controls">
+                        <button class="btn btn-sm btn-outline-primary me-2" id="prevPageBtn" disabled>
+                            <i class="fas fa-chevron-left me-1"></i>{{ _('Previous') }}
+                        </button>
+                        <span id="paginationInfo" class="me-2">{{ _('Page') }} <span id="currentPageDisplay">1</span> {{ _('of') }} <span id="totalPagesDisplay">1</span></span>
+                        <button class="btn btn-sm btn-outline-primary" id="nextPageBtn" disabled>
+                            {{ _('Next') }}<i class="fas fa-chevron-right ms-1"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="trade-history" class="mb-3">
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">{{ _('Loading') }}...</span>
+                            </div>
+                            <p class="mt-2 text-muted">{{ _('Loading transaction history') }}...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+            </div>
+</div>
+
+<!-- 分红管理对话框 -->
+<div class="modal fade" id="dividendModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ _('Initiate Dividend') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">{{ _('Current Holders Count') }}</label>
+                    <input type="text" class="form-control" id="holdersCount" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">{{ _('Dividend Amount (USDC)') }}</label>
+                    <input type="number" class="form-control" id="dividendAmount" min="10000" step="1000">
+                    <div class="form-text">{{ _('Minimum dividend amount is 10,000 USDC') }}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">{{ _('Estimated Gas Fee') }}</label>
+                    <input type="text" class="form-control" id="estimatedGas" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">{{ _('Platform Fee') }} (1.5%%)</label>
+                    <input type="text" class="form-control" id="platformFee" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">{{ _('Per Token Dividend Amount') }}</label>
+                    <input type="text" class="form-control" id="perTokenDividend" readonly>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Cancel') }}</button>
+                <button type="button" class="btn btn-primary" onclick="startDividend()">{{ _('Start Dividend') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* 轮播图样式 */
+.carousel-item img {
+    border-radius: 12px;
+}
+
+.carousel-control-prev,
+.carousel-control-next {
+    width: 40px;
+    height: 40px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 50%;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.carousel-control-prev {
+    left: 10px;
+}
+
+.carousel-control-next {
+    right: 10px;
+}
+
+/* 缩略图导航样式 */
+.thumbnail-nav {
+    transition: all 0.2s;
+    opacity: 0.7;
+    cursor: pointer;
+}
+
+.thumbnail-nav:hover {
+    opacity: 1;
+}
+
+/* 缩略图列样式 - 一行5个 */
+.thumbnail-col {
+    width: 20%;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    float: left;
+}
+
+/* 卡片样式 */
+.card {
+    border-radius: 12px;
+}
+
+.bg-light {
+    background-color: #f8f9fa !important;
+}
+
+/* 按钮样式 */
+.btn-lg {
+    padding: 0.8rem 1.5rem;
+    font-weight: 500;
+}
+
+/* 标签样式 */
+.badge {
+    padding: 0.5em 1em;
+    font-weight: 500;
+}
+
+/* 表格样式 */
+.table th {
+    font-weight: 600;
+    border-top: none;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* 交易历史卡片样式优化 */
+@media (max-width: 767.98px) {
+    .card-body {
+        padding: 0.75rem;
+    }
+    
+    .trade-card {
+        margin-bottom: 0.5rem;
+    }
+    
+    .trade-card .card-body {
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .mobile-trade-content {
+        font-size: 0.85rem;
+    }
+    
+    .mobile-trade-content .text-muted {
+        font-size: 0.75rem;
+        margin-right: 0.2rem;
+        color: #6c757d;
+    }
+    
+    .mobile-trade-content .col-6 {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    
+    .hash-mobile {
+        max-width: 100px;
+        display: inline-block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        vertical-align: bottom;
+    }
+    
+    .pagination-controls {
+        font-size: 0.875rem;
+    }
+    
+    .pagination-controls .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* 哈希值显示优化 */
+.hash-value {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .hash-value {
+        max-width: 120px;
+    }
+}
+
+@media (min-width: 992px) {
+    .hash-value {
+        max-width: 150px;
+    }
+}
+
+/* 钱包相关样式在base.html中已定义，此处删除 */
+
+/* 分页控件样式优化 */
+.pagination-controls {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+}
+
+.pagination-controls .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    vertical-align: middle;
+}
+
+.pagination-controls span {
+    vertical-align: middle;
+}
+</style>
+
+<script>
+// 显示指定索引的图片
+function showImage(index) {
+    const carousel = new bootstrap.Carousel(document.getElementById('assetImages'));
+    carousel.to(index);
+}
+
+// 显示分红对话框
+function showDividendModal() {
+    const modal = new bootstrap.Modal(document.getElementById('dividendModal'));
+    modal.show();
+    
+    // 获取持有人数等信息
+    fetchHoldersInfo();
+}
+
+// 获取持有人信息
+async function fetchHoldersInfo() {
+    try {
+        const response = await fetch(`/api/assets/${asset.id}/holders`);
+        const data = await response.json();
+        
+        document.getElementById('holdersCount').value = data.holders_count;
+        
+        // 添加分红金额输入事件
+        document.getElementById('dividendAmount').addEventListener('input', calculateDividend);
+    } catch (error) {
+        console.error('获取持有人信息失败:', error);
+    }
+}
+
+// 计算分红相关数据
+function calculateDividend() {
+    const amount = parseFloat(document.getElementById('dividendAmount').value) || 0;
+    const holdersCount = parseInt(document.getElementById('holdersCount').value) || 0;
+    
+    // 计算平台手续费 (1.5%)
+    const platformFee = amount * 0.015;
+    document.getElementById('platformFee').value = platformFee.toFixed(2) + ' USDC';
+    
+    // 计算预估Gas费用
+    const estimatedGas = calculateEstimatedGas(holdersCount);
+    document.getElementById('estimatedGas').value = estimatedGas + ' ETH';
+    
+    // 计算每代币分红金额
+    const actualAmount = amount - platformFee;
+    const perTokenDividend = actualAmount / parseInt('{{ asset.token_supply }}');
+    document.getElementById('perTokenDividend').value = perTokenDividend.toFixed(6) + ' USDC';
+}
+
+// 计算预估Gas费用
+function calculateEstimatedGas(holdersCount) {
+    // 基础Gas消耗
+    const baseGas = 111000; // approve + transferFrom
+    // 每个接收者的Gas消耗
+    const perHolderGas = 35000;
+    // 总Gas消耗
+    const totalGas = baseGas + (perHolderGas * holdersCount);
+    // 假设Gas价格为30 Gwei
+    const gasPrice = 30e-9;
+    return (totalGas * gasPrice).toFixed(4);
+}
+
+// 发起分红
+async function startDividend() {
+    try {
+        const amount = document.getElementById('dividendAmount').value;
+        if (amount < 10000) {
+            alert('分红金额不能小于10,000 USDC');
+            return;
+        }
+        
+        const response = await fetch(`/api/assets/${asset.id}/dividend`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                amount: amount
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('发起分红失败');
+        }
+        
+        const data = await response.json();
+        alert('分红发起成功，请在钱包中确认交易');
+        location.reload();
+        
+    } catch (error) {
+        console.error('发起分红失败:', error);
+        alert(error.message);
+    }
+}
+
+// 显示模态框
+function showModal(modalId) {
+    const modal = new bootstrap.Modal(document.getElementById(modalId));
+    modal.show();
+}
+
+// 连接钱包函数
+async function connectWallet() {
+    console.log('开始连接钱包...');
+    
+    // 检查是否已安装MetaMask
+    if (typeof window.ethereum === 'undefined') {
+        alert('请安装MetaMask或其他兼容的钱包插件');
+        throw new Error('未安装钱包插件');
+    }
+    
+    try {
+        // 请求账户授权
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        if (accounts.length === 0) {
+            throw new Error('用户拒绝连接钱包');
+        }
+        
+        console.log('钱包连接成功:', accounts[0]);
+        
+        // 更新全局状态 - 保持正确大小写
+        const walletAddress = accounts[0];
+        if (typeof window.walletState === 'undefined') {
+            window.walletState = {};
+        }
+        window.walletState.currentAccount = walletAddress;
+        
+        // 使用全局变量提升兼容性 - 保持正确大小写
+        window.walletPublicKey = { toString: () => walletAddress };
+        
+        // 设置cookie - 保持正确大小写
+        document.cookie = `eth_address=${walletAddress}; path=/; max-age=3600`;
+        
+        return walletAddress;
+    } catch (error) {
+        console.error('连接钱包失败:', error);
+        throw error;
+    }
+}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+        // 购买金额输入框验证
+        const purchaseAmountInput = document.getElementById('purchase-amount');
+        if (purchaseAmountInput) {
+            purchaseAmountInput.addEventListener('input', function(e) {
+                // 移除非数字字符
+                this.value = this.value.replace(/\D/g, '');
+                
+                // 确保不为空
+                if (!this.value) {
+                    this.value = '1';
+                }
+                
+                // 确保不小于1
+                if (parseInt(this.value) < 1) {
+                    this.value = '1';
+                }
+                
+                // 确保不超过最大值
+                const maxValue = parseInt(this.getAttribute('max') || '999999999');
+                if (parseInt(this.value) > maxValue) {
+                    this.value = maxValue.toString();
+                }
+                
+                // 更新总价
+                updateTotalPrice();
+            });
+        }
+        
+        // 函数：更新总价
+        function updateTotalPrice() {
+            const amountInput = document.getElementById('purchase-amount');
+            const totalPriceInput = document.getElementById('totalPrice');
+            const buyButton = document.getElementById('buy-button');
+            
+            if (amountInput && totalPriceInput && buyButton) {
+                const amount = parseInt(amountInput.value) || 0;
+                const pricePerToken = parseFloat(buyButton.getAttribute('data-token-price')) || 0;
+                const totalPrice = (amount * pricePerToken).toFixed(2);
+                
+                totalPriceInput.value = totalPrice;
+            }
+        }
+        
+        // 初始更新总价
+        updateTotalPrice();
+        
+        // 为购买按钮添加事件监听器
+        const buyButton = document.getElementById('buy-button');
+        if (buyButton) {
+            buyButton.addEventListener('click', localHandleBuy);
+        }
+    });
+</script>
+
+{% block scripts %}
+<script nonce="{{ nonce|default('') }}" version="1.0.1">
+// 检查钱包连接状态
+</script>
+{% endblock %}
+    </div>
+</div>
+{% endblock %}
+
+<!-- 添加在文件底部，确保bs58库已加载 -->
+<script>
+// 检查bs58库是否正确加载
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        if (typeof bs58 === 'undefined') {
+            console.warn('bs58库未加载，尝试手动加载');
+            
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/index.js';
+            script.onload = function() {
+                console.log('bs58库已手动加载成功');
+            };
+            script.onerror = function() {
+                console.error('bs58库加载失败');
+            };
+            document.head.appendChild(script);
+        } else {
+            console.log('bs58库已正确加载');
+        }
+    }, 1000);
+});
+</script>
+
+<!-- 添加Solana Web3.js -->
+<script src="{{ url_for('proxy.cached_vendor', filename='solana-web3-stable.js') }}"></script>
+<!-- 添加SPL Token库 -->
+<script src="{{ url_for('proxy.cached_vendor', filename='solana-spl-token.js') }}"></script>
+<script>
+    // 确保SPL Token库正确加载
+    window.initSplTokenLib = async function() {
+        console.log('执行SPL Token库初始化检查');
+        
+        // 如果全局初始化已完成，直接使用
+        if (window.solanaLibInitialized && window.spl_token_initialized) {
+            console.log('检测到全局Solana库已初始化，使用现有实例');
+            return true;
+        }
+        
+        // 如果全局初始化函数存在，优先使用
+        if (typeof window.initSolanaLibs === 'function') {
+            console.log('使用全局Solana初始化函数');
+            try {
+                await window.initSolanaLibs();
+                return true;
+            } catch (error) {
+                console.error('通过全局初始化函数加载SPL Token失败:', error);
+                // 继续尝试备用方法
+            }
+        }
+
+        try {
+            // 如果全局对象已存在，直接使用
+            if (window.splToken && window.splToken.TOKEN_PROGRAM_ID) {
+                console.log('SPL Token库已存在，无需重新加载');
+                return true;
+            }
+
+            // 如果全局对象不存在，尝试从window.SolanaToken获取
+            if (window.SolanaToken) {
+                window.splToken = window.SolanaToken;
+                console.log('从SolanaToken复制成功');
+                return true;
+            }
+
+            console.log('使用备用方法初始化SPL Token库');
+            
+            // 确保基础对象存在
+            window.splToken = window.splToken || {};
+            window.solanaWeb3 = window.solanaWeb3 || {};
+            
+            // 如果已有PublicKey对象，创建简化的SPL Token接口
+            if (window.solanaWeb3.PublicKey) {
+                window.splToken.TOKEN_PROGRAM_ID = window.splToken.TOKEN_PROGRAM_ID || 
+                    new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+                window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID = window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID || 
+                    new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+                
+                // 确保存在基本接口
+                window.splToken.createTransferInstruction = window.splToken.createTransferInstruction || 
+                    function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
+                        const keys = [
+                            { pubkey: fromPubkey, isSigner: false, isWritable: true },
+                            { pubkey: toPubkey, isSigner: false, isWritable: true },
+                            { pubkey: ownerPubkey, isSigner: multiSigners.length === 0, isWritable: false }
+                        ];
+                        multiSigners.forEach(signer => {
+                            keys.push({ pubkey: signer.publicKey, isSigner: true, isWritable: false });
+                        });
+                        return new window.solanaWeb3.TransactionInstruction({
+                            keys,
+                            programId,
+                            data: new Uint8Array([3, ...new Array(8).fill(0)]) // 3是transfer指令的代码
+                        });
+                    };
+                
+                // 确保SPL对象存在
+                window.solanaWeb3.SPL = window.splToken;
+                console.log('使用简化的SPL Token接口');
+                return true;
+            }
+
+            console.warn('无法初始化SPL Token库，缺少基础依赖');
+            return false;
+        } catch (error) {
+            console.error('SPL Token库初始化失败:', error);
+            return false;
+        }
+    };
+
+    // 仅在DOM加载后执行一次初始化检查
+    if (!window.splTokenInitChecked) {
+        window.splTokenInitChecked = true;
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                if (await window.initSplTokenLib()) {
+                    console.log('SPL Token库初始化成功 (页面底部检查)');
+                }
+            } catch (error) {
+                console.error('SPL Token库初始化检查失败:', error);
+            }
+        });
+    }
+</script>
+
+<script type="module">
+    import { API_ENDPOINTS, CONTRACT_CONFIG } from '/static/js/config/api.js';
+    import { 
+        checkWeb3Environment, 
+        getWalletAddress, 
+        checkUSDCBalance, 
+        approveUSDC, 
+        executeTrade, 
+        updateTradeStatus 
+    } from '/static/js/utils/web3.js';
+    import { 
+        validateCreateTradeParams, 
+        validateUpdateTradeParams, 
+        validateTradeHistoryParams,
+        validateApiResponse,
+        validateTradeRecord 
+    } from '/static/js/utils/apiValidator.js';
+
+    // 检查Web3环境
+    try {
+        checkWeb3Environment();
+    } catch (error) {
+        console.error('Web3环境检查失败:', error);
+        showError(error.message);
+    }
+
+    // 刷新钱包资产列表
+    function refreshWalletAssets() {
+        if (typeof loadUserAssets === 'function') {
+            console.log('使用全局loadUserAssets函数加载钱包资产');
+            loadUserAssets();
+        }
+    }
+
+    // 导出函数供其他模块使用
+    window.refreshWalletAssets = refreshWalletAssets;
+</script>
+
+<!-- 添加钱包余额检查函数 - 放在页面顶部script标签内 -->
+<script>
+// 检查Solana USDC余额函数
+async function checkSolanaUSDCBalance(walletAddress) {
+    console.log('检查钱包USDC余额:', walletAddress);
+    try {
+        // 调用API获取余额
+        const response = await fetch(`/api/wallet/token_balance?address=${walletAddress}&token=USDC&_=${Date.now()}`);
+        if (!response.ok) {
+            throw new Error('获取余额接口请求失败');
+        }
+        
+        const data = await response.json();
+        console.log('获取到的余额数据:', data);
+        
+        if (data && data.success) {
+            return parseFloat(data.balance);
+        } else {
+            console.error('获取余额失败:', data.error || '未知错误');
+            return 0;
+        }
+    } catch (error) {
+        console.error('检查USDC余额时出错:', error);
+        return 0;
+    }
+}
+
+// 确保函数在全局作用域可用
+window.checkSolanaUSDCBalance = checkSolanaUSDCBalance;
+</script>
+
+<!-- 添加USDC转账函数 - 现在不再需要，因为使用智能合约 -->
+<script>
+// 移除旧的 transferUSDC 函数，因为它不再被使用
+/*
+async function transferUSDC(fromAddress, toAddress, amount) {
+    console.log(`执行USDC转账: 从 ${fromAddress} 到 ${toAddress}, 金额: ${amount}`);
+    
+    try {
+        // 检查钱包状态
+        if (!window.walletState || !window.walletState.transferToken) {
+            throw new Error('钱包状态不可用或缺少transferToken方法');
+        }
+        
+        // 计算平台费和实际支付金额
+        const platformFeeRate = 0.035; // 3.5%平台费率
+        const platformFee = amount * platformFeeRate;
+        const actualPayment = amount * (1 - platformFeeRate);
+        
+        console.log(`转账明细: 总金额=${amount}, 平台费=${platformFee}, 实际支付=${actualPayment}`);
+        
+        // 平台手续费地址 - 应该由后端提供或配置
+                        const platformAddress = "{{ platform_fee_address|default('EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4') }}";
+        
+        // 1. 转账平台费用
+        console.log(`转账平台费用: ${platformFee} USDC 到 ${platformAddress}`);
+        const platformFeeResult = await window.walletState.transferToken(
+            'USDC',
+            platformAddress,
+            platformFee
+        );
+        
+        if (!platformFeeResult || !platformFeeResult.success) {
+            throw new Error('平台费用转账失败: ' + (platformFeeResult?.error || '未知错误'));
+        }
+        
+        console.log('平台费用转账成功:', platformFeeResult);
+        
+        // 2. 转账到资产创建者
+        console.log(`转账到资产创建者: ${actualPayment} USDC 到 ${toAddress}`);
+        const creatorPaymentResult = await window.walletState.transferToken(
+            'USDC',
+            toAddress,
+            actualPayment
+        );
+        
+        if (!creatorPaymentResult || !creatorPaymentResult.success) {
+            throw new Error('支付给资产创建者失败: ' + (creatorPaymentResult?.error || '未知错误'));
+        }
+        
+        console.log('支付给资产创建者成功:', creatorPaymentResult);
+        
+        // 返回成功结果，包含签名信息
+        return {
+            success: true,
+            signature: platformFeeResult.txHash || platformFeeResult.signature || 'tx_' + Date.now(),
+            platformFeeSignature: platformFeeResult.txHash || platformFeeResult.signature,
+            creatorPaymentSignature: creatorPaymentResult.txHash || creatorPaymentResult.signature
+        };
+    } catch (error) {
+        console.error('USDC转账失败:', error);
+        return {
+            success: false,
+            error: error.message || '转账过程中发生未知错误'
+        };
+    }
+}
+*/
+// ... existing code ...
+</script>
+
+{% block scripts %}
+{{ super() }}
+<!-- 加载修复脚本 -->
+<script src="{{ url_for('static', filename='js/wallet_api_fix.js') }}"></script>
+<script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dividend_fix.js') }}"></script>
+<script src="{{ url_for('static', filename='js/asset_price_display.js') }}"></script>
+<script src="{{ url_for('static', filename='js/payment_interceptor.js') }}"></script>
+{% endblock %}

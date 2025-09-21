@@ -35,10 +35,6 @@ def create_app(config_name='development'):
     # 加载配置
     app.config.from_object(config[config_name])
     config[config_name].init_app(app)
-
-    # 加载配置
-    app.config.from_object(config[config_name])
-    config[config_name].init_app(app)
     
     # 确保 SECRET_KEY 已设置
     if not app.config.get('SECRET_KEY'):
@@ -92,7 +88,7 @@ def create_app(config_name='development'):
                         else:
                             # 对于非整数的供应量（理论上不应该，但做兼容处理），保留2位小数
                             return "{:,.2f}".format(float_value)
-
+                
                 # 如果没有提供字段名或不匹配任何规则，使用默认格式化
                 # 检查是否为整数或可以无损转换为整数
                 float_value = float(value)
@@ -101,37 +97,12 @@ def create_app(config_name='development'):
                 else:
                     # 默认保留2位小数
                     return "{:,.2f}".format(float_value)
-
+            
             # 如果输入不是数字类型，直接返回原值
             return value
         except (ValueError, TypeError) as e:
             app.logger.error(f"格式化数字出错 (field: {field_name}, value: {value}): {str(e)}")
             return value # 出错时返回原值
-
-    @app.template_filter('compact_number')
-    def compact_number_filter(value, field_name=None, asset_type=None):
-        """使用K/M单位格式化大数值，对证券资产(20)和类不动产(30)的total_value使用"""
-        try:
-            if isinstance(value, (int, float, Decimal)):
-                float_value = float(value)
-
-                # 对证券资产(SECURITIES=20)和类不动产(COMMERCIAL=30)的总价值使用紧凑格式
-                if (field_name and 'total_value' in field_name and
-                    asset_type and asset_type in [20, 30]):  # 20=证券资产, 30=类不动产
-                    if abs(float_value) >= 1000000:
-                        return f"{float_value/1000000:.1f}M"
-                    elif abs(float_value) >= 1000:
-                        return f"{float_value/1000:.1f}K"
-                    else:
-                        return f"{float_value:.2f}"
-                else:
-                    # 其他情况使用原格式
-                    return number_format_filter(value, field_name)
-
-            return value
-        except (ValueError, TypeError) as e:
-            app.logger.error(f"紧凑格式化数字出错 (field: {field_name}, value: {value}, asset_type: {asset_type}): {str(e)}")
-            return value
             
     @app.template_filter('from_json')
     def from_json_filter(value):
@@ -141,38 +112,7 @@ def create_app(config_name='development'):
             return []
         except:
             return []
-
-    @app.template_filter('news_slug')
-    def news_slug_filter(title):
-        """生成新闻标题的SEO友好slug"""
-        import re
-        if not title:
-            return 'news'
-
-        # 创建slug：移除特殊字符，替换空格和标点为连字符
-        slug = str(title)
-        slug = re.sub(r'\s+', '-', slug)           # 空格替换为-
-        slug = re.sub(r'[，。：？！\.]', '-', slug)  # 中文标点和英文句号替换为-
-        slug = re.sub(r'(\.com|\.net|\.org)', '', slug, flags=re.IGNORECASE) # 移除常见域名后缀
-        slug = re.sub(r'[-]+', '-', slug)         # 多个-合并为一个
-        slug = re.sub(r'^-+|-+$', '', slug)       # 移除开头和结尾的-
-        slug = slug.lower()
-
-        # 截断slug长度
-        if len(slug) > 50:
-            slug = slug[:50]
-            # 确保不在单词中间截断
-            if '-' in slug:
-                slug = slug.rsplit('-', 1)[0]
-
-        return slug if slug else 'news'
     
-    # -- 为 Flask-Limiter 配置 Redis 存储 --
-    # 使用在 cache_service.py 中定义的默认 Redis URL
-    redis_url = 'redis://localhost:6379/0'
-    app.config['RATELIMIT_STORAGE_URI'] = redis_url
-    app.logger.info(f"为 Flask-Limiter 设置 Redis 存储 URI: {redis_url}")
-
     # 初始化扩展
     from .extensions import init_extensions, bind_db_to_app
     init_extensions(app)
@@ -194,23 +134,21 @@ def create_app(config_name='development'):
     babel.locale_selector_func = get_locale
     
     # 设置日志
-    if not hasattr(app, '_file_handler_configured'):
-        if not os.path.exists('logs'):
-            os.makedirs('logs')
-
-        file_handler = RotatingFileHandler(
-            'logs/app.log',
-            maxBytes=10240,
-            backupCount=10
-        )
-        file_handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-        ))
-        file_handler.setLevel(logging.INFO)
-        app.logger.addHandler(file_handler)
-        app.logger.setLevel(logging.INFO)
-        app._file_handler_configured = True
-        app.logger.info('应用启动')
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+    
+    file_handler = RotatingFileHandler(
+        'logs/app.log',
+        maxBytes=10240,
+        backupCount=10
+    )
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+    app.logger.info('应用启动')
     
     # 初始化存储（在注册蓝图之前）
     from .utils.storage import init_storage
@@ -229,57 +167,67 @@ def create_app(config_name='development'):
     
     # 注册初始化分销佣金设置命令
     app.cli.add_command(init_distribution_command)
-
-    # 注册IP安全管理命令
-    from app.commands.ip_security import init_ip_security_commands
-    init_ip_security_commands(app)
-    
-    # 初始化智能合约监控服务
-    if not hasattr(app, '_contract_monitor_initialized'):
-        try:
-            from app.services.contract_monitor import init_contract_monitor
-            init_contract_monitor(app)
-            app.logger.info("智能合约监控服务已初始化")
-            app._contract_monitor_initialized = True
-        except ImportError as import_error:
-            app.logger.warning(f"智能合约监控服务模块导入失败，跳过初始化: {str(import_error)}")
-        except Exception as monitor_error:
-            app.logger.error(f"初始化智能合约监控服务失败: {str(monitor_error)}")
     
     # 初始化后台任务处理系统
-    if not hasattr(app, '_tasks_initialized'):
-        with app.app_context():
-            try:
-                # import app.tasks
-                app.logger.info("后台任务处理系统已初始化")
-                app._tasks_initialized = True
-                
-                # 初始化并启动后台任务调度器
-                try:
-                    from . import tasks
-                    tasks.start_scheduled_tasks()
-                except Exception as task_err:
-                    app.logger.error(f"启动后台任务调度器失败: {str(task_err)}")
-                    import traceback
-                    app.logger.error(traceback.format_exc())
-                    
-            except Exception as e:
-                app.logger.error(f"初始化后台任务处理系统失败: {str(e)}")
-    
-    
-    
-    # 确保所有模型都被导入
     with app.app_context():
         try:
-            # 导入所有模型以确保它们被注册到SQLAlchemy
-            from app.models.commission_withdrawal import CommissionWithdrawal
-            from app.models.referral import DistributionSetting
-            from app.models.commission_config import CommissionConfig, UserCommissionBalance
-            app.logger.info("所有模型已导入并注册")
-        except ImportError as e:
-            app.logger.warning(f"某些模型导入失败: {str(e)}")
-
+            # import app.tasks
+            app.logger.info("后台任务处理系统已初始化")
+            
+            # 确保支付自动监控任务启动（增加一个全局变量防止重复初始化）
+            try:
+                # 只有当全局变量不存在时才初始化任务
+                if not hasattr(app, '_tasks_initialized'):
+                    # 直接导入并调用监控函数，而不是通过start_scheduled_tasks
+                    from app.extensions import scheduler
+                    from app.tasks import auto_monitor_pending_payments
+                    
+                    # 立即执行一次监控
+                    app.logger.info("立即触发资产上链状态检查...")
+                    auto_monitor_pending_payments()
+                    
+                    # 添加定时任务
+                    if not scheduler.get_job('monitor_payments'):
+                        scheduler.add_job(
+                            id='monitor_payments',
+                            func=auto_monitor_pending_payments,
+                            trigger='interval',
+                            minutes=5,
+                            replace_existing=True
+                        )
+                        app.logger.info("定时任务已添加到调度器: 每5分钟执行一次")
+                    
+                    # 设置标志，防止重复初始化
+                    app._tasks_initialized = True
+                    app.logger.info("支付自动监控任务已启动")
+                else:
+                    app.logger.info("支付自动监控任务已经在运行中，跳过初始化")
+            except Exception as task_err:
+                app.logger.error(f"启动支付自动监控任务失败: {str(task_err)}")
+                import traceback
+                app.logger.error(traceback.format_exc())
+                
+        except Exception as e:
+            app.logger.error(f"初始化后台任务处理系统失败: {str(e)}")
+    
+    # -- 修改：使用正确的配置键 RATELIMIT_STORAGE_URI --
+    db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
+    if db_uri:
+        # app.config['RATELIMIT_STORAGE_URL'] = db_uri # 错误键名
+        app.config['RATELIMIT_STORAGE_URI'] = db_uri # 正确键名
+        app.logger.info(f"设置 Flask-Limiter 存储 URI: {db_uri}")
+    else:
+        app.logger.warning("未找到数据库 URI，Flask-Limiter 将使用内存存储")
+    
     return app
+
+    # 确保所有模型都被导入
+    with app.app_context():
+        # 导入所有模型以确保它们被注册到SQLAlchemy
+        from app.models.commission_withdrawal import CommissionWithdrawal
+        from app.models.referral import DistributionSetting
+        from app.models.commission_config import CommissionConfig, UserCommissionBalance
+        app.logger.info("所有模型已导入并注册")
 
     # 在初始化时添加分销佣金设置
 @click.command('init-distribution')

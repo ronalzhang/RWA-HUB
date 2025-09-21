@@ -75,8 +75,6 @@
     </script>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
-    <!-- 替换为本地简化的富文本编辑器 -->
-    <script src="{{ url_for('static', filename='js/simple-editor.js') }}"></script>
     <!-- Alpine.js CDN -->
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <style>
@@ -172,10 +170,9 @@
                 <nav>
                     <ul>
                         <li>
-                            <a href="/" target="_blank" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100">
+                            <a href="{{ url_for('admin.admin_v2_index') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.admin_v2_index' }}">
                                 <i class="fas fa-home w-5 text-center"></i>
                                 <span class="ml-3">首页</span>
-                                <i class="fas fa-external-link-alt ml-auto text-xs text-gray-400"></i>
                             </a>
                         </li>
                         <li>
@@ -188,12 +185,6 @@
                             <a href="{{ url_for('admin.assets_v2') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.assets_v2' }}">
                                 <i class="fas fa-cubes w-5 text-center"></i>
                                 <span class="ml-3">资产管理</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{{ url_for('spl_token.spl_tokens_page') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'spl_token.spl_tokens_page' }}">
-                                <i class="fas fa-coins w-5 text-center"></i>
-                                <span class="ml-3">SPL Token管理</span>
                             </a>
                         </li>
                         <li>
@@ -220,18 +211,6 @@
                                 <span class="ml-3">分享消息管理</span>
                             </a>
                         </li>
-                        <li>
-                            <a href="{{ url_for('admin.news_hotspots_v2') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.news_hotspots_v2' }}">
-                                <i class="fas fa-newspaper w-5 text-center"></i>
-                                <span class="ml-3">热点新闻管理</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{{ url_for('payment_management.payment_management') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'payment_management.payment_management' }}">
-                                <i class="fas fa-credit-card w-5 text-center"></i>
-                                <span class="ml-3">支付管理</span>
-                            </a>
-                        </li>
                         <li class="border-t border-gray-200 mt-2 pt-2">
                             <a href="{{ url_for('admin.settings_v2') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.settings_v2' }}">
                                 <i class="fas fa-cog w-5 text-center"></i>
@@ -242,12 +221,6 @@
                             <a href="{{ url_for('admin.admin_users_v2') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.admin_users_v2' }}">
                                 <i class="fas fa-user-shield w-5 text-center"></i>
                                 <span class="ml-3">管理员用户</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{{ url_for('admin.ip_security_page') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.ip_security_page' }}">
-                                <i class="fas fa-shield-alt w-5 text-center"></i>
-                                <span class="ml-3">IP安全管理</span>
                             </a>
                         </li>
                     </ul>

@@ -2,7 +2,7 @@
 <html lang="{{ g.locale }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=920, initial-scale=0.42, minimum-scale=0.2, maximum-scale=3.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
     
     <!-- 阻止Font Awesome Kit的加载 -->
@@ -17,14 +17,12 @@
     
     <!-- Bootstrap CSS -->
     <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
-    <!-- 固定宽度布局CSS -->
-    <link href="{{ url_for('static', filename='css/fixed-width.css') }}" rel="stylesheet">
     <!-- Font Awesome -->
     <link href="{{ url_for('static', filename='fonts/fontawesome/css/all.min.css') }}" rel="stylesheet">
     <!-- AOS Animation -->
     <link href="{{ url_for('static', filename='vendor/aos.css') }}" rel="stylesheet">
     <!-- SweetAlert2 CSS -->
-    <link href="{{ url_for('static', filename='vendor/sweetalert2.min.css') }}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
     
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     
@@ -39,7 +37,7 @@
         /* 主内容区样式 */
         .main-content {
             margin-top: 76px;
-            min-height: auto;
+            min-height: calc(100vh - 180px);
         }
         
         /* 页脚样式 */
@@ -60,45 +58,133 @@
             background-color: #fff;
         }
         
-        /* 固定宽度布局 - 调整为920px，优化边距 */
-        body {
-            min-width: 920px;
-            overflow-x: auto;
+        /* 小屏幕导航栏优化 */
+        @media (max-width: 991px) {
+            .navbar-brand {
+                font-size: 1rem;
+                margin-right: 5px;
+            }
+            
+            .nav-link {
+                padding: 0.5rem 0.5rem;
+                font-size: 0.9rem;
+            }
+            
+            .language-dropdown .btn {
+                padding: 0.35rem 0.7rem;
+                font-size: 0.8rem;
+            }
+            
+            .language-dropdown .btn .fas {
+                margin-right: 0.2rem;
+                font-size: 0.8rem;
+            }
+            
+            .wallet-btn {
+                min-width: auto;
+                padding: 0.35rem 0.7rem;
+                font-size: 0.8rem;
+            }
+            
+            .wallet-btn .fas {
+                margin-right: 0.2rem;
+                font-size: 0.8rem;
+            }
+            
+            .me-3 {
+                margin-right: 0.5rem !important;
+            }
         }
         
-        .container {
-            width: 920px;
-            max-width: none;
-            margin: 0 auto;
-            padding-left: 10px;
-            padding-right: 10px;
+        /* 更小屏幕进一步优化 */
+        @media (max-width: 576px) {
+            #currentLanguage {
+                display: none;
+            }
+            
+            .language-dropdown .btn .fas {
+                margin-right: 0;
+            }
+            
+            #walletBtnText {
+                display: none;
+            }
+            
+            .wallet-btn .fas {
+                margin-right: 0 !important;
+            }
+            
+            .wallet-btn {
+                min-width: auto;
+                padding: 4px 8px;
+            }
         }
         
-        /* 确保导航栏元素正常显示 */
-        .navbar-brand {
-            font-size: 1.2rem;
-            margin-right: 10px;
+        /* 语言切换按钮和下拉菜单的统一样式 */
+        .language-dropdown {
+            position: relative;
         }
         
-        .nav-link {
-            padding: 0.5rem 1rem;
-            font-size: 1rem;
-        }
-        
-        /* 语言切换器样式已移除 */
-        
-        .wallet-btn {
-            min-width: auto;
+        .language-dropdown .btn {
+            border-radius: 8px;
+            transition: all 0.2s ease-in-out;
             padding: 0.4rem 0.8rem;
-            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            font-size: 0.85rem;
+            border: 1px solid #dee2e6;
+            background-color: #f8f9fa;
+            margin-right: 0.5rem;
         }
         
-        .wallet-btn .fas {
-            margin-right: 0.2rem;
-            font-size: 0.9rem;
+        .language-dropdown .btn:hover {
+            background-color: #e9ecef;
+            border-color: #ced4da;
+            transform: translateY(-1px);
         }
         
-        /* 语言切换器已移除 */
+        .language-dropdown .btn .fas {
+            margin-right: 0.25rem;
+            color: #6c757d;
+            font-size: 0.85rem;
+        }
+        
+        .language-dropdown .dropdown-menu {
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 1px solid #eee;
+            padding: 8px 0;
+            min-width: 120px;
+            width: auto;
+            margin-top: 10px;
+            right: 0;
+            left: auto !important;
+            overflow: hidden;
+            z-index: 1050;
+            background-color: white;
+        }
+        
+        .language-dropdown .dropdown-item {
+            padding: 6px 12px;
+            transition: all 0.15s ease-in-out;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            display: block;
+            width: 100%;
+            clear: both;
+            text-align: left;
+        }
+        
+        .language-dropdown .dropdown-item:hover {
+            background-color: #f8f9fa;
+            color: var(--primary-color);
+            transform: translateX(5px);
+        }
+        
+        .language-dropdown .dropdown-item:active {
+            background-color: var(--primary-color);
+            color: white;
+        }
         
         /* 钱包按钮样式优化 */
         .wallet-btn {
@@ -133,7 +219,19 @@
             display: none !important;
         }
         
-        /* 保持固定布局，移除移动端特殊处理 */
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .wallet-btn {
+                padding: 0.35rem 0.7rem;
+                font-size: 0.85rem;
+                max-width: 160px;
+            }
+            
+            .wallet-btn i {
+                font-size: 0.85rem;
+                margin-right: 0.15rem;
+            }
+        }
         
         /* 确保按钮没有边框和阴影 */
         .wallet-btn:focus,
@@ -269,10 +367,26 @@
         }
         
         /* 响应式调整 */
-        /* 钱包下拉菜单保持固定宽度 */
-        .wallet-dropdown-menu {
-            width: 270px;
-            min-width: 270px;
+        @media (max-width: 576px) {
+            .wallet-dropdown-menu {
+                width: 90vw;
+                min-width: 250px;
+            }
+            
+            .wallet-actions {
+                flex-direction: column;
+            }
+            
+            /* 移除旧按钮样式 */
+            #switchWalletBtn,
+            #disconnectWalletBtn {
+                margin-bottom: 8px;
+                width: 100%;
+            }
+            
+            #switchWalletBtn {
+                margin-right: 0 !important;
+            }
         }
 
         /* 钱包选择器样式 */
@@ -283,7 +397,13 @@
             padding: 15px;
         }
         
-        /* 钱包网格保持固定布局 */
+        @media (max-width: 576px) {
+            .wallet-grid {
+                grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+                gap: 10px;
+                padding: 10px;
+            }
+        }
         
         /* 钱包选择模态框样式 - 美化版 */
         .wallet-modal-content {
@@ -472,42 +592,63 @@
             border: 1px solid rgba(0,123,255,0.1);
         }
         
-        /* 钱包选择器保持固定布局 */
-        .wallet-grid {
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 16px;
-            padding: 5px;
+        /* 移动端适配改进 */
+        @media (max-width: 576px) {
+            .wallet-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 12px;
+                padding: 5px;
+            }
+            
+            .wallet-option {
+                height: 110px;
+                padding: 12px 8px;
+            }
+            
+            .wallet-icon-container {
+                width: 48px;
+                height: 48px;
+                margin-bottom: 8px;
+            }
+            
+            .wallet-icon-wrapper {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .wallet-icon-wrapper i {
+                font-size: 20px;
+            }
+            
+            .wallet-name {
+                font-size: 12px;
+                margin-top: 5px;
+            }
+            
+            .wallet-connected-badge {
+                font-size: 14px;
+                top: 8px;
+                right: 8px;
+            }
+            
+            .wallet-modal-title {
+                font-size: 16px;
+            }
+            
+            .wallet-modal-header {
+                padding: 15px 20px;
+            }
+            
+            .wallet-modal-body {
+                padding: 15px;
+            }
         }
         
-        .wallet-option {
-            height: 120px;
-            padding: 16px 10px;
-        }
-        
-        .wallet-icon-container {
-            width: 56px;
-            height: 56px;
-            margin-bottom: 12px;
-        }
-        
-        .wallet-icon-wrapper {
-            width: 50px;
-            height: 50px;
-        }
-        
-        .wallet-icon-wrapper i {
-            font-size: 24px;
-        }
-        
-        .wallet-name {
-            font-size: 14px;
-            margin-top: 8px;
-        }
-        
-        .wallet-connected-badge {
-            font-size: 16px;
-            top: 10px;
-            right: 10px;
+        /* 超小屏幕进一步优化 */
+        @media (max-width: 400px) {
+            .wallet-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
         
         /* 钱包选择器动画效果增强 */
@@ -626,12 +767,21 @@
                 </ul>
                 
                 <div class="d-flex align-items-center">
-                    <!-- 语言切换器已移除 -->
+                    <!-- 语言切换 -->
+                    <div class="dropdown me-3 language-dropdown">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" id="languageDropdown" data-bs-toggle="dropdown" style="padding:6px 12px; font-size:14px; border-radius:6px; display:inline-flex; align-items:center;">
+                            <i class="fas fa-globe" style="margin-right:4px; font-size:14px;"></i>
+                            <span id="currentLanguage">{{ _('English') if g.locale == 'en' else _('繁體中文') }}</span>
+                                </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="changeLanguage('en')">English</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="changeLanguage('zh_Hant')">繁體中文</a></li>
+                        </ul>
+                                    </div>
                     
                     <!-- 钱包按钮和下拉菜单 -->
                     <div class="wallet-dropdown" id="walletDropdown">
-                        <button id="walletBtn" class="btn btn-primary" type="button" 
-                                style="display: inline-flex; align-items: center; gap:4px; padding:6px 12px; font-size:14px; max-width:160px; border:none; background:#0d6efd; color:#fff; border-radius:6px; cursor: pointer; pointer-events: auto; user-select: none;">
+                        <button id="walletBtn" class="btn btn-primary" type="button" onclick="checkWalletConnection(event)" style="display: inline-flex; align-items: center; gap:4px; padding:6px 12px; font-size:14px; max-width:160px; border:none; background:#0d6efd; color:#fff; border-radius:6px;">
                             <i class="fas fa-wallet" style="margin-right:2px;"></i>
                             <span id="walletBtnText" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ _('Connect Wallet') }}</span>
                         </button>
@@ -666,13 +816,13 @@
                                     <div>
                                         <i class="fas fa-hand-holding-usd me-2"></i>{{ _('Commission') }}: <span id="walletCommissionInDropdown" style="font-weight:600;">0.00</span>
                                     </div>
-                                    <button class="btn btn-sm btn-success p-1" style="font-size:11px; line-height:1;" title="{{ _('Withdraw to current wallet') }}" onclick="withdrawCommission()">
-                                        <i class="fas fa-arrow-down me-1"></i>{{ _('Withdraw') }}
-                                    </button>
+                                    <button class="btn btn-sm text-success p-0" style="background:none; border:none; font-size:12px;" title="{{ _('View Details') }}">
+                                        <i class="fas fa-info-circle"></i>
+                                </button>
                                     </div>
                                 
                                 <!-- 用户资产部分 -->
-                                <div id="userAssetsSection" style="display: block; margin-top:6px; border-top:1px solid #eee; padding-top:6px;">
+                                <div id="userAssetsSection" style="display: none; margin-top:6px; border-top:1px solid #eee; padding-top:6px;">
                                     <div class="wallet-section-title mb-1" style="font-size:13px; font-weight:600; color:#333;">
                                         <i class="fas fa-boxes-stacked me-2"></i>{{ _('My Assets') }}
                                     </div>
@@ -683,11 +833,10 @@
                                 
                                 <!-- 钱包操作按钮 -->
                                 <div class="d-flex mt-2" style="border-top:1px solid #eee; padding-top:6px; gap:6px;">
-                                    <!-- 暂时隐藏切换功能，只支持Phantom钱包 -->
-                                    <!-- <button id="switchWalletBtn" type="button" onclick="switchWalletAndCloseMenu()" style="background-color:#eef5ff; color:#0d6efd; padding:5px 8px; border-radius:6px; font-size:12px; font-weight:500; border:none; outline:none; box-shadow:none; display:flex; align-items:center; justify-content:center; flex:1;">
+                                    <button id="switchWalletBtn" type="button" onclick="switchWalletAndCloseMenu()" style="background-color:#eef5ff; color:#0d6efd; padding:5px 8px; border-radius:6px; font-size:12px; font-weight:500; border:none; outline:none; box-shadow:none; display:flex; align-items:center; justify-content:center; flex:1;">
                                         <i class="fas fa-repeat me-1"></i> {{ _('Switch') }}
-                                </button> -->
-                                    <button id="disconnectWalletBtn" type="button" onclick="disconnectAndCloseMenu()" style="background-color:#fff0f0; color:#dc3545; padding:5px 8px; border-radius:6px; font-size:12px; font-weight:500; border:none; outline:none; box-shadow:none; display:flex; align-items:center; justify-content:center; width:100%;">
+                                </button>
+                                    <button id="disconnectWalletBtn" type="button" onclick="disconnectAndCloseMenu()" style="background-color:#fff0f0; color:#dc3545; padding:5px 8px; border-radius:6px; font-size:12px; font-weight:500; border:none; outline:none; box-shadow:none; display:flex; align-items:center; justify-content:center; flex:1;">
                                         <i class="fas fa-power-off me-1"></i> {{ _('Disconnect') }}
                                 </button>
                                     </div>
@@ -699,7 +848,7 @@
     </nav>
 
     <!-- 主要内容区域容器，添加顶部边距防止与导航栏重叠 -->
-    <div class="main-content" style="margin-top: 76px; min-height: auto;">
+    <div class="main-content" style="margin-top: 76px; min-height: calc(100vh - 180px);">
         {% block content %}{% endblock %}
                     </div>
 
@@ -717,14 +866,6 @@
     
     <!-- JavaScript翻譯字典 - 置於其他JS腳本之前 -->
     <script>
-    // 立即定义翻译函数，确保在所有脚本加载前可用
-    window._ = function(text) {
-        if (typeof window.translations === 'object' && window.translations !== null) {
-            return window.translations[text] || text;
-        }
-        return text;
-    };
-    
     // 全局翻譯字典，供JavaScript使用
     window.translations = {
         // 通用
@@ -736,93 +877,7 @@
         "Close": "{{ _('Close') }}",
         "Save": "{{ _('Save') }}",
         "Edit": "{{ _('Edit') }}",
-        "Delete": "{{ _('Delete') }}"
-    };
-    
-    // 语言切换函数
-    function changeLanguage(lang) {
-        console.log('切换语言到:', lang);
-        
-        // 发送请求到后端切换语言
-        fetch('/api/change_language', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({ language: lang })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // 刷新页面以应用新语言
-                window.location.reload();
-            } else {
-                console.error('语言切换失败:', data.error);
-                // 如果API不存在，直接设置cookie并刷新
-                document.cookie = `language=${lang}; path=/; max-age=31536000`;
-                window.location.reload();
-            }
-        })
-        .catch(error => {
-            console.error('语言切换请求失败:', error);
-            // 降级处理：直接设置cookie并刷新
-            document.cookie = `language=${lang}; path=/; max-age=31536000`;
-            window.location.reload();
-        });
-    }
-    
-    // Wallet connection handling moved to original architecture
-    
-    // Wallet functionality handled by scripts above
-    
-    // Click outside to close wallet menu
-    document.addEventListener('click', function(event) {
-        const walletDropdown = document.getElementById('walletDropdown');
-        const walletMenu = document.getElementById('walletMenu');
-        
-        if (walletMenu && walletDropdown && 
-            !walletDropdown.contains(event.target) && 
-            walletMenu.classList.contains('show')) {
-            walletMenu.classList.remove('show');
-            walletMenu.style.display = 'none';
-        }
-    });
-    
-    // Initialize after page load
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('Page loaded, initializing wallet and language features');
-        
-        // Language switcher removed
-        
-        // Wallet button events handled by original architecture
-        
-        // Language switcher items removed
-        
-        // Click outside to close all dropdown menus
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.dropdown')) {
-                document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
-                    menu.classList.remove('show');
-                });
-            }
-        });
-        
-        // Check for existing wallet connection on page load
-        initializeWalletConnection();
-
-        // Initialize wallet button state - don't load asset data immediately to improve homepage performance
-        if (window.walletState && window.walletState.address) {
-            // Only update wallet button display, don't load asset data immediately
-            const walletBtnText = document.getElementById('walletBtnText');
-            if (walletBtnText && window.walletState.formatAddress) {
-                walletBtnText.textContent = window.walletState.formatAddress(window.walletState.address);
-            }
-        }
-    });
-    
-    // 扩展翻译对象
-    Object.assign(window.translations, {
+        "Delete": "{{ _('Delete') }}",
         "Submit": "{{ _('Submit') }}",
         "Processing...": "{{ _('Processing...') }}",
         
@@ -888,19 +943,11 @@
         "Failed to switch wallet": "{{ _('Failed to switch wallet') }}",
         "Failed to disconnect wallet": "{{ _('Failed to disconnect wallet') }}",
         "MetaMask not installed!": "{{ _('MetaMask not installed!') }}"
-    });
-    
-    // 定義一個全局翻譯函數 - 确保立即可用
-    window._ = function(text) {
-        if (typeof window.translations === 'object' && window.translations !== null) {
-            return window.translations[text] || text;
-        }
-        return text;
     };
     
-    // 确保翻译函数在所有脚本加载前就可用
-    if (typeof window._ !== 'function') {
-        window._ = function(text) { return text; };
+    // 定義一個全局翻譯函數
+    window._ = function(text) {
+        return window.translations[text] || text;
     }
     </script>
 
@@ -924,60 +971,6 @@
     document.addEventListener('walletStateChanged', function(event) {
         updateAdminNavLink();
     });
-
-    // 监听钱包恢复事件（关键：修复管理员入口不显示问题）
-    document.addEventListener('walletRestored', function(event) {
-        console.log('钱包状态已恢复:', event.detail);
-        if (event.detail && event.detail.address) {
-            // 检查管理员权限
-            checkAdminStatus(event.detail.address);
-        }
-    });
-
-    // 检查管理员状态函数（原本应该存在的功能）
-    function checkAdminStatus(address) {
-        if (!address) {
-            hideAdminEntry();
-            return;
-        }
-
-        fetch('/api/admin/check', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Wallet-Address': address
-            },
-            body: JSON.stringify({ address: address })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.is_admin === true) {
-                showAdminEntry();
-            } else {
-                hideAdminEntry();
-            }
-        })
-        .catch(error => {
-            console.error('管理员检查失败:', error);
-            hideAdminEntry();
-        });
-    }
-
-    // 显示管理员入口
-    function showAdminEntry() {
-        const adminEntry = document.getElementById('adminEntry');
-        if (adminEntry) {
-            adminEntry.style.display = 'block';
-        }
-    }
-
-    // 隐藏管理员入口
-    function hideAdminEntry() {
-        const adminEntry = document.getElementById('adminEntry');
-        if (adminEntry) {
-            adminEntry.style.display = 'none';
-        }
-    }
     </script>
 
     <!-- Bootstrap, jQuery和其他脚本 -->
@@ -992,955 +985,257 @@
                 
                 // 禁用Bootstrap的自动dropdown行为
                 if (window.jQuery && window.bootstrap) {
-                    try {
-                        // 确保钱包按钮不使用Bootstrap的dropdown行为
-                        const walletBtn = document.getElementById('walletBtn');
-                        if (walletBtn) {
-                            // 移除任何Bootstrap dropdown相关属性
-                            walletBtn.removeAttribute('data-bs-toggle');
-                            walletBtn.classList.remove('dropdown-toggle');
-                        }
-                        
-                        // 只对非钱包按钮初始化Bootstrap下拉菜单
-                        var dropdownElementList = [].slice.call(
-                            document.querySelectorAll('.dropdown-toggle:not(#walletBtn)')
-                        );
-                        dropdownElementList.map(function (dropdownToggleEl) {
-                            return new bootstrap.Dropdown(dropdownToggleEl);
-                        });
-                    } catch (err) {
+                    setTimeout(function() {
+                        try {
+                            // 确保钱包按钮不使用Bootstrap的dropdown行为
+                            const walletBtn = document.getElementById('walletBtn');
+                            if (walletBtn) {
+                                // 移除任何Bootstrap dropdown相关属性
+                                walletBtn.removeAttribute('data-bs-toggle');
+                                walletBtn.classList.remove('dropdown-toggle');
+                                
+                                // 确保钱包按钮有点击事件
+                                walletBtn.onclick = function(event) {
+                                console.log('钱包按钮被点击');
+                                    checkWalletConnection(event);
+                                    return false;
+                                };
+                                
+                            console.log('钱包按钮事件已重新绑定');
+                            }
+                            
+                            // 只对非钱包按钮初始化Bootstrap下拉菜单
+                            var dropdownElementList = [].slice.call(
+                                document.querySelectorAll('.dropdown-toggle:not(#walletBtn)')
+                            );
+                            dropdownElementList.map(function (dropdownToggleEl) {
+                                return new bootstrap.Dropdown(dropdownToggleEl);
+                            });
+                        console.log('除钱包按钮外的下拉菜单初始化完成');
+                        } catch (err) {
                         console.error('初始化下拉菜单失败:', err);
-                    }
+                        }
+                    }, 300); // 缩短延迟时间
                 }
             });
     </script>
     
-    <!-- Wallet connection logic uses original architecture -->
+    <!-- 检查钱包连接状态并决定行为 -->
+    <script>
+        // 检查钱包连接状态并决定行为
+        function checkWalletConnection(event) {
+            // 阻止默认行为和事件冒泡
+            event.preventDefault(); 
+            event.stopPropagation();
+            
+            // 如果钱包未连接，打开钱包选择器
+            if (!window.walletState || !window.walletState.connected) {
+                console.log('钱包未连接，打开选择器');
+                // 确保下拉菜单关闭
+                const walletMenu = document.getElementById('walletMenu');
+                if (walletMenu && walletMenu.classList.contains('show')) {
+                    walletMenu.classList.remove('show');
+                }
+                
+                // 打开钱包选择器
+                if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+                    window.walletState.openWalletSelector();
+                } else {
+                    console.error('钱包选择器功能不可用');
+                }
+            } else {
+                // 如果已连接，直接手动切换下拉菜单显示状态
+                console.log('钱包已连接，切换下拉菜单显示状态');
+                const walletMenu = document.getElementById('walletMenu');
+                if (walletMenu) {
+                    if (walletMenu.classList.contains('show')) {
+                        walletMenu.classList.remove('show');
+                    } else {
+                        // 立即显示菜单
+                        walletMenu.classList.add('show');
+                    }
+                }
+            }
+        }
+        
+        // 监听全局点击事件，当点击页面其他地方时关闭钱包下拉菜单
+        document.addEventListener('click', function(event) {
+            const walletBtn = document.getElementById('walletBtn');
+            const walletMenu = document.getElementById('walletMenu');
+            
+            // 如果点击的不是钱包按钮或钱包菜单内部元素
+            if (walletMenu && walletMenu.classList.contains('show') && 
+                !walletBtn.contains(event.target) && 
+                !walletMenu.contains(event.target)) {
+                walletMenu.classList.remove('show');
+            }
+        });
+        
+        // 关闭下拉菜单并打开钱包选择器
+        function switchWalletAndCloseMenu() {
+            console.log('关闭下拉菜单并打开钱包选择器');
+            // 关闭下拉菜单
+            const walletMenu = document.getElementById('walletMenu');
+            if (walletMenu && walletMenu.classList.contains('show')) {
+                walletMenu.classList.remove('show');
+            }
+            
+            // 打开钱包选择器
+            if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+                window.walletState.openWalletSelector();
+            } else {
+                console.error('钱包选择器功能不可用');
+            }
+        }
+        
+        // 关闭下拉菜单并断开钱包连接
+        function disconnectAndCloseMenu() {
+            console.log('关闭下拉菜单并断开钱包连接');
+            // 关闭下拉菜单
+            const walletMenu = document.getElementById('walletMenu');
+            if (walletMenu && walletMenu.classList.contains('show')) {
+                walletMenu.classList.remove('show');
+            }
+            
+            // 延迟一点再断开连接，确保菜单已关闭
+            setTimeout(function() {
+                // 断开钱包连接
+                if (window.walletState && typeof window.walletState.disconnect === 'function') {
+                    window.walletState.disconnect();
+                } else {
+                    console.error('钱包断开连接功能不可用');
+                }
+            }, 50);
+        }
+    </script>
     
     <!-- 移除Font Awesome Kit脚本，已在头部引入CDN版本 -->
     <!-- <script src="https://kit.fontawesome.com/ad3f66688a.js" crossorigin="anonymous"></script> -->
     
-    <!-- 简化的Font Awesome Kit阻止脚本 -->
+    <!-- 添加Font Awesome CDN清理脚本 -->
     <script>
-        // 简单阻止Font Awesome Kit加载，提升性能
-        if (window.FontAwesomeConfig) {
-            window.FontAwesomeConfig.autoReplaceSvg = false;
-        }
-    </script>
-    
-    <!-- 钱包兼容性保护脚本 - 防止钱包扩展冲突 -->
-    <script>
-        // 保护window.ethereum属性，防止重复定义错误
-        if (typeof window.ethereum !== 'undefined') {
-            console.log('Ethereum provider already exists, preserving it');
-            window._originalEthereum = window.ethereum;
-        }
-        
-        // 监听钱包注入错误并静默处理
-        window.addEventListener('error', function(e) {
-            if (e.message && e.message.includes('Cannot redefine property: ethereum')) {
-                console.warn('Ethereum provider redefinition attempted, ignoring error');
-                e.stopPropagation();
-                e.preventDefault();
-                return false;
-            }
-        }, true);
-        
-        // 防止钱包扩展脚本冲突
-        window.addEventListener('DOMContentLoaded', function() {
-            if (window._originalEthereum && !window.ethereum) {
-                window.ethereum = window._originalEthereum;
-            }
-        });
-    </script>
-    
-    <!-- 加载Web3.js - 直接使用本地文件，避免CDN延迟 -->
-    <script src="{{ url_for('static', filename='vendor/web3.min.js') }}"></script>
-    
-    <!-- SweetAlert2 JavaScript -->
-    <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
-
-    <!-- Solana Web3.js - 同步加载避免竞态条件 -->
-    <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.78.0/lib/index.iife.min.js"
-            onerror="this.onerror=null; this.src='https://unpkg.com/@solana/web3.js@1.78.0/lib/index.iife.min.js'"></script>
-
-    <!-- SPL Token 库（在Solana Web3.js之后加载） -->
-    <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
-    <!-- 统一购买处理器（包含钱包管理功能） -->
-    <script src="{{ url_for('static', filename='js/purchase_handler_unified.js') }}?v=20250914_network_fix&cache_bust={{ range(10000000, 99999999) | random }}"></script>
-
-    <!-- 全局钱包函数定义 -->
-    <script>
-        // 全局钱包连接函数 - 只支持Phantom钱包
-        window.connectWallet = async function(walletType = 'phantom') {
-            console.log('connectWallet called with type:', walletType);
-
-            // 只支持Phantom钱包
-            if (walletType.toLowerCase() !== 'phantom') {
-                alert('Currently only Phantom wallet is supported.');
-                return false;
-            }
-
-            try {
-                if (window.solana && window.solana.isPhantom) {
-                    // 用户需要主动确认连接，不使用 onlyIfTrusted
-                    console.log('Requesting wallet connection with user confirmation...');
-                    const response = await window.solana.connect();
-                    const connectedAddress = response.publicKey.toString();
-                    console.log('Phantom connected:', connectedAddress);
-
-                    // 创建统一的钱包状态对象
-                    window.walletState = {
-                        connected: true,
-                        isConnected: true,
-                        address: connectedAddress,
-                        walletType: 'phantom',
-                        adapter: window.solana,
-                        formatAddress: function(addr) {
-                            if (!addr) return '';
-                            return addr.slice(0, 6) + '...' + addr.slice(-4);
-                        },
-                        copyWalletAddress: function() {
-                            if (this.address) {
-                                navigator.clipboard.writeText(this.address).then(() => {
-                                    const successMsg = document.getElementById('copyAddressSuccess');
-                                    if (successMsg) {
-                                        successMsg.style.opacity = '1';
-                                        setTimeout(() => successMsg.style.opacity = '0', 2000);
-                                    }
-                                }).catch(() => {
-                                    alert('Address: ' + this.address);
-                                });
+        // 更彻底的方法阻止Kit加载
+        (function() {
+            // 1. 使用MutationObserver监视DOM变化
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.addedNodes) {
+                        mutation.addedNodes.forEach(function(node) {
+                            if (node.nodeType === 1 && node.tagName === 'SCRIPT') {
+                                const src = node.src || '';
+                                if (src.includes('kit.fontawesome.com')) {
+                                    console.log('通过MutationObserver阻止加载Font Awesome Kit:', src);
+                                    node.parentNode.removeChild(node);
+                                }
                             }
-                        }
-                    };
-
-                    // ⭐ 关键修复：保存钱包连接状态到localStorage
-                    try {
-                        localStorage.setItem('wallet_address', connectedAddress);
-                        localStorage.setItem('wallet_type', 'phantom');
-                        localStorage.setItem('wallet_connected', 'true');
-                        sessionStorage.setItem('wallet_address', connectedAddress);
-                        console.log('✅ 钱包状态已保存到本地存储');
-                    } catch (error) {
-                        console.warn('保存钱包状态到本地存储失败:', error);
+                        });
                     }
-
-                    // 更新UI
-                    updateWalletUI(connectedAddress);
-
-                    // 检查管理员权限
-                    checkAdminStatus(connectedAddress);
-
-                    // 加载钱包数据
-                    if (typeof loadWalletData === 'function') {
-                        loadWalletData(connectedAddress);
-                    }
-
-                    return true;
-                } else {
-                    throw new Error('Phantom wallet not detected. Please install Phantom wallet extension.');
-                }
-            } catch (error) {
-                console.error('Wallet connection failed:', error);
-                if (error.message && error.message.includes('User rejected')) {
-                    console.log('User rejected the connection');
-                } else {
-                    alert(`Connection failed: ${error.message}`);
-                }
-                return false;
-            }
-        };
-
-        window.disconnectWallet = async function() {
-            console.log('disconnectWallet called');
-            try {
-                // 使用walletState中保存的适配器进行断开
-                if (window.walletState && window.walletState.adapter) {
-                    if (window.walletState.adapter.disconnect) {
-                        await window.walletState.adapter.disconnect();
-                        console.log(`${window.walletState.walletType} wallet disconnected`);
-                    }
-                }
-
-                // 清除钱包状态
-                window.walletState = null;
-
-                // ⭐ 关键修复：清除本地存储的钱包连接状态
-                try {
-                    localStorage.removeItem('wallet_address');
-                    localStorage.removeItem('wallet_type');
-                    localStorage.removeItem('wallet_connected');
-                    sessionStorage.removeItem('wallet_address');
-                    console.log('✅ 已清除本地存储的钱包状态');
-                } catch (error) {
-                    console.warn('清除本地存储失败:', error);
-                }
-
-                // 更新UI
-                const walletBtnText = document.getElementById('walletBtnText');
-                if (walletBtnText) {
-                    walletBtnText.textContent = 'Connect Wallet';
-                }
-
-                // 清除钱包地址显示
-                const walletAddressDisplay = document.getElementById('walletAddressDisplay');
-                if (walletAddressDisplay) {
-                    walletAddressDisplay.textContent = 'Not Connected';
-                }
-
-                // 隐藏管理员入口
-                hideAdminEntry();
-
-                // 隐藏钱包菜单
-                const walletMenu = document.getElementById('walletMenu');
-                if (walletMenu) {
-                    walletMenu.classList.remove('show');
-                    walletMenu.style.display = 'none';
-                }
-
-                // 触发钱包状态变化事件
-                document.dispatchEvent(new CustomEvent('walletStateChanged', {
-                    detail: { connected: false, address: null }
-                }));
-
-                return true;
-            } catch (error) {
-                console.error('Wallet disconnect failed:', error);
-                return false;
-            }
-        };
-
-        window.getWalletAddress = function() {
-            return window.walletState ? window.walletState.address : null;
-        };
-
-        // 辅助函数：更新钱包UI显示
-        function updateWalletUI(address) {
-            const walletBtnText = document.getElementById('walletBtnText');
-            if (walletBtnText && address) {
-                walletBtnText.textContent = address.slice(0, 6) + '...' + address.slice(-4);
-            }
-
-            const walletAddressDisplay = document.getElementById('walletAddressDisplay');
-            if (walletAddressDisplay && address) {
-                walletAddressDisplay.textContent = address.slice(0, 6) + '...' + address.slice(-4);
-            }
-        }
-    </script>
-
-    <!-- 简单的钱包按钮初始化 -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, initializing wallet button...');
-            initSimpleWalletButton();
-        });
-        
-        // 统一的地址格式化函数 - 避免重复代码
-        function formatWalletAddress(address) {
-            if (!address) return '';
-            // 如果walletState对象可用，使用其formatAddress方法，否则使用简单实现
-            if (window.walletState && typeof window.walletState.formatAddress === 'function') {
-                return window.walletState.formatAddress(address);
-            }
-            return address.slice(0, 6) + '...' + address.slice(-4);
-        }
-        
-        // 简单直接的钱包按钮初始化
-        function initSimpleWalletButton() {
-            const walletBtn = document.getElementById('walletBtn');
-            if (!walletBtn) {
-                console.error('Wallet button not found');
-                return;
-            }
-            
-            console.log('Initializing wallet button...');
-            
-            // 绑定点击事件
-            walletBtn.addEventListener('click', function(event) {
-                event.preventDefault();
-                event.stopPropagation();
-                console.log('Wallet button clicked');
-                
-                // 检查钱包连接状态
-                const isConnected = window.walletState && 
-                    (window.walletState.connected || window.walletState.isConnected) &&
-                    window.walletState.address;
-                
-                if (isConnected) {
-                    console.log('Wallet connected, showing dropdown menu');
-                    showWalletDropdown();
-                } else {
-                    console.log('Wallet not connected, opening wallet selector');
-                    openWalletSelector();
-                }
+                });
             });
             
-            console.log('Wallet button initialized successfully');
-        }
-        
-        // 显示钱包下拉菜单
-        function showWalletDropdown() {
-            const walletMenu = document.getElementById('walletMenu');
-            if (!walletMenu) return;
+            // 监听整个文档的变化
+            observer.observe(document, { childList: true, subtree: true });
             
-            const isVisible = walletMenu.classList.contains('show');
-            
-            if (isVisible) {
-                // 隐藏菜单
-                walletMenu.classList.remove('show');
-                walletMenu.style.display = 'none';
-            } else {
-                // 显示菜单并加载用户数据
-                walletMenu.classList.add('show');
-                walletMenu.style.display = 'block';
-                
-                // 加载用户资产和余额
-                if (window.walletState && window.walletState.address) {
-                    loadWalletData(window.walletState.address);
-                }
-            }
-        }
-        
-        // Load wallet data (balance and assets)
-        async function loadWalletData(address) {
-            if (!address) return;
-            
-            try {
-                // Load USDC balance
-                const balanceResponse = await fetch('/api/wallet/usdc-balance', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        wallet_address: address
-                    })
-                });
-                
-                if (balanceResponse.ok) {
-                    const balanceData = await balanceResponse.json();
-                    if (balanceData.success) {
-                        const balanceElement = document.getElementById('walletBalanceInDropdown');
-                        if (balanceElement) {
-                            balanceElement.textContent = balanceData.balance.toFixed(2);
+            // 2. 重写document.createElement来阻止创建加载Kit的script标签
+            const originalCreateElement = document.createElement;
+            document.createElement = function(tag) {
+                const element = originalCreateElement.call(document, tag);
+                if (tag.toLowerCase() === 'script') {
+                    const originalSetAttribute = element.setAttribute;
+                    element.setAttribute = function(name, value) {
+                        if (name === 'src' && typeof value === 'string' && value.includes('kit.fontawesome.com')) {
+                            console.log('拦截到Font Awesome Kit加载尝试:', value);
+                            return;
                         }
-                    }
-                }
-
-                // Load commission balance using service API
-                try {
-                    const commissionResponse = await fetch(`/api/service/wallet/commission_balance?address=${encodeURIComponent(address)}`);
-                    if (commissionResponse.ok) {
-                        const commissionData = await commissionResponse.json();
-                        if (commissionData.success) {
-                            const commissionElement = document.getElementById('walletCommissionInDropdown');
-                            if (commissionElement) {
-                                commissionElement.textContent = parseFloat(commissionData.balance || 0).toFixed(2);
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.log('Commission balance not available:', error);
-                    const commissionElement = document.getElementById('walletCommissionInDropdown');
-                    if (commissionElement) {
-                        commissionElement.textContent = '0.00';
-                    }
-                }
-
-                // Load user assets
-                const assetsResponse = await fetch(`/api/user/assets?address=${encodeURIComponent(address)}&wallet_type=solana`);
-                if (assetsResponse.ok) {
-                    const assetsData = await assetsResponse.json();
-                    if (assetsData.success) {
-                        const assetsList = document.getElementById('walletAssetsList');
-                        if (assetsList) {
-                            assetsList.innerHTML = '';
-                            
-                            if (assetsData.assets && assetsData.assets.length > 0) {
-                                assetsData.assets.forEach(asset => {
-                                    const assetItem = document.createElement('li');
-                                    assetItem.className = 'wallet-asset-item';
-                                    
-                                    assetItem.innerHTML = `
-                                        <div class="asset-link" style="display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; color: #333; text-decoration: none; border-radius: 4px; transition: all 0.2s ease; background-color: #f8f9fa;">
-                                            <div class="asset-info" style="display: flex; align-items: center;">
-                                                <a href="/assets/${asset.id || asset.asset_id}" class="asset-name" style="font-size: 12px; font-weight: 500; color: #2775ca; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; cursor: pointer;" title="View asset details">${asset.symbol}</a>
-                                            </div>
-                                            <div class="asset-quantity" style="font-size: 11px; color: #333; background: #eeeeee; padding: 1px 4px; border-radius: 3px; margin-left: 4px;">${asset.balance}</div>
-                                        </div>
-                                    `;
-                                    
-                                    assetsList.appendChild(assetItem);
-                                });
-                            } else {
-                                const noAssetsItem = document.createElement('li');
-                                noAssetsItem.innerHTML = '<div style="padding: 8px; color: #666; font-size: 12px; text-align: center;">No assets found</div>';
-                                assetsList.appendChild(noAssetsItem);
-                            }
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load wallet data:', error);
-            }
-        }
-        
-        // Functions removed to use original architecture
-        
-        // Mobile detection helper
-        function isMobileDevice() {
-            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        }
-
-        // Connect to Phantom wallet on mobile - 完整的移动端连接流程
-        async function connectPhantomMobile() {
-            try {
-                console.log('Attempting mobile Phantom connection...');
-
-                const walletBtnText = document.getElementById('walletBtnText');
-                if (walletBtnText) {
-                    walletBtnText.textContent = 'Connecting...';
-                }
-
-                // Method 1: Check if Phantom provider is available (in-app browser)
-                if (window.solana && window.solana.isPhantom) {
-                    console.log('Phantom provider detected in mobile browser, connecting...');
-                    return await window.connectWallet('phantom');
-                }
-
-                // Method 2: Try to detect if we're in Phantom's in-app browser
-                const userAgent = navigator.userAgent.toLowerCase();
-                if (userAgent.includes('phantom')) {
-                    console.log('In Phantom browser, waiting for provider...');
-
-                    let attempts = 0;
-                    return new Promise((resolve) => {
-                        const checkProvider = setInterval(() => {
-                            attempts++;
-                            if (window.solana && window.solana.isPhantom) {
-                                clearInterval(checkProvider);
-                                window.connectWallet('phantom').then(resolve);
-                            } else if (attempts > 10) {
-                                clearInterval(checkProvider);
-                                if (walletBtnText) {
-                                    walletBtnText.textContent = 'Connect Wallet';
-                                }
-                                alert('Please refresh the page in Phantom browser and try again.');
-                                resolve(false);
-                            }
-                        }, 500);
-                    });
-                }
-
-                // Method 3: Use WalletConnect-style deep link for mobile browsers
-                if (walletBtnText) {
-                    walletBtnText.textContent = 'Connect Wallet';
-                }
-
-                const currentUrl = encodeURIComponent(window.location.href);
-                const appName = encodeURIComponent('RWA-HUB');
-
-                // Store connection attempt state
-                sessionStorage.setItem('phantom_connection_attempt', Date.now().toString());
-
-                // Use universal link format that works better with mobile browsers
-                const universalLink = `https://phantom.app/ul/v1/connect?app_url=${currentUrl}&app_name=${appName}&redirect_link=${currentUrl}`;
-
-                console.log('Opening Phantom with universal link:', universalLink);
-
-                // Show instruction with better UX
-                const userConfirmed = confirm('Connect with Phantom wallet?\n\n• This will open Phantom app\n• Approve the connection in Phantom\n• You will be redirected back to this page\n\nContinue?');
-
-                if (userConfirmed) {
-                    try {
-                        // For iOS: try phantom:// scheme first, fallback to universal link
-                        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                        if (isIOS) {
-                            // Try phantom scheme first
-                            const phantomScheme = `phantom://v1/connect?app_url=${currentUrl}&app_name=${appName}&redirect_link=${currentUrl}`;
-                            window.location.href = phantomScheme;
-
-                            // Fallback to universal link after delay
-                            setTimeout(() => {
-                                if (document.visibilityState === 'visible') {
-                                    window.location.href = universalLink;
-                                }
-                            }, 1500);
-                        } else {
-                            // Android: use intent or universal link
-                            window.location.href = universalLink;
-                        }
-
-                        // Show waiting message
-                        if (walletBtnText) {
-                            walletBtnText.textContent = 'Waiting for Phantom...';
-                        }
-
-                        // Set timeout to handle if user doesn't complete connection
-                        setTimeout(() => {
-                            if (document.visibilityState === 'visible' && !window.walletState?.connected) {
-                                if (walletBtnText) {
-                                    walletBtnText.textContent = 'Connect Wallet';
-                                }
-
-                                if (confirm('Connection timed out or cancelled.\n\nIf Phantom didn\'t open, would you like to install it?')) {
-                                    const storeUrl = isIOS
-                                        ? 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977'
-                                        : 'https://play.google.com/store/apps/details?id=app.phantom';
-                                    window.open(storeUrl, '_blank');
-                                }
-                            }
-                        }, 10000); // 10 second timeout
-
-                    } catch (linkError) {
-                        console.error('Deep link failed:', linkError);
-                        if (confirm('Unable to open Phantom. Install from app store?')) {
-                            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                            const storeUrl = isIOS
-                                ? 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977'
-                                : 'https://play.google.com/store/apps/details?id=app.phantom';
-                            window.open(storeUrl, '_blank');
-                        }
-                    }
-                } else {
-                    console.log('User cancelled wallet connection');
-                }
-
-            } catch (error) {
-                console.error('Mobile Phantom connection failed:', error);
-
-                const walletBtnText = document.getElementById('walletBtnText');
-                if (walletBtnText) {
-                    walletBtnText.textContent = 'Connect Wallet';
-                }
-
-                alert('Failed to connect to Phantom wallet. Please make sure Phantom is installed and try again.');
-            }
-        }
-
-        // Connect to Phantom wallet - 使用统一管理器
-        async function connectPhantomWallet() {
-            try {
-                console.log('🔗 开始连接Phantom钱包 (使用统一管理器)...');
-
-                // 使用统一钱包管理器进行连接
-                if (window.unifiedWalletManager) {
-                    const success = await window.unifiedWalletManager.connectWallet('phantom');
-                    if (success) {
-                        console.log('✅ Phantom钱包连接成功');
-                        return;
-                    }
-                } else if (window.connectWallet) {
-                    // 备用方案：使用全局连接函数
-                    const success = await window.connectWallet('phantom');
-                    if (success) {
-                        console.log('✅ Phantom钱包连接成功 (备用方案)');
-                        return;
-                    }
-                }
-
-                // 如果统一管理器不可用，回退到基本连接逻辑
-                console.log('⚠️ 统一管理器不可用，使用基本连接逻辑');
-
-                if (!window.solana?.isPhantom) {
-                    throw new Error('Phantom钱包未安装或不可用');
-                }
-
-                const walletBtnText = document.getElementById('walletBtnText');
-                if (walletBtnText) {
-                    walletBtnText.textContent = 'Connecting...';
-                }
-
-                const response = await window.solana.connect();
-                const address = response.publicKey.toString();
-
-                // 手动创建钱包状态（作为备用）
-                const walletState = {
-                    connected: true,
-                    isConnected: true,
-                    address: address,
-                    publicKey: response.publicKey,
-                    walletType: 'phantom',
-                    formatAddress: function(addr) {
-                        return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
-                    }
-                };
-
-                window.walletState = walletState;
-
-                // 更新UI
-                if (walletBtnText) {
-                    walletBtnText.textContent = walletState.formatAddress(address);
-                }
-
-                console.log('✅ Phantom钱包连接成功 (基本逻辑):', address);
-
-            } catch (error) {
-                console.error('❌ Phantom钱包连接失败:', error);
-
-                const walletBtnText = document.getElementById('walletBtnText');
-                if (walletBtnText) {
-                    walletBtnText.textContent = 'Connect Wallet';
-                }
-
-                if (error.code === 4001) {
-                    console.log('用户拒绝了连接请求');
-                } else {
-                    alert('Failed to connect wallet: ' + error.message);
-                }
-            }
-        }
-
-        // Initialize wallet connection check - 使用统一管理器
-        function initializeWalletConnection() {
-            console.log('🚀 初始化钱包连接检查 (使用统一管理器)');
-
-            // ⭐ 关键修复：检查localStorage中的钱包连接状态
-            try {
-                const savedAddress = localStorage.getItem('wallet_address');
-                const savedType = localStorage.getItem('wallet_type');
-                const savedConnected = localStorage.getItem('wallet_connected');
-
-                if (savedAddress && savedType && savedConnected === 'true') {
-                    console.log('🔄 发现已保存的钱包连接状态，尝试恢复:', savedAddress);
-
-                    // 检查钱包扩展是否可用
-                    if (savedType === 'phantom' && window.solana && window.solana.isPhantom) {
-                        // 尝试无需用户交互的连接（仅限已授权的情况）
-                        window.solana.connect({ onlyIfTrusted: true })
-                            .then(response => {
-                                const currentAddress = response.publicKey.toString();
-                                if (currentAddress === savedAddress) {
-                                    console.log('✅ 成功恢复钱包连接:', currentAddress);
-
-                                    // 创建钱包状态
-                                    window.walletState = {
-                                        connected: true,
-                                        isConnected: true,
-                                        address: currentAddress,
-                                        walletType: savedType,
-                                        adapter: window.solana,
-                                        formatAddress: function(addr) {
-                                            if (!addr) return '';
-                                            return addr.slice(0, 6) + '...' + addr.slice(-4);
-                                        },
-                                        copyWalletAddress: function() {
-                                            if (this.address) {
-                                                navigator.clipboard.writeText(this.address).then(() => {
-                                                    const successMsg = document.getElementById('copyAddressSuccess');
-                                                    if (successMsg) {
-                                                        successMsg.style.opacity = '1';
-                                                        setTimeout(() => successMsg.style.opacity = '0', 2000);
-                                                    }
-                                                }).catch(() => {
-                                                    alert('Address: ' + this.address);
-                                                });
-                                            }
-                                        }
-                                    };
-
-                                    // 更新UI
-                                    updateWalletUI(currentAddress);
-                                    checkAdminStatus(currentAddress);
-
-                                    // 触发钱包恢复事件
-                                    document.dispatchEvent(new CustomEvent('walletRestored', {
-                                        detail: { address: currentAddress, type: savedType }
-                                    }));
-                                } else {
-                                    console.log('⚠️ 保存的地址与当前钱包地址不匹配，清除保存的状态');
-                                    localStorage.removeItem('wallet_address');
-                                    localStorage.removeItem('wallet_type');
-                                    localStorage.removeItem('wallet_connected');
-                                }
-                            })
-                            .catch(error => {
-                                console.log('钱包未授权自动连接或连接失败:', error);
-                                // 不清除localStorage，用户可能稍后手动连接
-                            });
-                    } else {
-                        console.log('⚠️ 钱包扩展不可用，无法恢复连接');
-                    }
-                } else {
-                    console.log('📭 没有找到已保存的钱包连接状态');
-                }
-            } catch (error) {
-                console.error('恢复钱包连接状态失败:', error);
-            }
-
-            // 延迟初始化，确保所有脚本都已加载
-            setTimeout(() => {
-                if (window.unifiedWalletManager) {
-                    console.log('✅ 统一钱包管理器已可用');
-                    // 统一管理器会自动处理初始连接检查
-                } else {
-                    console.log('⚠️ 统一钱包管理器不可用，使用基本检查');
-                    checkBasicWalletConnection();
-                }
-            }, 1000);
-        }
-
-        // 基本钱包连接检查（备用方案）+ 移动端返回检测增强
-        function checkBasicWalletConnection() {
-            // 检查是否是从Phantom app返回
-            const urlParams = new URLSearchParams(window.location.search);
-            const phantomPubkey = urlParams.get('phantom_encryption_public_key');
-            const phantomRedirect = urlParams.get('phantom_redirect');
-            const phantomConnected = urlParams.get('phantom_connected');
-            const phantomAddress = urlParams.get('phantom_address');
-
-            // 检查是否有连接尝试的状态
-            const connectionAttempt = sessionStorage.getItem('phantom_connection_attempt');
-
-            // 如果有URL参数或连接尝试，说明是从Phantom返回
-            if ((phantomPubkey || phantomRedirect || phantomConnected || phantomAddress) ||
-                (connectionAttempt && (Date.now() - parseInt(connectionAttempt)) < 60000)) {
-
-                console.log('检测到从Phantom钱包返回，尝试建立连接...');
-
-                // 清理URL参数，避免页面刷新时重复处理
-                window.history.replaceState({}, document.title, window.location.pathname);
-
-                // 清理连接尝试状态
-                sessionStorage.removeItem('phantom_connection_attempt');
-
-                const walletBtnText = document.getElementById('walletBtnText');
-                if (walletBtnText) {
-                    walletBtnText.textContent = 'Connecting...';
-                }
-
-                // 延迟一下，让Phantom provider有时间加载
-                setTimeout(async () => {
-                    try {
-                        if (window.solana && window.solana.isPhantom) {
-                            console.log('Phantom provider available, attempting connection...');
-
-                            // 尝试连接（如果用户在Phantom中已经批准）
-                            const success = await window.connectWallet('phantom');
-                            if (success) {
-                                console.log('✅ 从Phantom返回连接成功');
+                        return originalSetAttribute.call(this, name, value);
+                    };
+                    
+                    // 监听src属性的直接赋值
+                    const descriptor = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
+                    const originalSrcSetter = descriptor.set;
+                    
+                    Object.defineProperty(element, 'src', {
+                        set: function(value) {
+                            if (typeof value === 'string' && value.includes('kit.fontawesome.com')) {
+                                console.log('拦截到Font Awesome Kit通过属性赋值的加载尝试:', value);
                                 return;
                             }
-                        }
-
-                        // 如果自动连接失败，检查是否已经连接
-                        if (window.solana && window.solana.isConnected) {
-                            const address = window.solana.publicKey.toString();
-                            console.log('检测到已连接的钱包:', address);
-
-                            // 手动创建钱包状态
-                            window.walletState = {
-                                connected: true,
-                                isConnected: true,
-                                address: address,
-                                walletType: 'phantom',
-                                adapter: window.solana,
-                                formatAddress: function(addr) {
-                                    return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
-                                },
-                                copyWalletAddress: function() {
-                                    if (this.address) {
-                                        navigator.clipboard.writeText(this.address).then(() => {
-                                            const successMsg = document.getElementById('copyAddressSuccess');
-                                            if (successMsg) {
-                                                successMsg.style.opacity = '1';
-                                                setTimeout(() => successMsg.style.opacity = '0', 2000);
-                                            }
-                                        }).catch(() => {
-                                            alert('Address: ' + this.address);
-                                        });
-                                    }
-                                }
-                            };
-
-                            // 更新UI
-                            updateWalletUI(address);
-
-                            // 检查管理员权限
-                            checkAdminStatus(address);
-
-                            // 加载钱包数据
-                            if (typeof loadWalletData === 'function') {
-                                loadWalletData(address);
-                            }
-
-                            console.log('✅ 钱包状态已恢复');
-                        } else {
-                            console.log('连接可能被用户拒绝或失败');
-                            if (walletBtnText) {
-                                walletBtnText.textContent = 'Connect Wallet';
-                            }
-                        }
-                    } catch (error) {
-                        console.error('从Phantom返回时连接失败:', error);
-                        if (walletBtnText) {
-                            walletBtnText.textContent = 'Connect Wallet';
-                        }
-                    }
-                }, 1000);
-                return;
-            }
-
-            // 标准钱包连接检查（没有从Phantom返回的情况）
-            if (window.solana && window.solana.isConnected) {
-                try {
-                    const address = window.solana.publicKey.toString();
-                    console.log('检测到已连接的钱包:', address);
-
-                    // 手动创建钱包状态
-                    const walletState = {
-                        connected: true,
-                        isConnected: true,
-                        address: address,
-                        publicKey: window.solana.publicKey,
-                        walletType: 'phantom',
-                        adapter: window.solana,
-                        formatAddress: function(addr) {
-                            return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
+                            return originalSrcSetter.call(this, value);
                         },
-                        copyWalletAddress: function() {
-                            if (this.address) {
-                                navigator.clipboard.writeText(this.address).then(() => {
-                                    const successMsg = document.getElementById('copyAddressSuccess');
-                                    if (successMsg) {
-                                        successMsg.style.opacity = '1';
-                                        setTimeout(() => successMsg.style.opacity = '0', 2000);
-                                    }
-                                }).catch(() => {
-                                    alert('Address: ' + this.address);
-                                });
-                            }
-                        }
-                    };
-
-                    // 手动创建钱包状态
-                    window.walletState = walletState;
-
-                    // 更新UI
-                    const walletBtnText = document.getElementById('walletBtnText');
-                    if (walletBtnText) {
-                        walletBtnText.textContent = walletState.formatAddress(address);
-                    }
-
-                    console.log('钱包状态已恢复:', address);
-                } catch (error) {
-                    console.log('未检测到自动连接的钱包');
+                        get: descriptor.get
+                    });
                 }
-            }
-        }
-
-        // 断开钱包并关闭菜单
-        async function disconnectAndCloseMenu() {
-            await window.disconnectWallet();
-
-            const walletMenu = document.getElementById('walletMenu');
-            if (walletMenu) {
-                walletMenu.classList.remove('show');
-                walletMenu.style.display = 'none';
-            }
-        }
-
-        // 切换钱包（重新连接）
-        async function switchWalletAndCloseMenu() {
-            await window.disconnectWallet();
-            setTimeout(() => {
-                openWalletSelector();
-            }, 500);
-
-            const walletMenu = document.getElementById('walletMenu');
-            if (walletMenu) {
-                walletMenu.classList.remove('show');
-                walletMenu.style.display = 'none';
-            }
-        }
-
-        // Open wallet selector - 只支持Phantom钱包
-        function openWalletSelector() {
-            // 统一使用Phantom钱包连接
-            if (isMobileDevice()) {
-                // 移动设备：使用移动端专用连接流程
-                connectPhantomMobile();
-            } else {
-                // 桌面设备：检测Phantom扩展
-                if (window.solana && window.solana.isPhantom) {
-                    console.log('Desktop: Connecting to Phantom...');
-                    window.connectWallet('phantom');
-                } else {
-                    alert('Please install Phantom wallet extension.\n\nVisit: https://phantom.app/\n\nThen refresh this page.');
+                return element;
+            };
+            
+            // 3. 拦截XMLHttpRequest
+            const originalXHROpen = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function(method, url, ...args) {
+                if (typeof url === 'string' && url.includes('kit.fontawesome.com')) {
+                    console.log('拦截到Font Awesome Kit的XHR请求:', url);
+                    this.abort();
+                    return;
                 }
-            }
-        }
-
-
-        // Wallet connection functionality keeps original architecture
-        
-        // Commission details - keep original structure
-        function showCommissionDetails() {
-            if (!window.walletState || !window.walletState.address) {
-                alert('Please connect wallet first');
-                return;
-            }
-
-            const address = window.walletState.address;
-            const commissionValue = document.getElementById('walletCommissionInDropdown').textContent || '0.00';
-
-            alert(`Commission Details:\n\nWallet: ${formatWalletAddress(address)}\nBalance: ${commissionValue} USDC`);
-        }
-
-        // Withdraw commission function
-        async function withdrawCommission() {
-            if (!window.walletState || !window.walletState.address) {
-                alert('Please connect wallet first');
-                return;
-            }
-
-            const address = window.walletState.address;
-            const commissionValue = parseFloat(document.getElementById('walletCommissionInDropdown').textContent || '0.00');
-
-            if (commissionValue <= 0) {
-                alert('No commission balance to withdraw');
-                return;
-            }
-
-            if (!confirm(`Confirm withdrawal of ${commissionValue.toFixed(2)} USDC to your current wallet?\n\nTo: ${formatWalletAddress(address)}\nAmount: ${commissionValue.toFixed(2)} USDC\n\nThis will be processed automatically within 1 minute.`)) {
-                return;
-            }
-
-            try {
-                const response = await fetch('/admin/api/user/commission/withdraw', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        user_address: address,
-                        to_address: address,
-                        amount: commissionValue,
-                        note: 'Automatic withdrawal to connected wallet'
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success || response.ok) {
-                    alert(`Withdrawal request submitted successfully!\n\nAmount: ${commissionValue.toFixed(2)} USDC\nTo: ${formatWalletAddress(address)}\nDelay: ${data.delay_minutes || 1} minute(s)\n\nThe transaction will be processed automatically.`);
-
-                    // Refresh commission balance
-                    if (window.walletState && window.walletState.address) {
-                        loadWalletData(window.walletState.address);
-                    }
-                } else {
-                    throw new Error(data.error || 'Withdrawal request failed');
+                return originalXHROpen.call(this, method, url, ...args);
+            };
+            
+            // 4. 拦截fetch
+            const originalFetch = window.fetch;
+            window.fetch = function(resource, init) {
+                if (typeof resource === 'string' && resource.includes('kit.fontawesome.com')) {
+                    console.log('拦截到Font Awesome Kit的fetch请求:', resource);
+                    return Promise.reject(new Error('请求已被拦截'));
                 }
-            } catch (error) {
-                console.error('Withdrawal error:', error);
-                alert(`Withdrawal failed: ${error.message}`);
-            }
-        }
-        
-        // Switch and disconnect functions use original architecture
+                return originalFetch.call(this, resource, init);
+            };
+        })();
     </script>
+    
+    <!-- 加载Web3.js -->
+    <script>
+        // 动态加载Web3.js，多个CDN源和错误处理机制
+        (function loadWeb3() {
+            // 定义多个CDN源（按优先级排序）
+            const cdnUrls = [
+                "https://unpkg.com/web3@1.5.2/dist/web3.min.js",
+                "https://cdnjs.cloudflare.com/ajax/libs/web3/1.5.2/web3.min.js",
+                "https://cdn.bootcdn.net/ajax/libs/web3/1.5.2/web3.min.js", // 国内CDN
+                "/static/vendor/web3.min.js" // 最后尝试使用本地文件(如果有的话)
+            ];
+            
+            function tryLoadScript(index) {
+                if (index >= cdnUrls.length) {
+                    console.warn("所有Web3.js CDN源都加载失败，Web3功能将不可用");
+                    // 触发一个自定义事件，通知应用程序Web3加载失败
+                    document.dispatchEvent(new CustomEvent('web3LoadFailed'));
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = cdnUrls[index];
+                script.onerror = function() {
+                    console.warn(`从 ${cdnUrls[index]} 加载Web3.js失败，尝试下一个源...`);
+                    tryLoadScript(index + 1);
+                };
+                script.onload = function() {
+                    console.log(`成功从 ${cdnUrls[index]} 加载Web3.js`);
+                    // 触发一个自定义事件，通知应用程序Web3已加载
+                    document.dispatchEvent(new CustomEvent('web3Loaded'));
+                };
+                document.head.appendChild(script);
+            }
+            
+            // 开始尝试加载
+            tryLoadScript(0);
+        })();
+    </script>
+    
+    <!-- SweetAlert2 JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+    
+    <!-- 钱包主脚本 -->
+    <script src="{{ url_for('static', filename='js/wallet.js') }}?v=20241231-fix3&t=1735659600"></script>
+    <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -1948,19 +1243,6 @@
             setTimeout(function() {
                 // 在此处添加任何需要在页面加载后执行的代码
                 console.log('页面初始化完成');
-
-                // 添加点击空白处关闭钱包下拉菜单
-                document.addEventListener('click', function(event) {
-                    const walletMenu = document.getElementById('walletMenu');
-                    const walletBtn = document.getElementById('walletBtn');
-
-                    if (walletMenu && walletBtn &&
-                        !walletMenu.contains(event.target) &&
-                        !walletBtn.contains(event.target)) {
-                        walletMenu.classList.remove('show');
-                        walletMenu.style.display = 'none';
-                    }
-                });
             }, 100);
         });
     </script>
@@ -1976,7 +1258,10 @@
 
     <!-- 语言切换 -->
     <script>
-    // 语言切换功能已移除
+    function changeLanguage(lang) {
+        document.cookie = `language=${lang};path=/;max-age=31536000`;
+        window.location.reload();
+    }
     </script>
     
     <!-- 确保钱包按钮点击响应 -->
@@ -1984,17 +1269,21 @@
         // 确保DOM加载完成后设置钱包按钮的点击事件
         document.addEventListener('DOMContentLoaded', function() {
             // 添加一个简单的延迟，确保其他初始化完成
-            const walletBtn = document.getElementById('walletBtn');
-            if (walletBtn) {
-                // 清除可能存在的任何Bootstrap数据属性
-                walletBtn.removeAttribute('data-bs-toggle');
-                walletBtn.removeAttribute('aria-expanded');
-                
-                // 移除所有可能干扰的类名
-                walletBtn.className = walletBtn.className
-                    .replace('dropdown-toggle', '')
-                    .replace('toggle', '');
-            }
+            setTimeout(function() {
+                const walletBtn = document.getElementById('walletBtn');
+                if (walletBtn) {
+                    // 清除可能存在的任何Bootstrap数据属性
+                    walletBtn.removeAttribute('data-bs-toggle');
+                    walletBtn.removeAttribute('aria-expanded');
+                    
+                    // 移除所有可能干扰的类名
+                    walletBtn.className = walletBtn.className
+                        .replace('dropdown-toggle', '')
+                        .replace('toggle', '');
+                    
+                    console.log('钱包按钮点击响应优化完成');
+                }
+            }, 100);
         });
     </script>
 
@@ -2005,15 +1294,12 @@
         window.PLATFORM_FEE_WALLET_ADDRESS = null; // 将通过API获取
         window.USDC_MINT_ADDRESS = "{{ config.get('SOLANA_USDC_MINT', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') }}";
         window.RWA_TRADE_PROGRAM_ID = "{{ config.get('SOLANA_PROGRAM_ID', 'rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX') }}"; // 获取合约程序ID
-        // 生产环境不输出敏感配置信息
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            console.log('全局Solana配置已设置:', {
-                network: window.SOLANA_NETWORK_URL ? '***已配置***' : null,
-                platformFeeWallet: window.PLATFORM_FEE_WALLET_ADDRESS,
-                usdcMint: window.USDC_MINT_ADDRESS ? '***已配置***' : null,
-                tradeProgramId: window.RWA_TRADE_PROGRAM_ID ? '***已配置***' : null
-            });
-        }
+        console.log('全局Solana配置已设置:', {
+            network: window.SOLANA_NETWORK_URL,
+            platformFeeWallet: window.PLATFORM_FEE_WALLET_ADDRESS,
+            usdcMint: window.USDC_MINT_ADDRESS,
+            tradeProgramId: window.RWA_TRADE_PROGRAM_ID
+        });
     </script>
     
     <!-- 添加加载状态控制函数 -->
@@ -2072,10 +1358,11 @@
     {% block scripts %}
     <!-- 加载核心JavaScript -->
     {% if not js_loaded %}
-    <!-- 重复的脚本引用已删除，统一在上面引用 -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dividend.js') }}"></script>
     {% endif %}
-    <!-- 管理员检查脚本 -->
-
     <!-- 页面特定脚本可以在此添加 -->
     {% endblock %}
 

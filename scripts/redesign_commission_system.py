@@ -30,7 +30,7 @@ def redesign_commission_tables():
                 'min_amount': 0.01,
                 'max_amount': 999999999.0,
                 'is_active': True,
-                'created_by': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
+                'created_by': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
                 'description': '全局35%上级分佣设置'
             }
         ]
@@ -50,11 +50,11 @@ def redesign_commission_tables():
         referral_relations = [
             {
                 'user_address': '0x1234567890123456789012345678901234567890',
-                'referrer_address': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b'
+                'referrer_address': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4'
             },
             {
                 'user_address': '0x2345678901234567890123456789012345678901',
-                'referrer_address': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b'
+                'referrer_address': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4'
             }
         ]
         
@@ -88,7 +88,7 @@ def create_sample_commission_data():
                 'transaction_id': 'direct_payment_001',
                 'asset_id': 1,
                 'payer_address': '0x1234567890123456789012345678901234567890',
-                'recipient_address': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
+                'recipient_address': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
                 'amount': 35.0,
                 'currency': 'USDC',
                 'commission_type': 'referral_commission',
@@ -102,7 +102,7 @@ def create_sample_commission_data():
                 'transaction_id': 'direct_payment_002',
                 'asset_id': 2,
                 'payer_address': '0x2345678901234567890123456789012345678901',
-                'recipient_address': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
+                'recipient_address': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
                 'amount': 70.0,
                 'currency': 'USDC',
                 'commission_type': 'referral_commission',
@@ -116,7 +116,7 @@ def create_sample_commission_data():
                 'transaction_id': 'upstream_commission_001',
                 'asset_id': 3,
                 'payer_address': '0x1234567890123456789012345678901234567890',
-                'recipient_address': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
+                'recipient_address': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
                 'amount': 17.5,
                 'currency': 'USDC',
                 'commission_type': 'upstream_commission',

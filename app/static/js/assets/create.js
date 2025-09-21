@@ -1,11 +1,3 @@
-// 安全的翻译函数
-function safeTranslate(text) {
-    if (typeof window._ === 'function') {
-        return window._(text);
-    }
-    return text;
-}
-
 // 配置常量
 const CONFIG = {
     IMAGE: {
@@ -54,104 +46,85 @@ function initializeCreatePage() {
     // 检查是否已初始化
     if (window.assetFormInitialized) {
         console.log('页面已初始化，跳过');
-        return;
-    }
+            return;
+        }
         
     // 设置初始化标志
     window.assetFormInitialized = true;
         
-    // 立即检查钱包连接状态，不延迟
-    initializeWalletCheck();
-    
-    // 初始化表单元素
-    initializeFormFields();
-    
-    // 重置上传区域状态
+    // 首先重置上传区域状态，确保不显示"uploading"
     resetUploadAreas();
     
-    // 加载草稿（异步执行，不阻塞页面）
-    setTimeout(loadDraft, 100);
+    // 检查钱包连接
+    setTimeout(initializeWalletCheck, 500); // 延迟执行，确保钱包状态已初始化
     
-    // 设置自动保存（降低频率，减少性能影响）
+    // 初始化表单元素
+            initializeFormFields();
+    
+    // 加载草稿
+    loadDraft();
+    
+    // 设置自动保存
     setInterval(saveDraft, CONFIG.DRAFT.AUTO_SAVE_INTERVAL);
     
     // 监听钱包状态变化事件
     document.addEventListener('walletStateChanged', function(event) {
         console.log('资产创建页面收到钱包状态变化事件:', event.detail);
         // 重新检查钱包状态并更新UI
-        if (event.detail && typeof event.detail.connected !== 'undefined') {
-            initializeWalletCheck();
-        }
+        setTimeout(initializeWalletCheck, 100);
     });
-        
+
     // 监听钱包初始化完成事件
     document.addEventListener('walletStateInitialized', function(event) {
         console.log('资产创建页面收到钱包初始化完成事件:', event.detail);
         // 重新检查钱包状态
-        initializeWalletCheck();
+        setTimeout(initializeWalletCheck, 100);
     });
         
     console.log('初始化完成');
-}
+    }
 
-// 检查钱包连接状态
 // 检查钱包连接状态
 function initializeWalletCheck() {
     console.log('执行钱包连接状态检查...');
     const walletCheck = document.getElementById('walletCheck');
     const formContent = document.getElementById('formContent');
+    const connectWalletBtn = document.getElementById('connectWalletBtn');
 
     if (!walletCheck || !formContent) {
         console.error('找不到钱包检查或表单内容元素');
         return;
     }
 
-    // 统一的钱包状态检查优先级，与purchase_handler_unified.js保持一致
-    let walletAddress = null;
-
-    // 优先级1: 检查全局钱包状态
-    if (window.walletState?.address && window.walletState?.connected) {
-        console.log('从全局walletState找到钱包地址:', window.walletState.address);
-        walletAddress = window.walletState.address;
-    }
-    // 优先级2: 检查Phantom钱包直接连接状态
-    else if (window.solana && window.solana.isConnected && window.solana.publicKey) {
-        walletAddress = window.solana.publicKey.toString();
-        console.log('从Phantom钱包直接获取地址:', walletAddress);
-    }
-    // 优先级3: 检查钱包持久化管理器
-    else if (window.walletPersistenceManager) {
-        const savedState = window.walletPersistenceManager.loadWalletState();
-        if (savedState && savedState.address && savedState.connected) {
-            console.log('从持久化管理器找到钱包地址:', savedState.address);
-            walletAddress = savedState.address;
-        }
-    }
-    // 优先级4: 检查localStorage (兼容性)
-    else {
-        const sessionWalletAddress = sessionStorage.getItem('walletAddress');
-        const localWalletAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
-
-        if (sessionWalletAddress) {
-            console.log('从sessionStorage找到钱包地址:', sessionWalletAddress);
-            walletAddress = sessionWalletAddress;
-        } else if (localWalletAddress) {
-            console.log('从localStorage找到钱包地址:', localWalletAddress);
-            walletAddress = localWalletAddress;
-        }
+    // 绑定连接钱包按钮事件
+    if (connectWalletBtn) {
+        connectWalletBtn.addEventListener('click', function() {
+            console.log('点击连接钱包按钮');
+            if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+                window.walletState.openWalletSelector().then(connected => {
+                    if (connected) {
+                        console.log('钱包连接成功，刷新页面状态');
+                        initializeWalletCheck(); // 重新检查状态
+                    }
+                }).catch(error => {
+                    console.error('钱包连接失败:', error);
+                });
+            } else {
+                console.error('钱包状态管理器不可用');
+            }
+        });
     }
 
-    if (walletAddress) {
-        // 钱包已连接，显示表单
+    // 统一使用window.walletState作为唯一状态源
+    if (window.walletState && window.walletState.connected && window.walletState.address) {
+        console.log('钱包已连接:', window.walletState.address);
         walletCheck.style.display = 'none';
         formContent.style.display = 'block';
 
         // 检查管理员状态
-        setTimeout(() => checkAdmin(walletAddress), 100);
-        console.log('✅ 钱包已连接，显示创建表单');
+        setTimeout(() => checkAdmin(window.walletState.address), 100);
     } else {
-        // 钱包未连接，显示连接提示
-        console.log('❌ 未找到已连接的钱包地址，显示连接提示');
+        console.log('钱包未连接，显示连接提示');
         walletCheck.style.display = 'block';
         formContent.style.display = 'none';
     }
@@ -285,63 +258,6 @@ function updateUiForAdminStatus(isAdmin) {
     
     // 初始化上传区域显示状态
     resetUploadAreas();
-    
-    // 初始化时禁用上传区域，直到选择资产类型
-    toggleUploadAreas(false);
-}
-
-// 启用/禁用上传区域
-function toggleUploadAreas(enabled) {
-    const imageDropzone = document.getElementById('imageDropzone');
-    const documentDropzone = document.getElementById('documentDropzone');
-    const imageInput = document.getElementById('imageInput');
-    const documentInput = document.getElementById('documentInput');
-    
-    if (imageDropzone) {
-        const imageText = imageDropzone.querySelector('p');
-        if (enabled) {
-            imageDropzone.classList.remove('disabled');
-            imageDropzone.style.opacity = '1';
-            imageDropzone.style.pointerEvents = 'auto';
-            if (imageText) {
-                imageText.textContent = safeTranslate('Drag and drop images here or click to select');
-            }
-        } else {
-            imageDropzone.classList.add('disabled');
-            imageDropzone.style.opacity = '0.5';
-            imageDropzone.style.pointerEvents = 'none';
-            if (imageText) {
-                imageText.textContent = safeTranslate('Please select asset type first');
-            }
-        }
-    }
-    
-    if (documentDropzone) {
-        const documentText = documentDropzone.querySelector('p');
-        if (enabled) {
-            documentDropzone.classList.remove('disabled');
-            documentDropzone.style.opacity = '1';
-            documentDropzone.style.pointerEvents = 'auto';
-            if (documentText) {
-                documentText.textContent = safeTranslate('Drag and drop documents here or click to select');
-            }
-        } else {
-            documentDropzone.classList.add('disabled');
-            documentDropzone.style.opacity = '0.5';
-            documentDropzone.style.pointerEvents = 'none';
-            if (documentText) {
-                documentText.textContent = safeTranslate('Please select asset type first');
-            }
-        }
-    }
-    
-    if (imageInput) {
-        imageInput.disabled = !enabled;
-    }
-    
-    if (documentInput) {
-        documentInput.disabled = !enabled;
-    }
 }
 
 // 重置上传区域状态
@@ -464,9 +380,6 @@ function initializeFileUploads() {
             realEstateFields.forEach(el => el.style.display = 'none');
             similarAssetsFields.forEach(el => el.style.display = 'block');
         }
-        
-        // 启用/禁用文件上传区域
-        toggleUploadAreas(!!type);
     }
 
     // 处理面积变化
@@ -572,80 +485,68 @@ function updateTokenPriceSimilar() {
     // 生成代币符号
     async function generateTokenSymbol(type) {
         try {
-            console.log(`开始生成代币符号，资产类型: ${type}`);
-            
-            // 请求服务器生成代币符号
+        // 请求服务器生成代币符号
             const response = await fetch('/api/assets/generate-token-symbol', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ type: type || '10' })  // 提供默认值
+                body: JSON.stringify({ type: type })
             });
             
-            console.log(`代币符号生成响应状态: ${response.status}`);
-            
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error(`生成token_symbol请求失败: ${response.status}, 响应: ${errorText}`);
-                throw new Error(`服务器响应错误: ${response.status}`);
+            console.error(`生成token_symbol请求失败: ${response.status}`);
+            return null;
             }
             
             const data = await response.json();
-            console.log('代币符号生成响应数据:', data);
             
-            // 检查success字段
-            if (!data.success) {
-                console.error('生成token_symbol失败:', data.error || '未知错误');
-                throw new Error(data.error || '生成代币符号失败');
-            }
-            
-            // 如果服务器返回了token_symbol，返回它
-            if (data.token_symbol) {
-                console.log(`生成代币符号: ${data.token_symbol}`);
+        // 检查success字段
+        if (!data.success) {
+            console.error('生成token_symbol失败:', data.error || '未知错误');
+            throw new Error(data.error || '生成代币符号失败');
+        }
+        
+        // 如果服务器返回了token_symbol，返回它
+        if (data.token_symbol) {
+            console.log(`生成代币符号: ${data.token_symbol}`);
                 return data.token_symbol;
             } else {
-                console.error('服务器未返回token_symbol');
-                throw new Error('服务器未返回有效的代币符号');
+            console.error('服务器未返回token_symbol');
+            return null;
             }
         } catch (error) {
-            console.error('生成代币符号出错:', error);
+        console.error('生成代币符号出错:', error);
             
-            // 本地生成作为备用方案
-            console.log('尝试本地生成代币符号');
-            try {
-                // 生成4位随机数字，使用资产类型前缀
-                const randomDigits = Math.floor(1000 + Math.random() * 9000);
-                
-                // 构建代币符号 - 使用资产类型 + 4位数字格式
-                const assetTypePrefix = type || '20'; // 默认使用20
-                const symbol = `RH-${assetTypePrefix}${randomDigits}`;
-                
-                console.log(`本地生成代币符号: ${symbol}`);
-                return symbol;
-            } catch (localError) {
-                console.error('本地生成代币符号失败:', localError);
-                // 返回一个基于时间戳的符号作为最后的备用方案
-                const timestamp = Date.now().toString().slice(-4); // 使用4位时间戳
-                const assetTypePrefix = type || '20';
-                return `RH-${assetTypePrefix}${timestamp}`;
-            }
+        // 重试逻辑
+        console.log('尝试本地生成代币符号');
+        // 生成4位随机数字
+            const randomDigits = Math.floor(1000 + Math.random() * 9000);
+        
+        // 构建代币符号
+            const symbol = `${type === '10' ? 'RH-10' : 'RH-20'}${randomDigits}`;
+        
+        // 验证符号是否可用
+        try {
+            const checkResult = await checkTokenSymbolAvailability(symbol);
+            if (checkResult.exists) {
+                console.error(`本地生成的符号 ${symbol} 已存在`);
+                return null;
         }
+            
+            console.log(`本地生成代币符号: ${symbol}`);
+            return symbol;
+        } catch (checkError) {
+            console.error('验证本地生成的符号失败:', checkError);
+            return null;
+        }
+    }
     }
 
 // 处理文件上传
 async function handleFiles(files, fileType) {
     console.log(`开始处理${fileType}上传，文件数量:`, files.length);
     if (!files || files.length === 0) return;
-    
-    // 检查是否已选择资产类型
-    const assetTypeSelect = document.getElementById('type');
-    const assetType = assetTypeSelect ? assetTypeSelect.value : '';
-    if (!assetType) {
-        alert('请先选择资产类型再上传文件');
-        return;
-    }
     
     // 确定文件类型参数
     const isImage = fileType === 'IMAGE';
@@ -722,15 +623,6 @@ async function handleFiles(files, fileType) {
         // 获取当前选择的资产类型
         const assetTypeSelect = document.getElementById('type');
         const assetType = assetTypeSelect ? assetTypeSelect.value : '';
-        
-        // 检查是否已选择资产类型
-        if (!assetType) {
-            statusElement.textContent = '请先选择资产类型再上传文件';
-            console.error('未选择资产类型，无法上传文件');
-            failed++;
-            continue;
-        }
-        
         formData.append('asset_type', assetType);
         
         // 获取代币符号
@@ -872,7 +764,7 @@ async function handleFiles(files, fileType) {
         if (!container) return;
         
     if (uploadedImages.length === 0) {
-        container.innerHTML = `<div class="text-center text-muted">${safeTranslate("No images uploaded")}</div>`;
+        container.innerHTML = `<div class="text-center text-muted">${window._("No images uploaded")}</div>`;
             return;
         }
         
@@ -881,7 +773,7 @@ async function handleFiles(files, fileType) {
             html += `
                 <div class="col-md-4">
                     <div class="position-relative">
-                    <img src="${image.url}" class="img-fluid rounded" alt="${safeTranslate("Asset Image")}">
+                    <img src="${image.url}" class="img-fluid rounded" alt="${window._("Asset Image")}">
                         <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2" 
                                 onclick="removeImage(${index})">
                             <i class="fas fa-times"></i>
@@ -900,7 +792,7 @@ async function handleFiles(files, fileType) {
         if (!container) return;
         
     if (uploadedDocuments.length === 0) {
-        container.innerHTML = `<div class="text-center text-muted">${safeTranslate("No documents uploaded")}</div>`;
+        container.innerHTML = `<div class="text-center text-muted">${window._("No documents uploaded")}</div>`;
             return;
         }
         
@@ -1099,7 +991,6 @@ async function checkAndConnectWallet() {
             // 尝试使用全局钱包选择器连接
             console.log('尝试连接钱包...');
             showLoadingState('正在连接钱包...');
-            updateProgress(10, '正在连接钱包...', 1);
             
             // 使用全局钱包选择器
             if (typeof window.walletState === 'object' && typeof window.walletState.openWalletSelector === 'function') {
@@ -1257,8 +1148,8 @@ function showSuccess(message) {
     // 显示资产预览
     function showAssetPreview() {
     // 获取所有字段数据
-        const formData = getAssetFormData();
-        if (!formData) return false;
+    const formData = getAssetFormData();
+    if (!formData) return false;
         
     try {
         const previewModalEl = document.getElementById('previewModal');
@@ -1360,40 +1251,25 @@ function closePreview() {
     }
     }
 
-// 获取资产类型名称
-function getAssetTypeName(assetType) {
-    const types = {
-        '10': 'Real Property',
-        '20': 'Securities',
-        '30': 'Quasi Property',
-        '40': 'Land',
-        '50': 'Industrial'
-    };
-    return types[assetType] || 'Unknown';
-}
-
-// 生成预览HTML内容 - 与详情页保持一致的样式
-function generatePreviewHTML(data) {
-    const feeAmount = (parseFloat(data.total_value) * 0.035).toFixed(2);
-    
-    return `
-    <div class="asset-detail-page">
-        <div class="row">
-            <!-- 左侧内容 -->
-            <div class="col-lg-7">
+// 生成预览HTML内容
+    function generatePreviewHTML(data) {
+        return `
+        <!-- 预览内容 -->
+            <div class="row">
+                <div class="col-md-8">
                 <!-- 资产图片轮播 -->
                 <div id="previewCarousel" class="carousel slide mb-4" data-bs-ride="carousel">
                     <div class="carousel-inner">
                         ${data.images.length > 0 ? 
                             data.images.map((img, index) => `
                                 <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                                    <img src="${img.url}" class="d-block w-100" style="border-radius: 12px; height: 400px; object-fit: cover;" alt="Asset Image">
+                                    <img src="${img.url}" class="d-block w-100" alt="${window._("Asset Image")}">
                                 </div>
                             `).join('') : 
                             `<div class="carousel-item active">
-                                <div class="d-block w-100 bg-light text-center py-5" style="height: 400px; border-radius: 12px;">
+                                <div class="d-block w-100 bg-light text-center py-5" style="height: 300px;">
                                     <i class="fas fa-image text-muted" style="font-size: 64px;"></i>
-                                    <p class="mt-3 text-muted">No images uploaded</p>
+                                    <p class="mt-3 text-muted">${window._("No images uploaded")}</p>
                                 </div>
                             </div>`
                         }
@@ -1401,239 +1277,107 @@ function generatePreviewHTML(data) {
                     ${data.images.length > 1 ? `
                         <button class="carousel-control-prev" type="button" data-bs-target="#previewCarousel" data-bs-slide="prev">
                             <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">${window._("Previous")}</span>
                         </button>
                         <button class="carousel-control-next" type="button" data-bs-target="#previewCarousel" data-bs-slide="next">
                             <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">${window._("Next")}</span>
                         </button>
                     ` : ''}
                 </div>
-
-                <!-- 资产基本信息 -->
+                
+                <!-- 缩略图导航 -->
+                ${data.images.length > 1 ? `
+                    <div class="d-flex gap-2 mb-4">
+                        ${data.images.map((img, index) => `
+                            <div class="thumbnail" style="width: 80px; height: 60px; cursor: pointer;" 
+                                onclick="$('#previewCarousel').carousel(${index})">
+                                <img src="${img.url}" class="img-fluid rounded" alt="${window._("Thumbnail")}">
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                
+                <!-- 资产描述 -->
                 <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Asset Information</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p><strong>Asset Name:</strong> ${data.name}</p>
-                                <p><strong>Location:</strong> ${data.location || 'Not specified'}</p>
-                                <p><strong>Asset Type:</strong> ${getAssetTypeName(data.asset_type)}</p>
+                        <div class="card-body">
+                            <h5 class="card-title">${data.name}</h5>
+                            <p class="card-text">${data.description}</p>
+                        
+                        <div class="row mt-4">
+                                <div class="col-md-6">
+                                <h6 class="text-muted">${window._("Asset Details")}</h6>
+                                    <ul class="list-unstyled">
+                                    <li><strong>${window._("Type")}:</strong> ${data.asset_type === 10 ? window._("Real Estate") : window._("Similar Assets")}</li>
+                                    <li><strong>${window._("Location")}:</strong> ${data.location}</li>
+                                    ${data.asset_type === 10 ? `
+                                        <li><strong>${window._("Area")}:</strong> ${data.area} ${window._("sqm")}</li>
+                                    ` : ''}
+                                    <li><strong>${window._("Total Value")}:</strong> ${data.total_value} USDC</li>
+                                    </ul>
+                                </div>
                             </div>
-                            <div class="col-md-6">
-                                <p><strong>Total Value:</strong> ${parseFloat(data.total_value).toLocaleString()} USDC</p>
-                                <p><strong>Token Supply:</strong> ${parseInt(data.token_supply).toLocaleString()}</p>
-                                <p><strong>Token Price:</strong> ${parseFloat(data.token_price).toFixed(4)} USDC</p>
-                            </div>
-                        </div>
-                        <div class="mt-3">
-                            <p><strong>Description:</strong></p>
-                            <p class="text-muted">${data.description || 'No description provided'}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 分红信息 -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Dividend Information</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p><strong>Annual Revenue:</strong> ${parseFloat(data.annual_revenue || 0).toLocaleString()} USDC</p>
-                                <p><strong>Dividend Frequency:</strong> Quarterly</p>
-                            </div>
-                            <div class="col-md-6">
-                                <p><strong>Expected Yield:</strong> ${((parseFloat(data.annual_revenue || 0) / parseFloat(data.total_value)) * 100).toFixed(2)}%</p>
-                                <p><strong>First Dividend:</strong> After asset launch</p>
-                            </div>
+                        
+                        <!-- 相关文档 -->
+                        <div class="mt-4">
+                            <h6 class="text-muted">${window._("Related Documents")}</h6>
+                            ${data.documents.length > 0 ? `
+                                <ul class="list-unstyled">
+                                    ${data.documents.map(doc => `
+                                        <li><i class="fas fa-file-alt me-2"></i>${doc.name}</li>
+                                    `).join('')}
+                                </ul>
+                            ` : `<p class="text-muted">${window._("No documents uploaded")}</p>`}
                         </div>
                     </div>
                 </div>
             </div>
-
-            <!-- 右侧交易卡片 -->
-            <div class="col-lg-5">
-                <div class="card trade-card">
-                    <div class="card-header">
-                        <h5 class="mb-0">Asset Preview</h5>
-                    </div>
-                    <div class="card-body">
+            
+            <!-- 右侧交易信息 -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                        <h5 class="card-title">${window._("Asset Trading")}</h5>
                         <div class="mb-4">
-                            <h4 class="mb-3 text-primary">RH-PREVIEW</h4>
                             <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">Asset Name:</span>
-                                <span>${data.name}</span>
-                            </div>
+                                <span class="text-muted">${window._("Total Supply")}</span>
+                                    <span>${data.token_supply} ${data.token_symbol}</span>
+                                </div>
                             <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">Token Price:</span>
-                                <span class="fw-bold fs-5">${parseFloat(data.token_price).toFixed(4)} USDC</span>
+                                <span class="text-muted">${window._("Token Price")}</span>
+                                    <span>${data.token_price} USDC</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                <span class="text-muted">${window._("Publishing Fee")}</span>
+                                <span>${data.publishing_fee}</span>
+                                </div>
                             </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">Token Supply:</span>
-                                <span>${parseInt(data.token_supply).toLocaleString()}</span>
+                        
+                        <!-- 购买表单（预览模式下禁用） -->
+                        <form class="mb-4">
+                            <div class="mb-3">
+                                <label class="form-label">${window._("Purchase Amount")}</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="${window._("Enter amount")}" disabled>
+                                    <span class="input-group-text">${window._("tokens")}</span>
+                                </div>
                             </div>
-                            <div class="d-flex justify-content-between mb-4">
-                                <span class="text-muted">Available:</span>
-                                <span>${parseInt(data.token_supply).toLocaleString()}</span>
-                            </div>
+                            <button type="button" class="btn btn-gradient-primary" data-page="create-asset" disabled>
+                                ${window._("Not available in preview mode")}
+                            </button>
+                        </form>
+                        
+                        <!-- 近期交易 -->
+                        <div>
+                            <h6 class="text-muted mb-3">${window._("Recent Transactions")}</h6>
+                            <p class="text-muted">${window._("No transaction records yet")}</p>
                         </div>
-
-                        <!-- 发布成本信息 -->
-                        <div class="alert alert-info">
-                            <h6 class="alert-heading">Publishing Cost</h6>
-                            <p class="mb-1"><strong>Platform Fee (3.5%):</strong> ${feeAmount} USDC</p>
-                            <p class="mb-0 small text-muted">This fee covers asset tokenization and blockchain deployment costs.</p>
-                        </div>
-
-                        <!-- 预览说明 -->
-                        <div class="alert alert-warning">
-                            <i class="fas fa-info-circle me-2"></i>
-                            <strong>Preview Mode</strong><br>
-                            <small>This is how your asset will appear to investors after publishing. Review all information carefully before proceeding with payment.</small>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>`;
-}
-
-// 显示详细的进度步骤
-function showDetailedProgress() {
-    const progressSteps = [
-        { id: 'step-1', title: '准备支付', description: '获取支付配置和验证钱包连接', status: 'pending' },
-        { id: 'step-2', title: '处理支付', description: '在钱包中确认USDC转账交易', status: 'pending' },
-        { id: 'step-3', title: '生成代币符号', description: '为资产生成唯一的代币标识符', status: 'pending' },
-        { id: 'step-4', title: '创建资产', description: '在区块链上部署资产智能合约', status: 'pending' },
-        { id: 'step-5', title: '完成', description: '资产创建完成，可以开始交易', status: 'pending' }
-    ];
-
-    const progressHtml = `
-        <div class="progress-steps-container">
-            <div class="progress-header mb-4">
-                <h5 class="mb-2">资产创建进度</h5>
-                <div class="progress mb-3" style="height: 8px;">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                         role="progressbar" style="width: 0%" id="main-progress-bar"></div>
-                </div>
-            </div>
-            <div class="steps-list">
-                ${progressSteps.map(step => `
-                    <div class="step-item" id="${step.id}">
-                        <div class="step-icon">
-                            <i class="fas fa-circle step-pending"></i>
-                            <i class="fas fa-spinner fa-spin step-loading" style="display: none;"></i>
-                            <i class="fas fa-check step-completed" style="display: none;"></i>
-                            <i class="fas fa-times step-error" style="display: none;"></i>
-                        </div>
-                        <div class="step-content">
-                            <div class="step-title">${step.title}</div>
-                            <div class="step-description">${step.description}</div>
-                            <div class="step-error-message" style="display: none;"></div>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `;
-
-    return progressHtml;
-}
-
-// 更新步骤状态
-function updateStepStatus(stepId, status, errorMessage = '') {
-    const stepElement = document.getElementById(stepId);
-    if (!stepElement) return;
-
-    const icons = {
-        pending: stepElement.querySelector('.step-pending'),
-        loading: stepElement.querySelector('.step-loading'),
-        completed: stepElement.querySelector('.step-completed'),
-        error: stepElement.querySelector('.step-error')
-    };
-
-    const errorDiv = stepElement.querySelector('.step-error-message');
-
-    // 隐藏所有图标
-    Object.values(icons).forEach(icon => {
-        if (icon) icon.style.display = 'none';
-    });
-
-    // 显示对应状态的图标
-    if (icons[status]) {
-        icons[status].style.display = 'inline-block';
+        `;
     }
-
-    // 更新步骤样式
-    stepElement.className = `step-item step-${status}`;
-
-    // 显示错误消息
-    if (status === 'error' && errorMessage && errorDiv) {
-        errorDiv.textContent = errorMessage;
-        errorDiv.style.display = 'block';
-    } else if (errorDiv) {
-        errorDiv.style.display = 'none';
-    }
-}
-
-// 更新主进度条
-function updateMainProgress(percentage) {
-    const progressBar = document.getElementById('main-progress-bar');
-    if (progressBar) {
-        progressBar.style.width = `${percentage}%`;
-    }
-}
-
-// 显示进度模态框
-function showProgressModal() {
-    // 创建进度模态框
-    const progressModalHtml = `
-        <div class="modal fade" id="progressModal" tabindex="-1" aria-labelledby="progressModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="progressModalLabel">创建资产</h5>
-                    </div>
-                    <div class="modal-body">
-                        ${showDetailedProgress()}
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // 移除已存在的进度模态框
-    const existingModal = document.getElementById('progressModal');
-    if (existingModal) {
-        existingModal.remove();
-    }
-    
-    // 添加新的进度模态框
-    document.body.insertAdjacentHTML('beforeend', progressModalHtml);
-    
-    // 显示模态框
-    const progressModal = new bootstrap.Modal(document.getElementById('progressModal'));
-    progressModal.show();
-    
-    return progressModal;
-}
-
-// 隐藏进度模态框
-function hideProgressModal() {
-    const progressModal = document.getElementById('progressModal');
-    if (progressModal) {
-        const modal = bootstrap.Modal.getInstance(progressModal);
-        if (modal) {
-            modal.hide();
-        }
-        // 延迟移除DOM元素
-        setTimeout(() => {
-            progressModal.remove();
-        }, 300);
-    }
-}
 
 // 显示支付确认对话框
     function showPaymentConfirmation() {
@@ -1680,9 +1424,6 @@ function hideProgressModal() {
                     if (connected) {
                         // 隐藏确认模态框
                 confirmModal.hide();
-                        // 显示进度对话框
-                        showProgressModal();
-                        
                         // 执行支付流程
                         processPayment().then(paymentResult => {
                             if (paymentResult.success) {
@@ -1692,13 +1433,11 @@ function hideProgressModal() {
                                 // 支付失败
                                 showError(paymentResult.error || '支付处理失败');
                                 disablePublishButtons(false);
-                                hideProgressModal();
                             }
                         }).catch(error => {
                             console.error('支付处理错误:', error);
                             showError(error.message || '支付处理错误');
                             disablePublishButtons(false);
-                            hideProgressModal();
             });
                     } else {
                         // 钱包连接失败
@@ -1724,8 +1463,8 @@ async function processPayment() {
     return new Promise(async (resolve, reject) => {
         try {
             console.log('开始处理支付...');
-            updateStepStatus('step-1', 'loading');
-            updateMainProgress(30);
+            showLoadingState('处理支付交易...');
+            updateProgress(20, '准备支付...');
             
             // 检查并加载Solana Web3.js库
             if (typeof solanaWeb3 === 'undefined') {
@@ -1789,12 +1528,7 @@ async function processPayment() {
             }
             
             try {
-                updateStepStatus('step-1', 'completed');
-                updateStepStatus('step-2', 'loading');
-                updateMainProgress(30);
-                
-                // 添加延迟让用户看到进度变化
-                await new Promise(resolve => setTimeout(resolve, 800));
+                updateProgress(50, '处理支付...');
                 
                 console.log('开始处理支付交易，不预先检查余额...');
                 
@@ -1812,11 +1546,7 @@ async function processPayment() {
             }
             
                 console.log('支付成功，交易哈希:', result.txHash);
-                updateStepStatus('step-2', 'completed');
-                updateMainProgress(50);
-                
-                // 添加延迟让用户看到支付成功状态
-                await new Promise(resolve => setTimeout(resolve, 600));
+                updateProgress(80, '支付成功，处理资产创建...');
             
                 // 处理资产创建
                 await handlePaymentSuccess(result.txHash, formData);
@@ -1853,7 +1583,7 @@ function loadExternalScript(url) {
 async function processAssetCreation(formData, txHash) {
     try {
         console.log('开始创建资产...');
-        showLoadingState('{{ _("Creating asset...") }}');
+        showLoadingState('{{ _("Creating asset record...") }}');
         disablePublishButtons(true);
         
         // 更新进度
@@ -1862,24 +1592,11 @@ async function processAssetCreation(formData, txHash) {
         // 验证token_symbol
         let tokenSymbol = formData.token_symbol;
         if (!tokenSymbol) {
-            const assetType = formData.asset_type || '20';
-            console.log('Token Symbol不存在，生成新的，资产类型:', assetType);
-            const newTokenSymbol = await generateTokenSymbol(assetType);
-            
-            if (newTokenSymbol) {
-                formData.token_symbol = newTokenSymbol;
-                console.log('使用新生成的Token Symbol:', newTokenSymbol);
-                
-                // 更新页面上的Token Symbol显示
-                const tokenSymbolInput = document.getElementById('tokensymbol');
-                if (tokenSymbolInput) {
-                    tokenSymbolInput.value = newTokenSymbol;
-                }
-            } else {
-                throw new Error('{{ _("Failed to generate valid Token Symbol, please try again.") }}');
-            }
+            tokenSymbol = await generateTokenSymbol(formData.asset_type);
+            if (!tokenSymbol) throw new Error('{{ _("Failed to generate valid Token Symbol, please try again.") }}');
+            document.getElementById('tokensymbol').value = tokenSymbol;
+            formData.token_symbol = tokenSymbol;
         } else {
-            console.log('使用现有的Token Symbol:', formData.token_symbol);
             const checkResult = await checkTokenSymbolAvailability(tokenSymbol);
             if (checkResult.exists) throw new Error(`{{ _("Token symbol \'{tokenSymbol}\' is already in use. Please try another symbol or refresh the page.") }}`.replace('{tokenSymbol}', tokenSymbol));
         }
@@ -1891,6 +1608,7 @@ async function processAssetCreation(formData, txHash) {
         // 确保包含支付交易信息
         const requestData = {
             ...formData,
+            status: 8, // PAYMENT_PROCESSING 状态 - 支付已提交，等待确认
             payment_tx_hash: Array.isArray(txHash) ? 
                 txHash.map(byte => byte.toString(16).padStart(2, '0')).join('') : // 字节数组转十六进制字符串
                 txHash, // 如果已经是字符串，直接使用
@@ -1920,177 +1638,27 @@ async function processAssetCreation(formData, txHash) {
         const createResult = await createResponse.json();
         
         if (!createResponse.ok || !createResult.success) {
-            throw new Error('{{ _("Failed to create asset") }}' + ': ' + (createResult.error || '{{ _("Unknown error") }}'));
+            throw new Error('{{ _("Failed to create asset") }}: ' + (createResult.error || '{{ _("Unknown error") }}'));
         }
         
         console.log('资产创建请求成功:', createResult);
        
-        updateProgress(90, '{{ _("Asset creation request submitted!") }}', 4);
+        updateProgress(100, '{{ _("Asset creation request submitted!") }}');
         
-        // 检查是否需要部署智能合约
-        if (createResult.contract_ready) {
-            console.log('资产智能合约已准备完成，需要部署到区块链');
-            updateProgress(95, '准备部署智能合约到区块链...', 4);
-            
-            // 询问用户是否立即部署智能合约
-            const shouldDeploy = await showDeploymentConfirmDialog();
-            if (shouldDeploy) {
-                try {
-                    await deployAssetContract(createResult);
-                    updateProgress(100, '智能合约部署成功！', 4);
-                    hideLoadingState();
-                    showSuccess('{{ _("Asset creation and smart contract deployment completed! Redirecting to asset page...") }}');
-                } catch (deployError) {
-                    console.error('智能合约部署失败:', deployError);
-                    updateProgress(100, '资产创建成功，但智能合约部署失败', 4);
-                    hideLoadingState();
-                    showWarning('资产创建成功，但智能合约部署失败。您可以稍后在资产详情页面重新部署。');
-                }
-            } else {
-                updateProgress(100, '资产创建成功，智能合约稍后部署', 4);
-                hideLoadingState();
-                showSuccess('{{ _("Asset creation request submitted successfully! You can deploy the smart contract later from the asset page.") }}');
-            }
-        } else {
-            updateProgress(100, '{{ _("Asset creation request submitted!") }}', 4);
-            hideLoadingState();
-            showSuccess('{{ _("Asset creation request submitted successfully! Redirecting to asset page...") }}');
-        }
+        // 显示成功消息并立即跳转
+        hideLoadingState();
+        showSuccess('{{ _("Asset creation request submitted successfully! Redirecting to asset page...") }}');
         
-        // 延迟跳转到资产详情页，给用户时间看到消息
-        setTimeout(() => {
-            window.location.href = `/assets/${createResult.token_symbol}`;
-        }, 2000);
+        // 立即跳转到资产详情页
+        window.location.href = `/assets/${createResult.token_symbol}`;
         
         return createResult;
     } catch (error) {
-        console.error('{{ _("Asset creation error") }}' + ':', error);
+        console.error('{{ _("Asset creation error") }}:', error);
         hideLoadingState();
         showError(error.message || '{{ _("Processing error, please try again.") }}');
         disablePublishButtons(false);
         throw error; // 重新抛出错误以便调用者处理
-    }
-}
-
-/**
- * 显示智能合约部署确认对话框
- */
-async function showDeploymentConfirmDialog() {
-    return new Promise((resolve) => {
-        if (typeof Swal !== 'undefined') {
-            Swal.fire({
-                title: '部署智能合约',
-                text: '您的资产已创建成功！是否立即部署智能合约到区块链？这将启用真正的链上交易功能。',
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: '立即部署',
-                cancelButtonText: '稍后部署',
-                confirmButtonColor: '#007bff',
-                cancelButtonColor: '#6c757d'
-            }).then((result) => {
-                resolve(result.isConfirmed);
-            });
-        } else {
-            const deploy = confirm('您的资产已创建成功！是否立即部署智能合约到区块链？');
-            resolve(deploy);
-        }
-    });
-}
-
-/**
- * 部署资产智能合约
- */
-async function deployAssetContract(createResult) {
-    try {
-        console.log('开始部署智能合约:', createResult);
-        
-        if (!createResult.contract_deployment) {
-            throw new Error('缺少智能合约部署信息');
-        }
-        
-        // 检查钱包连接
-        if (!window.walletState || !window.walletState.connected) {
-            throw new Error('钱包未连接，无法部署智能合约');
-        }
-        
-        const walletAddress = window.walletState.getAddress();
-        if (!walletAddress) {
-            throw new Error('无法获取钱包地址');
-        }
-        
-        // 获取智能合约交易数据
-        const deploymentData = {
-            asset_id: createResult.id,
-            wallet_address: walletAddress
-        };
-        
-        console.log('请求智能合约部署数据:', deploymentData);
-        
-        // 请求智能合约部署交易
-        const response = await fetch('/api/deploy-contract', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Wallet-Address': walletAddress
-            },
-            body: JSON.stringify(deploymentData)
-        });
-        
-        const deployData = await response.json();
-        
-        if (!response.ok || !deployData.success) {
-            throw new Error(deployData.error || '准备智能合约部署失败');
-        }
-        
-        console.log('智能合约部署数据准备完成，等待用户签名');
-        
-        // 检查Solana钱包API
-        if (!window.solana || !window.solana.signAndSendTransaction) {
-            throw new Error('Solana钱包API不可用');
-        }
-        
-        // 解码并签名智能合约部署交易
-        const transactionBuffer = Uint8Array.from(atob(deployData.transaction_data), c => c.charCodeAt(0));
-        const transaction = solanaWeb3.Transaction.from(transactionBuffer);
-        
-        // 请求钱包签名并发送交易
-        const result = await window.solana.signAndSendTransaction(transaction);
-        
-        if (!result.signature) {
-            throw new Error('智能合约部署交易失败：无签名返回');
-        }
-        
-        console.log('智能合约部署交易成功，签名:', result.signature);
-        
-        // 等待交易确认（可选）
-        // 这里可以添加交易确认逻辑
-        
-        return {
-            success: true,
-            signature: result.signature,
-            message: '智能合约部署成功'
-        };
-        
-    } catch (error) {
-        console.error('智能合约部署失败:', error);
-        throw error;
-    }
-}
-
-/**
- * 显示警告消息
- */
-function showWarning(message) {
-    if (typeof Swal !== 'undefined') {
-        Swal.fire({
-            title: '注意',
-            text: message,
-            icon: 'warning',
-            confirmButtonText: '确定',
-            confirmButtonColor: '#ffc107'
-        });
-    } else {
-        alert(message);
     }
 }
 
@@ -2254,16 +1822,9 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(fixButtonStyles, 500);
 });
 
-    // 支付过程状态跟踪
-    let isPaymentInProgress = false;
-
     // 显示加载状态
     function showLoadingState(message) {
         const loadingOverlay = document.getElementById('loadingOverlay');
-        isPaymentInProgress = true;
-        
-        // 添加页面关闭警告
-        window.addEventListener('beforeunload', handleBeforeUnload);
     
         if (loadingOverlay) {
             loadingOverlay.classList.remove('d-none');
@@ -2280,74 +1841,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // 隐藏加载状态
     function hideLoadingState() {
         const loadingOverlay = document.getElementById('loadingOverlay');
-        isPaymentInProgress = false;
-        
-        // 移除页面关闭警告
-        window.removeEventListener('beforeunload', handleBeforeUnload);
     
         if (loadingOverlay) {
             loadingOverlay.classList.add('d-none');
         }
     }
-    
-    // 处理页面关闭前的警告
-    function handleBeforeUnload(event) {
-        if (isPaymentInProgress) {
-            const message = '正在处理支付交易，关闭页面可能导致交易失败。确定要离开吗？';
-            event.preventDefault();
-            event.returnValue = message;
-            return message;
+
+// 更新进度条
+    function updateProgress(percent, message) {
+        const progressBar = document.getElementById('progressBar');
+        const statusElement = document.getElementById('loadingStatus');
+        
+        if (progressBar) {
+            progressBar.style.width = `${percent}%`;
+            progressBar.setAttribute('aria-valuenow', percent);
+        }
+        
+        if (statusElement && message) {
+            statusElement.textContent = message;
         }
     }
-
-// 更新进度条和步骤指示器
-function updateProgress(percent, message, step = null) {
-    const progressBar = document.getElementById('progressBar');
-    const statusElement = document.getElementById('progressStatus');
-    const loadingText = document.querySelector('.loading-text');
-    
-    if (progressBar) {
-        progressBar.style.width = `${percent}%`;
-        progressBar.setAttribute('aria-valuenow', percent);
-    }
-    
-    if (statusElement && message) {
-        statusElement.textContent = message;
-    }
-    
-    if (loadingText && message) {
-        loadingText.textContent = message;
-    }
-    
-    // 更新步骤指示器
-    updateStepIndicator(step, percent);
-}
-
-// 更新步骤指示器
-function updateStepIndicator(currentStep, percent) {
-    const steps = ['step1', 'step2', 'step3', 'step4'];
-    
-    // 根据进度百分比自动确定步骤
-    if (currentStep === null) {
-        if (percent < 25) currentStep = 1;
-        else if (percent < 50) currentStep = 2;
-        else if (percent < 90) currentStep = 3;
-        else currentStep = 4;
-    }
-    
-    steps.forEach((stepId, index) => {
-        const stepElement = document.getElementById(stepId);
-        if (stepElement) {
-            stepElement.classList.remove('active', 'completed');
-            
-            if (index + 1 < currentStep) {
-                stepElement.classList.add('completed');
-            } else if (index + 1 === currentStep) {
-                stepElement.classList.add('active');
-            }
-        }
-    });
-}
 
 // 获取表单数据
 function getAssetFormData() {
@@ -2408,45 +1921,30 @@ function getAssetFormData() {
 // 处理支付成功的情况
 async function handlePaymentSuccess(txHash, formData) {
     try {
-        updateStepStatus('step-3', 'loading');
-        updateMainProgress(60);
+        updateProgress(85, '支付已确认，正在创建资产...');
         
-        // 验证Token Symbol是否存在，如果不存在则生成
-        if (!formData.token_symbol) {
-            const assetType = formData.asset_type || '20';
-            console.log('Token Symbol不存在，生成新的，资产类型:', assetType);
-            const newTokenSymbol = await generateTokenSymbol(assetType);
+        // 重新生成Token Symbol，避免重复使用
+        const assetType = formData.asset_type || '20';
+        console.log('重新生成Token Symbol，资产类型:', assetType);
+        const newTokenSymbol = await generateTokenSymbol(assetType);
+        
+        if (newTokenSymbol) {
+            formData.token_symbol = newTokenSymbol;
+            console.log('使用新的Token Symbol:', newTokenSymbol);
             
-            if (newTokenSymbol) {
-                formData.token_symbol = newTokenSymbol;
-                console.log('使用新生成的Token Symbol:', newTokenSymbol);
-                
-                // 更新页面上的Token Symbol显示
-                const tokenSymbolInput = document.getElementById('tokensymbol');
-                if (tokenSymbolInput) {
-                    tokenSymbolInput.value = newTokenSymbol;
-                }
-            } else {
-                throw new Error('无法生成Token Symbol，请重试');
+            // 更新页面上的Token Symbol显示
+            const tokenSymbolInput = document.getElementById('tokensymbol');
+            if (tokenSymbolInput) {
+                tokenSymbolInput.value = newTokenSymbol;
             }
         } else {
-            console.log('使用现有的Token Symbol:', formData.token_symbol);
+            console.warn('无法生成新的Token Symbol，使用原有的');
         }
         
         // 创建资产
-        updateStepStatus('step-3', 'completed');
-        updateStepStatus('step-4', 'loading');
-        updateMainProgress(75);
-        
         const result = await processAssetCreation(formData, txHash);
         
         if (result.success) {
-            // 更新进度显示
-            updateStepStatus('step-3', 'completed');
-            updateStepStatus('step-4', 'completed');
-            updateStepStatus('step-5', 'completed');
-            updateMainProgress(100);
-            
             // 创建成功
             let successMessage = `
                 <div class="text-center">
@@ -2519,17 +2017,8 @@ async function handlePaymentSuccess(txHash, formData) {
         }
     } catch (error) {
         console.error('处理支付成功后发生错误:', error);
-        
-        // 更新失败的步骤状态
-        if (error.message.includes('生成代币符号')) {
-            updateStepStatus('step-3', 'error', error.message);
-        } else if (error.message.includes('创建资产')) {
-            updateStepStatus('step-4', 'error', error.message);
-        } else {
-            updateStepStatus('step-4', 'error', error.message || '未知错误');
-        }
-        
         showError(`资产创建过程出错: ${error.message || '未知错误'}`);
+        updateProgress(0, '创建失败，请重试');
         enablePublishButtons(false);
         }
 }

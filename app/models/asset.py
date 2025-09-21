@@ -3,22 +3,21 @@ import json
 from datetime import datetime
 from app.extensions import db
 from sqlalchemy.orm import validates
-from sqlalchemy import Index, CheckConstraint, event
+from sqlalchemy import Index, CheckConstraint
 import re
 from flask import current_app, url_for
 from urllib.parse import urlparse
 from sqlalchemy.dialects.postgresql import JSON
-from app.utils.validation_utils import ValidationUtils, ValidationError
 
 class AssetType(enum.Enum):
-    REAL_PROPERTY = 10      # 不动产 (Real Property)
-    SECURITIES = 20         # 证券资产（股票、ETF等金融类资产）
-    QUASI_PROPERTY = 30     # 类不动产 (Quasi Property)
-    LAND = 40              # 土地资产
-    INDUSTRIAL = 50         # 工业地产
-    ART = 60               # 艺术品
-    COLLECTIBLES = 70      # 收藏品
-    OTHER = 99             # 其他资产
+    REAL_ESTATE = 10        # 不动产
+    COMMERCIAL = 20         # 类不动产
+    INDUSTRIAL = 30         # 工业地产
+    LAND = 40               # 土地资产
+    SECURITIES = 50         # 证券资产
+    ART = 60                # 艺术品
+    COLLECTIBLES = 70       # 收藏品
+    OTHER = 99              # 其他资产
 
 class AssetStatus(enum.Enum):
     PENDING = 1    # 待审核/待支付
@@ -63,11 +62,6 @@ class Asset(db.Model):
     blockchain_details = db.Column(db.Text)  # 区块链部署详情，JSON格式
     deployment_tx_hash = db.Column(db.String(100))  # 部署交易哈希
     
-    # 智能合约相关字段
-    contract_address = db.Column(db.String(64), nullable=True)  # 智能合约资产账户地址
-    vault_address = db.Column(db.String(64), nullable=True)  # 资产金库PDA地址
-    blockchain_data = db.Column(db.Text, nullable=True)  # 智能合约数据（JSON格式）
-    
     # 支付相关字段
     payment_tx_hash = db.Column(db.String(255), nullable=True)  # 支付交易哈希
     payment_details = db.Column(db.Text, nullable=True)  # 支付详情（JSON字符串）
@@ -78,20 +72,6 @@ class Asset(db.Model):
     # 添加审核信息
     approved_at = db.Column(db.DateTime)  # 审核通过时间
     approved_by = db.Column(db.String(64))  # 审核人地址
-
-    # SPL Token相关字段
-    spl_mint_address = db.Column(db.String(44), nullable=True, unique=True)  # 真正的SPL Token mint地址
-    mint_authority_keypair = db.Column(db.Text, nullable=True)  # 加密存储的mint权限私钥
-    freeze_authority_keypair = db.Column(db.Text, nullable=True)  # 加密存储的freeze权限私钥
-    metadata_uri = db.Column(db.String(500), nullable=True)  # Token元数据URI
-    spl_creation_status = db.Column(db.Integer, default=0)  # SPL Token创建状态 (0=待创建, 1=创建中, 2=完成, 3=失败)
-    spl_creation_tx_hash = db.Column(db.String(128), nullable=True)  # SPL Token创建交易哈希
-    spl_created_at = db.Column(db.DateTime, nullable=True)  # SPL Token创建时间
-
-    # 上链进度跟踪
-    deployment_in_progress = db.Column(db.Boolean, default=False)  # 标记上链操作是否正在进行中
-    deployment_started_at = db.Column(db.DateTime, nullable=True)  # 记录上链操作开始时间
-    deployment_retry_count = db.Column(db.Integer, nullable=False, default=0, server_default='0') # 部署重试次数
 
     # 添加关联
     trades = db.relationship("Trade", back_populates="asset", lazy=True, cascade="all, delete-orphan")
@@ -135,26 +115,33 @@ class Asset(db.Model):
 
     @validates('token_address')
     def validate_token_address(self, key, value):
-        if value and not ValidationUtils.validate_wallet_address(value):
-            raise ValidationError('无效的代币地址格式', field='token_address')
-        return ValidationUtils.normalize_address(value) if value else value
+        if value:
+            # 修改验证规则，接受更长的Solana地址
+            if not (re.match(r'^0x[a-fA-F0-9]{40}$', value) or    # 以太坊地址格式
+                   re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,126}$', value)):  # Solana 地址格式(最长126个字符)
+                raise ValueError('无效的代币地址格式')
+        return value
 
     @validates('owner_address')
     def validate_owner_address(self, key, value):
-        if not ValidationUtils.validate_wallet_address(value):
-            raise ValidationError('无效的所有者地址格式', field='owner_address')
-        return ValidationUtils.normalize_address(value)
+        # 修改验证规则，接受更长的Solana地址
+        if not (re.match(r'^0x[a-fA-F0-9]{40}$', value) or    # 以太坊地址格式
+               re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,126}$', value)):  # Solana 地址格式(最长126个字符)
+            raise ValueError('无效的所有者地址格式')
+        return value
 
     @validates('creator_address')
     def validate_creator_address(self, key, value):
-        if not ValidationUtils.validate_wallet_address(value):
-            raise ValidationError('无效的创建者地址格式', field='creator_address')
-        return ValidationUtils.normalize_address(value)
+        # 修改验证规则，接受更长的Solana地址
+        if not (re.match(r'^0x[a-fA-F0-9]{40}$', value) or    # 以太坊地址格式
+               re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,126}$', value)):  # Solana 地址格式(最长126个字符)
+            raise ValueError('无效的创建者地址格式')
+        return value
 
     @validates('token_price')
     def validate_token_price(self, key, value):
-        if not ValidationUtils.validate_positive_number(value, 'token_price'):
-            raise ValidationError('代币价格必须大于0', field='token_price')
+        if value <= 0:
+            raise ValueError('Token price must be greater than 0')
         return value
 
     @validates('token_supply')
@@ -249,9 +236,37 @@ class Asset(db.Model):
             self.token_supply = int(self.area * 10000)
 
     def to_dict(self):
-        """转换为字典格式 - 使用统一的数据转换器"""
-        from app.utils.data_converters import AssetDataConverter
-        return AssetDataConverter.to_api_format(self)
+        """转换为字典格式"""
+        data = {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'asset_type': self.asset_type,
+            'location': self.location,
+            'token_symbol': self.token_symbol,
+            'token_price': self.token_price,
+            'price': self.token_price,  # 添加price字段，与token_price相同，保证前端兼容性
+            'token_supply': self.token_supply,
+            'total_supply': self.token_supply,  # 添加total_supply字段，与token_supply相同，保证前端兼容性
+            'remaining_supply': self.remaining_supply,
+            'token_address': self.token_address,
+            'annual_revenue': self.annual_revenue,
+            'status': self.status,
+            'reject_reason': self.reject_reason,
+            'owner_address': self.owner_address,
+            'creator_address': self.creator_address,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else None,
+            'images': self.images,
+            'documents': self.documents,
+            'total_value': self.total_value  # 确保所有资产类型都包含total_value字段
+        }
+
+        # 根据资产类型添加特定字段
+        if self.asset_type == AssetType.REAL_ESTATE.value:
+            data['area'] = self.area
+
+        return data
 
     @staticmethod
     def from_dict(data):
@@ -275,6 +290,10 @@ class Asset(db.Model):
                 
         return Asset(**data)
 
+    # 上链进度跟踪
+    deployment_in_progress = db.Column(db.Boolean, default=False)  # 标记上链操作是否正在进行中
+    deployment_started_at = db.Column(db.DateTime, nullable=True)  # 记录上链操作开始时间
+
 class AssetStatusHistory(db.Model):
     """资产状态变更历史记录"""
     __tablename__ = 'asset_status_history'
@@ -290,36 +309,3 @@ class AssetStatusHistory(db.Model):
     
     def __repr__(self):
         return f'<AssetStatusHistory {self.id}: Asset {self.asset_id} {self.old_status}->{self.new_status}>'
-
-
-# Event listeners for data consistency
-@event.listens_for(Asset, 'before_insert')
-@event.listens_for(Asset, 'before_update')
-def ensure_asset_data_consistency(mapper, connection, target):
-    """确保资产数据一致性的事件监听器"""
-    try:
-        # 自动修复 remaining_supply = None 的问题
-        if target.remaining_supply is None and target.token_supply:
-            target.remaining_supply = target.token_supply
-            if current_app:
-                current_app.logger.info(f"Auto-fixed remaining_supply for asset {getattr(target, 'id', 'new')}")
-        
-        # 修复负的 remaining_supply
-        if target.remaining_supply is not None and target.remaining_supply < 0:
-            target.remaining_supply = 0
-            if current_app:
-                current_app.logger.info(f"Auto-fixed negative remaining_supply for asset {getattr(target, 'id', 'new')}")
-        
-        # 修复 remaining_supply > token_supply
-        if (target.remaining_supply is not None and target.token_supply and 
-            target.remaining_supply > target.token_supply):
-            target.remaining_supply = target.token_supply
-            if current_app:
-                current_app.logger.info(f"Auto-fixed excess remaining_supply for asset {getattr(target, 'id', 'new')}")
-    
-    except Exception as e:
-        # 记录错误但不阻止保存
-        if current_app:
-            current_app.logger.error(f"数据一致性检查失败: {e}")
-        else:
-            print(f"数据一致性检查失败: {e}")

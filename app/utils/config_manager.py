@@ -18,9 +18,11 @@ class ConfigManager:
     
     # 默认配置值
     DEFAULT_CONFIGS = {
-        'PLATFORM_FEE_ADDRESS': 'H6FMXx3s1kq1aMkYHiexVzircV31WnWaP5MSQQwfHfeW',
-        'ASSET_CREATION_FEE_ADDRESS': 'H6FMXx3s1kq1aMkYHiexVzircV31WnWaP5MSQQwfHfeW',
+        'PLATFORM_FEE_ADDRESS': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
+        'ASSET_CREATION_FEE_ADDRESS': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
         'ASSET_CREATION_FEE_AMOUNT': '0.02',
+        'PLATFORM_FEE_BASIS_POINTS': '350',  # 3.5%
+        'PLATFORM_FEE_RATE': '0.035',  # 3.5%
     }
     
     @staticmethod
@@ -33,11 +35,10 @@ class ConfigManager:
             if key in ConfigManager.FIXED_CONFIGS:
                 return ConfigManager.FIXED_CONFIGS[key]
             
-            # 仅当应用上下文存在时才查询数据库
-            if current_app:
-                value = SystemConfig.get_value(key)
-                if value is not None:
-                    return value
+            # 从数据库获取
+            value = SystemConfig.get_value(key)
+            if value is not None:
+                return value
             
             # 使用默认配置
             if key in ConfigManager.DEFAULT_CONFIGS:
@@ -67,6 +68,16 @@ class ConfigManager:
         return float(ConfigManager.get_config('ASSET_CREATION_FEE_AMOUNT', '0.02'))
     
     @staticmethod
+    def get_platform_fee_rate():
+        """获取平台费率（小数形式）"""
+        return float(ConfigManager.get_config('PLATFORM_FEE_RATE', '0.035'))
+    
+    @staticmethod
+    def get_platform_fee_basis_points():
+        """获取平台费率（基点形式）"""
+        return int(ConfigManager.get_config('PLATFORM_FEE_BASIS_POINTS', '350'))
+    
+    @staticmethod
     def get_usdc_mint():
         """获取USDC mint地址（固定值）"""
         return ConfigManager.FIXED_CONFIGS['SOLANA_USDC_MINT']
@@ -79,11 +90,6 @@ class ConfigManager:
     @staticmethod
     def get_payment_settings():
         """获取完整的支付设置"""
-        from app.models.admin import SystemConfig
-
-        # 获取平台抽佣率（20%）
-        platform_commission_rate = SystemConfig.get_value('PLATFORM_COMMISSION_RATE') or 0.2
-
         return {
             'platform_fee_address': ConfigManager.get_platform_fee_address(),
             'asset_creation_fee_address': ConfigManager.get_asset_creation_fee_address(),
@@ -92,7 +98,7 @@ class ConfigManager:
                 'amount': str(ConfigManager.get_asset_creation_fee_amount()),
                 'token': 'USDC'
             },
-            'platform_commission_rate': float(platform_commission_rate),
-            'platform_commission_percent': float(platform_commission_rate) * 100,
+            'platform_fee_basis_points': ConfigManager.get_platform_fee_basis_points(),
+            'platform_fee_percent': ConfigManager.get_platform_fee_rate() * 100,
             'currency': 'USDC'
         } 
