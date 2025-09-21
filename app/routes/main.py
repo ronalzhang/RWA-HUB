@@ -207,25 +207,64 @@ def news_detail(year, month, day, slug):
         start_date = datetime(year, month, day)
         end_date = datetime(year, month, day, 23, 59, 59)
 
-        # 根据日期和slug查找新闻
-        hotspot = NewsHotspot.query.filter(
+        # 首先根据日期范围获取当天的所有新闻
+        daily_hotspots = NewsHotspot.query.filter(
             NewsHotspot.is_active == True,
             NewsHotspot.created_at >= start_date,
             NewsHotspot.created_at <= end_date
-        ).first()
+        ).all()
 
-        # 如果找不到精确匹配，尝试模糊匹配标题
-        if not hotspot:
+        current_app.logger.info(f'日期新闻查询 - 日期: {year}-{month}-{day}, slug: {slug}')
+        current_app.logger.info(f'当天找到 {len(daily_hotspots)} 个新闻')
+
+        hotspot = None
+
+        # 如果只有一个新闻，直接返回
+        if len(daily_hotspots) == 1:
+            hotspot = daily_hotspots[0]
+            current_app.logger.info(f'当天只有一个新闻，直接返回: {hotspot.title}')
+
+        # 如果有多个新闻，需要根据slug精确匹配
+        elif len(daily_hotspots) > 1:
+            current_app.logger.info(f'当天有多个新闻，开始slug匹配...')
+
+            # 为每个新闻生成slug并与请求的slug比较
+            for news in daily_hotspots:
+                # 生成新闻的slug（与前端逻辑一致）
+                import re
+                news_slug = str(news.title)
+                news_slug = re.sub(r'\s+', '-', news_slug)           # 空格替换为-
+                news_slug = re.sub(r'[，。：？！]', '-', news_slug)    # 中文标点替换为-
+                news_slug = re.sub(r'[-]+', '-', news_slug)         # 多个-合并为一个
+                news_slug = re.sub(r'^-+|-+$', '', news_slug)       # 移除开头和结尾的-
+                news_slug = news_slug.lower()
+
+                # 截断slug长度
+                if len(news_slug) > 50:
+                    news_slug = news_slug[:50]
+                    if '-' in news_slug:
+                        news_slug = news_slug.rsplit('-', 1)[0]
+
+                current_app.logger.info(f'新闻: "{news.title}" -> slug: "{news_slug}" (请求slug: "{slug}")')
+
+                if news_slug == slug:
+                    hotspot = news
+                    current_app.logger.info(f'✅ 精确匹配找到: {news.title}')
+                    break
+
+        # 如果精确匹配失败，尝试模糊匹配
+        if not hotspot and daily_hotspots:
+            current_app.logger.warning(f'精确匹配失败，尝试模糊匹配...')
             # 将slug转换为可能的标题关键词
             title_keywords = slug.replace('-', ' ').split()
-            for keyword in title_keywords:
-                if len(keyword) > 2:  # 只搜索长度大于2的关键词
-                    hotspot = NewsHotspot.query.filter(
-                        NewsHotspot.is_active == True,
-                        NewsHotspot.title.contains(keyword)
-                    ).first()
-                    if hotspot:
+            for news in daily_hotspots:
+                for keyword in title_keywords:
+                    if len(keyword) > 2 and keyword.lower() in news.title.lower():
+                        hotspot = news
+                        current_app.logger.info(f'✅ 模糊匹配找到: {news.title} (关键词: {keyword})')
                         break
+                if hotspot:
+                    break
 
         if not hotspot:
             current_app.logger.warning(f'日期新闻详情页面 - 未找到 {year}-{month}-{day}/{slug} 的新闻')
