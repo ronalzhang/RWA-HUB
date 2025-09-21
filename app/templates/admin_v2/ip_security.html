@@ -43,6 +43,11 @@
                                 activeTab === 'analysis' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
                     📊 IP行为分析
                 </button>
+                <button @click="switchTab('iplist')"
+                        :class="['tab-button whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm',
+                                activeTab === 'iplist' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
+                    📋 IP列表
+                </button>
             </nav>
         </div>
 
@@ -139,6 +144,88 @@
                 <!-- 分析结果将通过JavaScript动态显示 -->
             </div>
         </div>
+
+        <!-- IP列表 -->
+        <div x-show="activeTab === 'iplist'" class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h4 class="text-lg font-medium text-gray-900">IP访问列表</h4>
+                <div class="flex space-x-2">
+                    <select id="iplist-hours" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="1">过去1小时</option>
+                        <option value="6">过去6小时</option>
+                        <option value="24" selected>过去24小时</option>
+                        <option value="72">过去3天</option>
+                        <option value="168">过去7天</option>
+                    </select>
+                    <select id="iplist-sort" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="visit_count">按访问次数</option>
+                        <option value="unique_paths">按路径数量</option>
+                        <option value="last_visit">按最后访问</option>
+                    </select>
+                    <select id="iplist-order" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="desc">降序</option>
+                        <option value="asc">升序</option>
+                    </select>
+                    <button @click="loadIPList()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-search mr-2"></i>查询
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                <table class="min-w-full divide-y divide-gray-300">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP地址</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">访问次数</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">路径数</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">访问频率</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">地区</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">威胁等级</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后访问</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="iplist-table" class="bg-white divide-y divide-gray-200">
+                        <!-- 数据将通过JavaScript动态加载 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页控件 -->
+            <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4">
+                <div class="flex flex-1 justify-between sm:hidden">
+                    <button @click="prevPage()" :disabled="!pagination.has_prev" class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                        上一页
+                    </button>
+                    <button @click="nextPage()" :disabled="!pagination.has_next" class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                        下一页
+                    </button>
+                </div>
+                <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            显示第 <span class="font-medium" x-text="((pagination.page - 1) * pagination.per_page + 1)"></span> 至
+                            <span class="font-medium" x-text="Math.min(pagination.page * pagination.per_page, pagination.total)"></span> 条，
+                            共 <span class="font-medium" x-text="pagination.total"></span> 条记录
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                            <button @click="prevPage()" :disabled="!pagination.has_prev" class="relative inline-flex items-center rounded-l-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <span class="relative inline-flex items-center border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700">
+                                第 <span x-text="pagination.page"></span> 页，共 <span x-text="pagination.pages"></span> 页
+                            </span>
+                            <button @click="nextPage()" :disabled="!pagination.has_next" class="relative inline-flex items-center rounded-r-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 手动封禁IP模态框 -->
@@ -175,6 +262,14 @@ function ipSecurityData() {
             ip: '',
             reason: ''
         },
+        pagination: {
+            page: 1,
+            per_page: 20,
+            total: 0,
+            pages: 0,
+            has_prev: false,
+            has_next: false
+        },
 
         switchTab(tabId) {
             this.activeTab = tabId;
@@ -182,6 +277,8 @@ function ipSecurityData() {
             // 加载对应数据
             if (tabId === 'suspicious') {
                 this.detectSuspiciousIPs();
+            } else if (tabId === 'iplist') {
+                this.loadIPList();
             }
         },
 
@@ -439,6 +536,8 @@ function ipSecurityData() {
                     this.loadBlacklist();
                     if (this.activeTab === 'suspicious') {
                         this.detectSuspiciousIPs();
+                    } else if (this.activeTab === 'iplist') {
+                        this.loadIPList();
                     }
                 } else {
                     alert('封禁失败: ' + response.data.error);
@@ -447,6 +546,100 @@ function ipSecurityData() {
                 console.error('封禁IP失败:', error);
                 alert('封禁失败: ' + error.message);
             }
+        },
+
+        async loadIPList() {
+            const hours = document.getElementById('iplist-hours').value;
+            const sortBy = document.getElementById('iplist-sort').value;
+            const order = document.getElementById('iplist-order').value;
+
+            try {
+                const response = await axios.get(`/api/admin/ip-security/ip-list?hours=${hours}&sort_by=${sortBy}&order=${order}&page=${this.pagination.page}&per_page=${this.pagination.per_page}`);
+                if (response.data.success) {
+                    const data = response.data.data;
+                    this.pagination = data.pagination;
+
+                    const tableBody = document.getElementById('iplist-table');
+                    tableBody.innerHTML = data.ip_list.map(ip => {
+                        let statusBadge = '';
+                        let riskColor = '';
+
+                        switch(ip.status) {
+                            case 'whitelisted':
+                                statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">白名单</span>';
+                                break;
+                            case 'blacklisted':
+                                statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">已封禁</span>';
+                                break;
+                            case 'high_risk':
+                                statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">高危</span>';
+                                break;
+                            case 'medium_risk':
+                                statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">中危</span>';
+                                break;
+                            case 'low_risk':
+                                statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">低危</span>';
+                                break;
+                            default:
+                                statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">正常</span>';
+                        }
+
+                        const location = [ip.country, ip.city].filter(Boolean).join(', ') || '-';
+
+                        return `
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <div>${ip.ip_address}</div>
+                                    <div class="text-xs text-gray-500">风险评分: ${ip.risk_score}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <div class="font-medium">${ip.visit_count}</div>
+                                    <div class="text-xs text-gray-400">代理: ${ip.unique_agents}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${ip.unique_paths}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <div>${ip.visits_per_hour}/小时</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${location}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    ${ip.last_visit ? new Date(ip.last_visit).toLocaleString() : '-'}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button onclick="ipSecurity.showIPDetails('${ip.ip_address}')" class="text-indigo-600 hover:text-indigo-900 mr-2">详情</button>
+                                    <button onclick="ipSecurity.analyzeSpecificIP('${ip.ip_address}')" class="text-blue-600 hover:text-blue-900 mr-2">分析</button>
+                                    ${ip.status !== 'blacklisted' && ip.status !== 'whitelisted' ?
+                                        `<button onclick="ipSecurity.showBlockModal('${ip.ip_address}')" class="text-red-600 hover:text-red-900">封禁</button>` :
+                                        ''
+                                    }
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('加载IP列表失败:', error);
+                alert('加载IP列表失败: ' + error.message);
+            }
+        },
+
+        nextPage() {
+            if (this.pagination.has_next) {
+                this.pagination.page++;
+                this.loadIPList();
+            }
+        },
+
+        prevPage() {
+            if (this.pagination.has_prev) {
+                this.pagination.page--;
+                this.loadIPList();
+            }
+        },
+
+        showIPDetails(ip) {
+            // 显示IP详细信息的模态框或跳转到详情页
+            this.analyzeSpecificIP(ip);
         }
     }
 }
@@ -465,6 +658,12 @@ window.ipSecurity = {
     showBlockModal: function(ip) {
         const component = document.querySelector('[x-data*="ipSecurityData"]').__x.$data;
         component.showBlockIPModal(ip);
+    },
+
+    showIPDetails: function(ip) {
+        // 获取IP详细信息并显示
+        const component = document.querySelector('[x-data*="ipSecurityData"]').__x.$data;
+        component.showIPDetails(ip);
     }
 };
 </script>
