@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Any, Optional, Dict, Set, Union
-from .publickey import PublicKey
+# 临时移除PublicKey导入，使用字符串代替
+# from .publickey import PublicKey
 
 @dataclass
 class AccountMeta:
