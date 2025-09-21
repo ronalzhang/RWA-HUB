@@ -9,6 +9,7 @@ from app.models import Trade, Asset, User
 from app.extensions import db
 from app.utils.error_handler import create_error_response
 from app.utils.decorators import api_endpoint
+from app.utils.ip_security import ip_security_check, enhanced_rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,8 @@ logger = logging.getLogger(__name__)
 trades_api_bp = Blueprint('trades_api', __name__, url_prefix='/api/trades')
 
 @trades_api_bp.route('/asset/<int:asset_id>/trades/history', methods=['GET'])
+@ip_security_check()
+@enhanced_rate_limit('trades')
 @api_endpoint(log_calls=True)
 def get_asset_trade_history(asset_id):
     """获取资产交易历史"""
@@ -81,6 +84,8 @@ def get_asset_trade_history(asset_id):
         return create_error_response('INTERNAL_ERROR', '获取交易历史失败')
 
 @trades_api_bp.route('/asset/<int:asset_id>/data/realtime', methods=['GET'])
+@ip_security_check()
+@enhanced_rate_limit('realtime')
 @api_endpoint(log_calls=True)
 def get_asset_realtime_data(asset_id):
     """获取资产实时数据"""

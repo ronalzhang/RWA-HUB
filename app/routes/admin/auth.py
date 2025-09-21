@@ -12,6 +12,7 @@ from app.models.admin import AdminUser
 from app.utils.auth import eth_address_required
 from app.utils.admin import is_admin
 from app.utils.admin import get_admin_permissions
+from app.utils.ip_security import ip_security_check, enhanced_rate_limit
 from app.services.authentication_service import get_auth_service
 from sqlalchemy import func
 from . import admin_bp, admin_api_bp
@@ -271,6 +272,8 @@ def login_v2_api():
 
 # 添加admin_api_bp蓝图的路由，匹配前端期望的/api/admin/check
 @admin_api_bp.route('/check', methods=['GET', 'POST'])
+@ip_security_check()
+@enhanced_rate_limit('admin')
 def check_admin_api():
     """检查钱包地址是否为管理员 - API蓝图版本"""
     try:

@@ -15,6 +15,7 @@ from app.extensions import db
 from app.utils.error_handler import error_handler, create_error_response
 from app.utils.decorators import api_endpoint
 from app.utils.data_converters import AssetDataConverter, DataConverter
+from app.utils.ip_security import ip_security_check, enhanced_rate_limit
 
 # 从__init__.py导入正确的API蓝图
 from . import api_bp
@@ -89,6 +90,8 @@ def deploy_contract():
         return create_error_response('INTERNAL_SERVER_ERROR', f'部署失败: {str(e)}')
 
 @api_bp.route('/assets/<int:asset_id>/status', methods=['GET'])
+@ip_security_check()
+@enhanced_rate_limit('assets')
 @api_endpoint(log_calls=True, measure_perf=True)
 def get_asset_status(asset_id):
     """获取资产状态"""
@@ -331,6 +334,8 @@ def get_trade_history():
         return create_error_response('INTERNAL_SERVER_ERROR', f'获取交易历史失败: {str(e)}')
 
 @api_bp.route('/v2/trades/<string:asset_identifier>', methods=['GET'])
+@ip_security_check()
+@enhanced_rate_limit('trades')
 def get_trade_history_v2(asset_identifier):
     """获取资产交易历史 - V2版本，支持RESTful风格URL"""
     try:

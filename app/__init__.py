@@ -204,6 +204,10 @@ def create_app(config_name='development'):
     
     # 注册初始化分销佣金设置命令
     app.cli.add_command(init_distribution_command)
+
+    # 注册IP安全管理命令
+    from app.commands.ip_security import init_ip_security_commands
+    init_ip_security_commands(app)
     
     # 初始化智能合约监控服务
     if not hasattr(app, '_contract_monitor_initialized'):
