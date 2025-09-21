@@ -639,7 +639,7 @@
                     </div>
                     <div class="recommendations-list">
                         {% for news in related_news[:2] %}
-                        <a href="/news/{{ news.created_at.strftime('%Y/%m/%d') }}/{{ (news.title|replace(' ', '-')|replace('，', '-')|replace('。', '')|replace('：', '-')|replace('？', '')|replace('！', ''))|truncate(50, True, '') }}" class="recommendation-item">
+                        <a href="/news/{{ news.created_at.strftime('%Y/%m/%d') }}/{{ news.title|news_slug }}" class="recommendation-item">
                             <div class="recommendation-content">
                                 <h3 class="recommendation-title">{{ news.title }}</h3>
                                 <p class="recommendation-summary">{{ news.summary[:100] }}{% if news.summary|length > 100 %}...{% endif %}</p>

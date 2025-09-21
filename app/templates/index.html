@@ -433,11 +433,29 @@
         updateActiveSlide();
     }
 
-    // 创建新闻卡片
     function createNewsCard(news, index) {
         const card = document.createElement('div');
         card.className = `news-card ${index === 0 ? 'active' : ''}`;
-        card.onclick = () => window.location.href = `/news/${news.id}`;
+
+        // 创建正确的日期格式URL
+        const date = new Date(news.created_at);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+
+        // 创建SEO友好的slug
+        const slug = (news.title || '')
+            .replace(/\s+/g, '-')           // 空格替换为-
+            .replace(/[，。：？！]/g, '-')    // 中文标点替换为-
+            .replace(/[-]+/g, '-')         // 多个-合并为一个
+            .replace(/^-+|-+$/g, '')       // 移除开头和结尾的-
+            .toLowerCase();
+
+        // 截断slug长度
+        const truncatedSlug = slug.length > 50 ? slug.substring(0, 50) : slug;
+        const newsUrl = `/news/${year}/${month}/${day}/${truncatedSlug}`;
+
+        card.onclick = () => window.location.href = newsUrl;
 
         const categoryText = {
             'general': '通用',
@@ -606,9 +624,25 @@
             </div>
         `;
 
-        // 点击事件 - 优先跳转到详情页
+        // 点击事件 - 使用正确的日期格式URL
         container.onclick = () => {
-            window.location.href = `/news/${hotspot.id}`;
+            const date = new Date(hotspot.created_at);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+
+            // 创建SEO友好的slug
+            const slug = (hotspot.title || '')
+                .replace(/\s+/g, '-')           // 空格替换为-
+                .replace(/[，。：？！]/g, '-')    // 中文标点替换为-
+                .replace(/[-]+/g, '-')         // 多个-合并为一个
+                .replace(/^-+|-+$/g, '')       // 移除开头和结尾的-
+                .toLowerCase();
+
+            // 截断slug长度
+            const truncatedSlug = slug.length > 50 ? slug.substring(0, 50) : slug;
+
+            window.location.href = `/news/${year}/${month}/${day}/${truncatedSlug}`;
         };
     }
 

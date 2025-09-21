@@ -141,6 +141,30 @@ def create_app(config_name='development'):
             return []
         except:
             return []
+
+    @app.template_filter('news_slug')
+    def news_slug_filter(title):
+        """生成新闻标题的SEO友好slug"""
+        import re
+        if not title:
+            return 'news'
+
+        # 创建slug：移除特殊字符，替换空格和标点为连字符
+        slug = str(title)
+        slug = re.sub(r'\s+', '-', slug)           # 空格替换为-
+        slug = re.sub(r'[，。：？！]', '-', slug)    # 中文标点替换为-
+        slug = re.sub(r'[-]+', '-', slug)         # 多个-合并为一个
+        slug = re.sub(r'^-+|-+$', '', slug)       # 移除开头和结尾的-
+        slug = slug.lower()
+
+        # 截断slug长度
+        if len(slug) > 50:
+            slug = slug[:50]
+            # 确保不在单词中间截断
+            if '-' in slug:
+                slug = slug.rsplit('-', 1)[0]
+
+        return slug if slug else 'news'
     
     # -- 为 Flask-Limiter 配置 Redis 存储 --
     # 使用在 cache_service.py 中定义的默认 Redis URL
