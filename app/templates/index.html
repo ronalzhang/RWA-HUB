@@ -624,25 +624,28 @@
             </div>
         `;
 
-        // 点击事件 - 使用正确的日期格式URL
+        // 生成当前热点的URL
+        const date = new Date(hotspot.created_at);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+
+        // 创建SEO友好的slug
+        const slug = (hotspot.title || '')
+            .replace(/\s+/g, '-')           // 空格替换为-
+            .replace(/[，。：？！]/g, '-')    // 中文标点替换为-
+            .replace(/[-]+/g, '-')         // 多个-合并为一个
+            .replace(/^-+|-+$/g, '')       // 移除开头和结尾的-
+            .toLowerCase();
+
+        // 截断slug长度
+        const truncatedSlug = slug.length > 50 ? slug.substring(0, 50) : slug;
+        const hotspotUrl = `/news/${year}/${month}/${day}/${truncatedSlug}`;
+
+        // 重新绑定点击事件 - 确保每次更新都绑定正确的URL
         container.onclick = () => {
-            const date = new Date(hotspot.created_at);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-
-            // 创建SEO友好的slug
-            const slug = (hotspot.title || '')
-                .replace(/\s+/g, '-')           // 空格替换为-
-                .replace(/[，。：？！]/g, '-')    // 中文标点替换为-
-                .replace(/[-]+/g, '-')         // 多个-合并为一个
-                .replace(/^-+|-+$/g, '')       // 移除开头和结尾的-
-                .toLowerCase();
-
-            // 截断slug长度
-            const truncatedSlug = slug.length > 50 ? slug.substring(0, 50) : slug;
-
-            window.location.href = `/news/${year}/${month}/${day}/${truncatedSlug}`;
+            console.log('点击热点:', hotspot.title, '-> URL:', hotspotUrl);
+            window.location.href = hotspotUrl;
         };
     }
 
