@@ -22,6 +22,7 @@ from . import trades
 from . import utils
 from . import monitoring
 from . import news_hotspot
+from . import ip_security  # 新增IP安全管理模块
 
 # 导出常用函数，保持向后兼容
 from .auth import admin_required, api_admin_required, admin_page_required, permission_required

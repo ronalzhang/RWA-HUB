@@ -115,10 +115,6 @@ def register_blueprints(app):
     from .spl_token_routes import spl_token_bp
     app.register_blueprint(spl_token_bp)
 
-    # 注册IP安全管理蓝图
-    from .admin.ip_security import register_ip_security_blueprints
-    register_ip_security_blueprints(app)
-
     # 注册系统配置管理蓝图 - 临时禁用以解决端点冲突
     # from .system_config_routes import system_config_bp
     # app.register_blueprint(system_config_bp)

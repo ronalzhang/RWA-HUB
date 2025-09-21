@@ -1,29 +1,26 @@
 """
-IP安全管理API路由
-提供IP黑名单管理和安全监控功能
+IP安全管理模块
+整合到现有admin系统中
 """
 import logging
-from flask import Blueprint, request, jsonify, render_template
+from flask import request, jsonify, render_template
 from app.utils.ip_security import IPSecurityManager, log_suspicious_activity
 from app.utils.decorators import api_endpoint
 from app.routes.admin.utils import has_permission
-from app.routes.admin.auth import api_admin_required
+from app.routes.admin.auth import api_admin_required, admin_page_required
+from . import admin_bp, admin_api_bp
 
 logger = logging.getLogger(__name__)
 
-# 创建IP安全管理蓝图
-ip_security_bp = Blueprint('ip_security', __name__, url_prefix='/admin/ip-security')
-ip_security_api_bp = Blueprint('ip_security_api', __name__, url_prefix='/api/admin/ip-security')
+
+@admin_bp.route('/v2/ip-security')
+@admin_page_required
+def ip_security_page():
+    """IP安全管理页面"""
+    return render_template('admin_v2/ip_security.html')
 
 
-@ip_security_bp.route('/')
-@api_admin_required
-def ip_security_dashboard():
-    """IP安全管理仪表板"""
-    return render_template('admin/ip_security.html')
-
-
-@ip_security_api_bp.route('/blacklist', methods=['GET'])
+@admin_api_bp.route('/ip-security/blacklist', methods=['GET'])
 @api_admin_required
 @api_endpoint(log_calls=True)
 def get_blacklist():
@@ -47,7 +44,7 @@ def get_blacklist():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@ip_security_api_bp.route('/analyze/<string:ip_address>', methods=['GET'])
+@admin_api_bp.route('/ip-security/analyze/<string:ip_address>', methods=['GET'])
 @api_admin_required
 @api_endpoint(log_calls=True)
 def analyze_ip_address(ip_address):
@@ -65,7 +62,7 @@ def analyze_ip_address(ip_address):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@ip_security_api_bp.route('/suspicious', methods=['GET'])
+@admin_api_bp.route('/ip-security/suspicious', methods=['GET'])
 @api_admin_required
 @api_endpoint(log_calls=True)
 def get_suspicious_ips():
@@ -145,7 +142,7 @@ def get_suspicious_ips():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@ip_security_api_bp.route('/block', methods=['POST'])
+@admin_api_bp.route('/ip-security/block', methods=['POST'])
 @api_admin_required
 @api_endpoint(log_calls=True)
 def block_ip():
@@ -178,7 +175,7 @@ def block_ip():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@ip_security_api_bp.route('/stats', methods=['GET'])
+@admin_api_bp.route('/ip-security/stats', methods=['GET'])
 @api_admin_required
 @api_endpoint(log_calls=True)
 def get_security_stats():
@@ -225,10 +222,3 @@ def get_security_stats():
     except Exception as e:
         logger.error(f"获取安全统计失败: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-
-
-# 将蓝图注册函数
-def register_ip_security_blueprints(app):
-    """注册IP安全管理蓝图"""
-    app.register_blueprint(ip_security_bp)
-    app.register_blueprint(ip_security_api_bp)
