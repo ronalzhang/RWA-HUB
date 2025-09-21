@@ -222,3 +222,227 @@ def get_security_stats():
     except Exception as e:
         logger.error(f"获取安全统计失败: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_api_bp.route('/ip-security/ip-list', methods=['GET'])
+@api_admin_required
+@api_endpoint(log_calls=True)
+def get_ip_list():
+    """获取IP访问列表统计"""
+    try:
+        import psycopg2
+        import os
+        from datetime import datetime, timedelta
+
+        # 获取查询参数
+        hours = request.args.get('hours', 24, type=int)
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        sort_by = request.args.get('sort_by', 'visit_count')  # visit_count, unique_paths, last_visit
+        order = request.args.get('order', 'desc')  # desc, asc
+
+        database_url = os.getenv('DATABASE_URL', 'postgresql://rwa_hub_user:password@localhost/rwa_hub')
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+
+        since_time = datetime.now() - timedelta(hours=hours)
+
+        # 构建排序字段
+        if sort_by == 'visit_count':
+            order_field = 'visit_count'
+        elif sort_by == 'unique_paths':
+            order_field = 'unique_paths'
+        elif sort_by == 'last_visit':
+            order_field = 'last_visit'
+        else:
+            order_field = 'visit_count'
+
+        order_direction = 'DESC' if order == 'desc' else 'ASC'
+
+        # 查询IP访问统计
+        cursor.execute(f"""
+            SELECT ip_address,
+                   COUNT(*) as visit_count,
+                   COUNT(DISTINCT path) as unique_paths,
+                   COUNT(DISTINCT user_agent) as unique_agents,
+                   MAX(timestamp) as last_visit,
+                   MIN(timestamp) as first_visit,
+                   country,
+                   city
+            FROM ip_visits
+            WHERE timestamp >= %s
+            GROUP BY ip_address, country, city
+            ORDER BY {order_field} {order_direction}
+            LIMIT %s OFFSET %s
+        """, (since_time, per_page, (page - 1) * per_page))
+
+        results = cursor.fetchall()
+
+        # 获取总数
+        cursor.execute("""
+            SELECT COUNT(DISTINCT ip_address)
+            FROM ip_visits
+            WHERE timestamp >= %s
+        """, (since_time,))
+        total_count = cursor.fetchone()[0]
+
+        ip_list = []
+        for row in results:
+            ip_address, visit_count, unique_paths, unique_agents, last_visit, first_visit, country, city = row
+
+            # 检查IP状态
+            status = 'normal'
+            if IPSecurityManager.is_whitelisted(ip_address):
+                status = 'whitelisted'
+            elif IPSecurityManager.is_blacklisted(ip_address):
+                status = 'blacklisted'
+            else:
+                # 计算风险评分
+                behavior = IPSecurityManager.analyze_ip_behavior(ip_address, hours)
+                risk_score = behavior.get('risk_score', 0)
+                if risk_score >= 80:
+                    status = 'high_risk'
+                elif risk_score >= 60:
+                    status = 'medium_risk'
+                elif risk_score >= 40:
+                    status = 'low_risk'
+
+            # 计算访问频率
+            time_span = (last_visit - first_visit).total_seconds() / 3600 if last_visit and first_visit else hours
+            visits_per_hour = visit_count / max(time_span, 1)
+
+            ip_list.append({
+                'ip_address': ip_address,
+                'visit_count': visit_count,
+                'unique_paths': unique_paths,
+                'unique_agents': unique_agents,
+                'last_visit': last_visit.isoformat() if last_visit else None,
+                'first_visit': first_visit.isoformat() if first_visit else None,
+                'visits_per_hour': round(visits_per_hour, 2),
+                'country': country or '',
+                'city': city or '',
+                'status': status,
+                'risk_score': behavior.get('risk_score', 0) if 'behavior' in locals() else 0
+            })
+
+        conn.close()
+
+        # 计算分页信息
+        total_pages = (total_count + per_page - 1) // per_page
+        has_next = page < total_pages
+        has_prev = page > 1
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'ip_list': ip_list,
+                'pagination': {
+                    'page': page,
+                    'per_page': per_page,
+                    'total': total_count,
+                    'pages': total_pages,
+                    'has_next': has_next,
+                    'has_prev': has_prev
+                },
+                'query_params': {
+                    'hours': hours,
+                    'sort_by': sort_by,
+                    'order': order
+                }
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"获取IP列表失败: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_api_bp.route('/ip-security/ip-details/<string:ip_address>', methods=['GET'])
+@api_admin_required
+@api_endpoint(log_calls=True)
+def get_ip_details(ip_address):
+    """获取特定IP的详细访问信息"""
+    try:
+        import psycopg2
+        import os
+        from datetime import datetime, timedelta
+
+        hours = request.args.get('hours', 24, type=int)
+
+        database_url = os.getenv('DATABASE_URL', 'postgresql://rwa_hub_user:password@localhost/rwa_hub')
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+
+        since_time = datetime.now() - timedelta(hours=hours)
+
+        # 获取访问的API接口统计
+        cursor.execute("""
+            SELECT path, COUNT(*) as count
+            FROM ip_visits
+            WHERE ip_address = %s AND timestamp >= %s
+            GROUP BY path
+            ORDER BY count DESC
+            LIMIT 20
+        """, (ip_address, since_time))
+
+        api_stats = []
+        for path, count in cursor.fetchall():
+            api_stats.append({
+                'path': path,
+                'count': count,
+                'is_api': path.startswith('/api/')
+            })
+
+        # 获取User-Agent统计
+        cursor.execute("""
+            SELECT user_agent, COUNT(*) as count
+            FROM ip_visits
+            WHERE ip_address = %s AND timestamp >= %s
+            GROUP BY user_agent
+            ORDER BY count DESC
+            LIMIT 10
+        """, (ip_address, since_time))
+
+        user_agents = []
+        for ua, count in cursor.fetchall():
+            user_agents.append({
+                'user_agent': ua,
+                'count': count,
+                'is_bot': any(bot in ua.lower() for bot in ['bot', 'crawler', 'spider', 'scraper', 'curl', 'python', 'requests']) if ua else False
+            })
+
+        # 获取时间分布统计
+        cursor.execute("""
+            SELECT EXTRACT(hour FROM timestamp) as hour, COUNT(*) as count
+            FROM ip_visits
+            WHERE ip_address = %s AND timestamp >= %s
+            GROUP BY EXTRACT(hour FROM timestamp)
+            ORDER BY hour
+        """, (ip_address, since_time))
+
+        hourly_stats = {}
+        for hour, count in cursor.fetchall():
+            hourly_stats[int(hour)] = count
+
+        conn.close()
+
+        # 获取行为分析
+        behavior = IPSecurityManager.analyze_ip_behavior(ip_address, hours)
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'ip_address': ip_address,
+                'api_stats': api_stats,
+                'user_agents': user_agents,
+                'hourly_stats': hourly_stats,
+                'behavior_analysis': behavior,
+                'query_params': {
+                    'hours': hours
+                }
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"获取IP详情失败: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
