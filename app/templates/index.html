@@ -13,29 +13,54 @@
 <div class="hero-section position-relative overflow-hidden">
     <div class="hero-bg-pattern"></div>
     <div class="container position-relative">
-        <div class="row align-items-center min-vh-80">
-            <div class="col-lg-6 pe-lg-5">
-                <div class="hero-content" data-aos="fade-up">
-                    <h1 class="display-4 fw-bold text-white mb-4">
-                        {{ _('Real World Assets') }}<br>
-                        <span class="gradient-text">{{ _('Tokenization Platform') }}</span>
-                    </h1>
-                    <p class="lead text-white-75 mb-5">{{ _('Start your asset tokenization journey now') }}<br>{{ _('Secure, transparent, and efficient blockchain asset management platform') }}</p>
-                    <div class="d-flex gap-3 flex-wrap">
-                        <button type="button" id="publishAssetBtn" class="btn btn-primary btn-lg px-4 py-3 me-3">
-                            <i class="fas fa-plus me-2"></i>{{ _('Publish Asset') }}
-                        </button>
-                        <a href="{{ url_for('static', filename='docs/whitpaper.pdf') }}" class="btn btn-outline-light btn-lg px-4 py-3" target="_blank">
-                            {{ _('White Paper') }} <i class="fas fa-file-pdf ms-2"></i>
-                        </a>
+        <div class="row">
+            <!-- 上半部分：文字和图片左右排列 -->
+            <div class="col-12">
+                <div class="row align-items-center mb-5">
+                    <div class="col-lg-6 pe-lg-4">
+                        <div class="hero-content" data-aos="fade-up">
+                            <h1 class="display-4 fw-bold text-white mb-4">
+                                {{ _('Real World Assets') }}<br>
+                                <span class="gradient-text">{{ _('Tokenization Platform') }}</span>
+                            </h1>
+                            <p class="lead text-white-75 mb-0">{{ _('Start your asset tokenization journey now') }}<br>{{ _('Secure, transparent, and efficient blockchain asset management platform') }}</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-6 mt-4 mt-lg-0 ps-lg-4">
+                        <div class="hotspots-container" data-aos="fade-up">
+                            <!-- 热点卡片滚动容器 -->
+                            <div class="hotspots-scroll-wrapper">
+                                <!-- 加载状态 -->
+                                <div class="hotspots-loading" id="newsLoading">
+                                    <div class="loading-spinner"></div>
+                                </div>
+                                <!-- 热点卡片滚动区域 -->
+                                <div class="hotspots-scroll-area" id="newsCarousel">
+                                    <!-- 动态加载 -->
+                                </div>
+                                <!-- 无数据状态 -->
+                                <div class="hotspots-empty" id="newsEmpty" style="display: none;">
+                                    <i class="fas fa-newspaper"></i>
+                                    <p>暂无热点新闻</p>
+                                </div>
+                            </div>
+
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-lg-6 mt-5 mt-lg-0">
-                <div class="platform-illustration" data-aos="fade-left">
-                    <img src="{{ url_for('static', filename='images/platform-illustration.png') }}" 
-                         alt="Platform Illustration" 
-                         class="img-fluid">
+
+            <!-- 下半部分：按钮居中并排显示 -->
+            <div class="col-12">
+                <div class="hero-buttons text-center" data-aos="fade-up" data-aos-delay="300">
+                    <div class="d-flex gap-3 justify-content-center flex-wrap">
+                        <button type="button" id="publishAssetBtn" class="btn btn-primary btn-lg px-5 py-3">
+                            <i class="fas fa-plus me-2"></i>{{ _('Publish Asset') }}
+                        </button>
+                        <a href="{{ url_for('static', filename='docs/whitepaper.pdf') }}" class="btn btn-outline-light btn-lg px-5 py-3" target="_blank">
+                            {{ _('White Paper') }} <i class="fas fa-file-pdf ms-2"></i>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -50,7 +75,7 @@
                 <h2 class="fw-bold mb-0" data-aos="fade-up">{{ _('Latest Assets') }}</h2>
                 <p class="text-muted mt-2" data-aos="fade-up" data-aos-delay="100">{{ _('Discover quality assets and start your investment journey') }}</p>
             </div>
-            <a href="{{ url_for('assets.list_assets_page') }}" 
+            <a href="{{ url_for('assets.list_assets_page') }}"
                class="btn btn-outline-primary"
                data-aos="fade-up"
                data-aos-delay="100">
@@ -62,8 +87,7 @@
             {% if assets %}
                 {% for asset in assets %}
                 <div class="col-md-4" data-aos="fade-up" data-aos-delay="{{ loop.index * 100 }}">
-                    {% if asset.status == 2 %}
-                    <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" 
+                    <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}"
                        class="text-decoration-none home-asset-card-link"
                        data-token-symbol="{{ asset.token_symbol }}"
                        onclick="forceHomeAssetCardClick(event, this)">
@@ -71,8 +95,8 @@
                             <!-- Asset Image -->
                             <div class="position-relative">
                                 {% if asset.images and asset.images|length > 0 %}
-                                <img src="{{ asset.images[0] }}" 
-                                     class="card-img-top" 
+                                <img src="{{ asset.images[0] }}"
+                                     class="card-img-top"
                                      style="height: 200px; object-fit: cover; width: 100%"
                                      alt="{{ asset.name }}"
                                      onerror="this.onerror=null; this.src='/static/images/placeholder.jpg'">
@@ -81,7 +105,7 @@
                                     <i class="fas fa-image fa-3x text-secondary"></i>
                                 </div>
                                 {% endif %}
-                                
+
                                 <!-- Status Label -->
                                 <div class="position-absolute top-0 start-0 m-2">
                                     <span class="badge bg-success">{{ _('On Chain') }}</span>
@@ -128,7 +152,6 @@
                             </div>
                         </div>
                     </a>
-                    {% endif %}
                 </div>
                 {% endfor %}
             {% else %}
@@ -194,32 +217,56 @@
     <div class="container">
         <div class="text-center mb-5">
             <h2 class="fw-bold mb-4" data-aos="fade-up">{{ _('Asset Types') }}</h2>
-            <p class="text-muted" data-aos="fade-up" data-aos-delay="100">{{ _('Supporting two main asset types to meet different needs') }}</p>
+            <p class="text-muted" data-aos="fade-up" data-aos-delay="100">{{ _('Supporting three main asset types to meet different investment needs') }}</p>
         </div>
-        <div class="row g-4 justify-content-center">
-            <div class="col-md-6" data-aos="fade-up" data-aos-delay="200">
+        <div class="row g-4">
+            <!-- Real Property (10) -->
+            <div class="col-md-4" data-aos="fade-up" data-aos-delay="200">
                 <div class="asset-type-card h-100">
                     <div class="asset-type-icon mb-4">
                         <i class="fas fa-home"></i>
                     </div>
-                    <h4 class="mb-3">{{ _('Real Estate') }} (RH-10YYYY)</h4>
-                    <ul class="list-unstyled text-muted">
-                        <li><i class="fas fa-check me-2"></i>{{ _('Token amount = Area × 10000') }}</li>
-                        <li><i class="fas fa-check me-2"></i>{{ _('Requires property certificate, land certificate, etc.') }}</li>
-                        <li><i class="fas fa-check me-2"></i>{{ _('Shows total asset area') }}</li>
+                    <h4 class="mb-3">{{ _('Real Property') }}</h4>
+                    <p class="text-muted mb-3">{{ _('Including residential, commercial, industrial and land properties with stable value and income potential') }}</p>
+                    <ul class="list-unstyled text-muted small">
+                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Residential Properties') }}</li>
+                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Commercial Buildings') }}</li>
+                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Industrial Facilities') }}</li>
+                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Land Assets') }}</li>
                     </ul>
                 </div>
             </div>
-            <div class="col-md-6" data-aos="fade-up" data-aos-delay="300">
+
+            <!-- Securities (50) -->
+            <div class="col-md-4" data-aos="fade-up" data-aos-delay="300">
                 <div class="asset-type-card h-100">
                     <div class="asset-type-icon mb-4">
-                        <i class="fas fa-boxes"></i>
+                        <i class="fas fa-chart-line"></i>
                     </div>
-                    <h4 class="mb-3">{{ _('Similar Assets') }} (RH-20YYYY)</h4>
-                    <ul class="list-unstyled text-muted">
-                        <li><i class="fas fa-check me-2"></i>{{ _('Customizable token amount') }}</li>
-                        <li><i class="fas fa-check me-2"></i>{{ _('Requires auction, exhibition documents, etc.') }}</li>
-                        <li><i class="fas fa-check me-2"></i>{{ _('Shows total asset value') }}</li>
+                    <h4 class="mb-3">{{ _('Securities') }}</h4>
+                    <p class="text-muted mb-3">{{ _('Traditional and digital securities with liquidity and growth potential') }}</p>
+                    <ul class="list-unstyled text-muted small">
+                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Stocks and Bonds') }}</li>
+                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Investment Funds') }}</li>
+                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Cryptocurrency') }}</li>
+                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Digital Assets') }}</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Commercial Assets (20-99) -->
+            <div class="col-md-4" data-aos="fade-up" data-aos-delay="400">
+                <div class="asset-type-card h-100">
+                    <div class="asset-type-icon mb-4">
+                        <i class="fas fa-gem"></i>
+                    </div>
+                    <h4 class="mb-3">{{ _('Commercial Assets') }}</h4>
+                    <p class="text-muted mb-3">{{ _('High-value commercial and luxury assets with appreciation potential') }}</p>
+                    <ul class="list-unstyled text-muted small">
+                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Art and Collectibles') }}</li>
+                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Luxury Goods') }}</li>
+                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Intellectual Property') }}</li>
+                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Other Commercial Assets') }}</li>
                     </ul>
                 </div>
             </div>
@@ -235,17 +282,17 @@
         once: true,
         offset: 100
     });
-    
+
     // 发布资产按钮点击事件
     document.getElementById('publishAssetBtn').addEventListener('click', function() {
         window.location.href = "{{ url_for('assets.create_asset_page') }}";
     });
-    
+
     document.addEventListener('DOMContentLoaded', function() {
         console.log("DOM加载完成，开始处理资产卡片");
         const cards = document.querySelectorAll('#assets .card');
         console.log("找到资产卡片数量:", cards.length);
-        
+
         // 鼠标交互效果 - 保持
         cards.forEach((card, index) => {
             card.addEventListener('mouseenter', function() {
@@ -253,21 +300,21 @@
                 this.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
                 this.style.transition = 'all 0.3s ease';
             });
-            
+
             card.addEventListener('mouseleave', function() {
                 this.style.transform = 'translateY(0)';
                 this.style.boxShadow = '0 2px 10px rgba(0,0,0,0.05)';
                 this.style.transition = 'all 0.3s ease';
             });
         });
-        
+
         // 如果需要，重新初始化AOS
         if (typeof AOS !== 'undefined') {
             AOS.init(); // 重新启用AOS
         }
-        
+
         console.log("资产卡片处理完成");
-        
+
         // 可以选择性保留调试日志，或移除
         const assetLinks = document.querySelectorAll('.home-asset-card-link');
         assetLinks.forEach(link => {
@@ -278,31 +325,252 @@
                 // 不阻止默认行为，让<a>标签的默认跳转发生
             });
         });
+
+        // 初始化热点新闻
+        initializeHotspots();
     });
 
     // 处理首页资产卡片点击事件
     function handleHomeAssetCardClick(event, element) {
         // 防止事件冒泡
         event.stopPropagation();
-        
+
         // 获取目标URL
         const url = element.getAttribute('data-href');
         const tokenSymbol = element.getAttribute('data-token-symbol');
-        
+
         console.log('首页资产卡片点击:', tokenSymbol);
         console.log('目标URL:', url);
-        
+
         // 检查URL是否正确
         if (!url || url.indexOf('/assets/') !== 0) {
             console.error('无效的资产详情URL:', url);
             return false;
         }
-        
+
         // 直接强制跳转 - 使用href而不是replace，避免历史记录问题
         window.location.href = url;
-        
+
         // 防止其他事件处理器
         return false;
+    }
+
+    // =================== 热点新闻系统 ===================
+
+    let newsData = [];
+    let currentNewsIndex = 0;
+    let newsRotationInterval = null;
+
+    // 初始化热点新闻
+    function initializeHotspots() {
+        console.log('🔄 初始化热点新闻系统...');
+        loadNewsHotspots();
+    }
+
+    // 加载新闻热点数据
+    function loadNewsHotspots() {
+        console.log('📡 开始加载新闻热点数据...');
+
+        const loading = document.getElementById('newsLoading');
+        const carousel = document.getElementById('newsCarousel');
+        const empty = document.getElementById('newsEmpty');
+
+        // 显示加载状态
+        loading.style.display = 'flex';
+        carousel.style.display = 'none';
+        empty.style.display = 'none';
+
+        fetch('/api/admin/news/hotspots?limit=5')
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.data && data.data.length > 0) {
+                    newsData = data.data;
+                    renderNews();
+                    startAutoPlay();
+                    console.log('✅ 新闻轮播初始化成功，数量:', newsData.length);
+                } else {
+                    showEmpty();
+                }
+            })
+            .catch(error => {
+                console.error('❌ 加载新闻热点失败:', error);
+                showEmpty();
+            });
+    }
+
+    // 显示空状态
+    function showEmpty() {
+        const loading = document.getElementById('newsLoading');
+        const carousel = document.getElementById('newsCarousel');
+        const empty = document.getElementById('newsEmpty');
+
+        loading.style.display = 'none';
+        carousel.style.display = 'none';
+        empty.style.display = 'flex';
+    }
+
+    // 渲染新闻
+    function renderNews() {
+        if (newsData.length === 0) return;
+
+        console.log('🎨 开始渲染新闻，数量:', newsData.length);
+
+        const loading = document.getElementById('newsLoading');
+        const carousel = document.getElementById('newsCarousel');
+        const empty = document.getElementById('newsEmpty');
+
+        loading.style.display = 'none';
+        carousel.style.display = 'block';
+        empty.style.display = 'none';
+
+        // 清空现有内容
+        carousel.innerHTML = '';
+
+        // 创建单卡片容器
+        const cardContainer = document.createElement('div');
+        cardContainer.className = 'news-card-container';
+        cardContainer.style.cssText = `
+            position: relative;
+            width: 100%;
+            height: 400px;
+            overflow: hidden;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        `;
+
+        // 显示第一个新闻
+        updateNewsCard(cardContainer, newsData[0]);
+        carousel.appendChild(cardContainer);
+
+        console.log('✅ 新闻卡片渲染完成');
+    }
+
+    // 更新新闻卡片内容
+    function updateNewsCard(container, news) {
+        const imageUrl = news.image_url || '/static/images/placeholder.jpg';
+
+        container.innerHTML = `
+            <div class="news-card-bg" style="
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-image: url('${imageUrl}');
+                background-size: cover;
+                background-position: center;
+                filter: brightness(0.4);
+            "></div>
+            <div class="news-card-overlay" style="
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.8) 100%);
+            "></div>
+            <div class="news-card-content" style="
+                position: relative;
+                z-index: 2;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-end;
+                padding: 30px;
+                color: white;
+            ">
+                <h3 style="
+                    font-size: 1.5rem;
+                    font-weight: bold;
+                    margin-bottom: 15px;
+                    line-height: 1.3;
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+                ">${escapeHtml(news.title)}</h3>
+                <p style="
+                    font-size: 1rem;
+                    opacity: 0.9;
+                    margin-bottom: 20px;
+                    line-height: 1.5;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                ">${escapeHtml(news.summary || '').substring(0, 100)}...</p>
+                <div style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    font-size: 0.9rem;
+                    opacity: 0.8;
+                ">
+                    <span><i class="fas fa-calendar me-2"></i>${formatDate(news.created_at)}</span>
+                    <span><i class="fas fa-eye me-2"></i>${news.view_count || 0} 阅读</span>
+                </div>
+            </div>
+        `;
+
+        // 添加点击事件
+        container.onclick = function() {
+            window.location.href = `/news/${news.id}`;
+        };
+
+        // 添加悬停效果
+        container.onmouseenter = function() {
+            this.style.transform = 'scale(1.02)';
+            this.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+        };
+
+        container.onmouseleave = function() {
+            this.style.transform = 'scale(1)';
+            this.style.boxShadow = '0 5px 20px rgba(0,0,0,0.2)';
+        };
+    }
+
+    // 开始自动播放
+    function startAutoPlay() {
+        if (newsData.length <= 1) return;
+
+        console.log('⏰ 启动新闻自动轮播');
+
+        // 清除现有定时器
+        if (newsRotationInterval) {
+            clearInterval(newsRotationInterval);
+        }
+
+        // 每4秒切换一次
+        newsRotationInterval = setInterval(() => {
+            currentNewsIndex = (currentNewsIndex + 1) % newsData.length;
+
+            const container = document.querySelector('.news-card-container');
+            if (container) {
+                // 添加淡出效果
+                container.style.opacity = '0.7';
+                container.style.transform = 'scale(0.95)';
+
+                setTimeout(() => {
+                    updateNewsCard(container, newsData[currentNewsIndex]);
+
+                    // 恢复效果
+                    container.style.opacity = '1';
+                    container.style.transform = 'scale(1)';
+                }, 200);
+            }
+        }, 4000);
+    }
+
+    // 辅助函数
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function formatDate(dateStr) {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('zh-CN', {
+            month: 'short',
+            day: 'numeric'
+        });
     }
 </script>
 
@@ -312,23 +580,23 @@
     function forceHomeAssetCardClick(event, element) {
         // 防止默认行为
         event.preventDefault();
-        
+
         // 获取原始href
         const url = element.href;
         const tokenSymbol = element.getAttribute('data-token-symbol');
-        
+
         console.log('首页资产卡片强制点击:', tokenSymbol);
         console.log('目标URL:', url);
-        
+
         // 检查是否是资产详情URL
         if (url.indexOf('/assets/') === -1) {
             console.error('无效的资产详情URL:', url);
             return false;
         }
-        
+
         // 使用window.open打开新页面，确保完全避开可能的缓存或历史问题
         window.open(url, '_self');
-        
+
         return false;
     }
 </script>
@@ -336,60 +604,6 @@
 <style>
     /* 移除 .home-asset-card-link 样式 */
 </style>
-
-<!-- 资产类型说明部分 -->
-<section class="py-16 bg-gray-50">
-    <div class="container mx-auto px-6">
-        <div class="text-center mb-12">
-            <h2 class="text-3xl font-bold text-gray-900 mb-4">Asset Categories</h2>
-            <p class="text-lg text-gray-600">Diverse real-world asset tokenization on Solana blockchain</p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Real Estate -->
-            <div class="bg-white rounded-xl shadow-lg p-8 text-center hover:shadow-xl transition-shadow">
-                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <i class="fas fa-building text-2xl text-blue-600"></i>
-                </div>
-                <h3 class="text-xl font-bold text-gray-900 mb-4">Real Estate</h3>
-                <p class="text-gray-600 mb-6">Traditional real estate assets including residential, commercial, and industrial properties with proven track records and stable returns.</p>
-                <div class="space-y-2 text-sm text-gray-500">
-                    <div>• Residential Properties</div>
-                    <div>• Commercial Buildings</div>
-                    <div>• Industrial Facilities</div>
-                </div>
-            </div>
-
-            <!-- Securities -->
-            <div class="bg-white rounded-xl shadow-lg p-8 text-center hover:shadow-xl transition-shadow">
-                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <i class="fas fa-chart-line text-2xl text-green-600"></i>
-                </div>
-                <h3 class="text-xl font-bold text-gray-900 mb-4">Securities</h3>
-                <p class="text-gray-600 mb-6">Securities and investment instruments including stocks, bonds, ETFs, and other regulated financial products with liquidity potential.</p>
-                <div class="space-y-2 text-sm text-gray-500">
-                    <div>• Public Securities</div>
-                    <div>• Investment Funds</div>
-                    <div>• Bond Instruments</div>
-                </div>
-            </div>
-
-            <!-- Commercial -->
-            <div class="bg-white rounded-xl shadow-lg p-8 text-center hover:shadow-xl transition-shadow">
-                <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <i class="fas fa-gem text-2xl text-purple-600"></i>
-                </div>
-                <h3 class="text-xl font-bold text-gray-900 mb-4">Commercial</h3>
-                <p class="text-gray-600 mb-6">Commercial assets with property-like characteristics including art, collectibles, intellectual property, and other unique value stores.</p>
-                <div class="space-y-2 text-sm text-gray-500">
-                    <div>• Art & Collectibles</div>
-                    <div>• Intellectual Property</div>
-                    <div>• Luxury Assets</div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
 
 </div>
 {% endblock %}

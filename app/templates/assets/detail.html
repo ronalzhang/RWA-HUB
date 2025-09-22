@@ -176,6 +176,67 @@
                     <div class="card-body">
                         <div class="mb-4">
                             <h4 class="mb-3">{{ asset.token_symbol }}</h4>
+
+                            <!-- SPL Token信息 -->
+                            {% if asset.spl_mint_address %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted small">SPL Token Address:</span>
+                                <div class="text-end">
+                                    <span id="splTokenAddressFull" style="display: none;">{{ asset.spl_mint_address }}</span>
+                                    <a href="https://solscan.io/token/{{ asset.spl_mint_address }}" target="_blank" class="text-decoration-none small text-primary" title="{{ asset.spl_mint_address }}">
+                                        {{ asset.spl_mint_address[:6] }}...{{ asset.spl_mint_address[-4:] }}
+                                    </a>
+                                    <button class="btn btn-sm btn-outline-secondary ms-1 py-0 px-1"
+                                            onclick="copyToClipboard('splTokenAddressFull', this)">
+                                        <i class="far fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- SPL Token详细信息 -->
+                            <div class="spl-token-details mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-muted small">Total Supply:</span>
+                                    <div class="text-end">
+                                        <span id="onChainSupply" class="small">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-muted small">Token Status:</span>
+                                    <div class="text-end">
+                                        <span id="tokenStatus" class="badge bg-secondary">
+                                            <div class="spinner-border spinner-border-sm text-white" role="status" style="width: 0.8rem; height: 0.8rem;"></div>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- SPL Token健康检查按钮 -->
+                            <div class="mb-2">
+                                <button type="button" class="btn btn-sm btn-outline-info w-100" onclick="performTokenHealthCheck('{{ asset.spl_mint_address }}')">
+                                    <i class="fas fa-heartbeat me-1"></i>Token Health Check
+                                </button>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-info small mb-3">
+                                <i class="fas fa-info-circle me-2"></i>
+                                This asset doesn't have an SPL Token yet. SPL Tokens are automatically created when the first purchase is made.
+                            </div>
+                            {% endif %}
+
+                            {% if asset.metadata_uri %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted small">Token Metadata:</span>
+                                <div class="text-end">
+                                    <a href="{{ asset.metadata_uri }}" target="_blank" class="btn btn-sm btn-outline-info py-0 px-2">
+                                        <i class="fas fa-info-circle me-1"></i>View
+                                    </a>
+                                </div>
+                            </div>
+                            {% endif %}
                             <div class="d-flex justify-content-between mb-2">
                                 <span class="text-muted">Asset Name:</span>
                                 <span>{{ asset.name }}</span>
@@ -184,13 +245,9 @@
                                 <span class="text-muted">Token Price:</span>
                                 <span class="fw-bold fs-5">{{ asset.token_price }} USDC</span>
                             </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">Token Supply:</span>
-                                <span>{{ asset.token_supply }}</span>
-                            </div>
                             <div class="d-flex justify-content-between mb-4">
                                 <span class="text-muted">Available:</span>
-                                <span>{{ remaining_supply }}</span>
+                                <span data-field="remaining_supply">{{ "{:,}".format(remaining_supply|int) }}</span>
                             </div>
                         </div>
 
@@ -301,7 +358,8 @@ window.ASSET_CONFIG = {
     tokenPrice: parseFloat("{{ asset.token_price }}"),
     totalSupply: parseInt("{{ asset.token_supply }}"),
     remainingSupply: parseInt("{{ remaining_supply }}"),
-    platformFeeRate: 0.035
+    platformFeeRate: 0.035,
+    splMintAddress: "{{ asset.spl_mint_address|default('') }}"
 };
 
 // 调试模板变量
@@ -448,6 +506,12 @@ function initializePage() {
     loadTotalDividends();
     checkDividendAccess();
     updateBuyButtonState();
+
+    // 加载SPL Token信息
+    if (window.ASSET_CONFIG && window.ASSET_CONFIG.splMintAddress) {
+        loadSplTokenInfo();
+    }
+
     console.log('页面初始化完成');
 }
 
@@ -859,5 +923,279 @@ document.addEventListener('keydown', function(event) {
         closeShareModal();
     }
 });
+
+// ============================================================================
+// SPL Token 相关函数
+// ============================================================================
+
+// 加载SPL Token信息
+async function loadSplTokenInfo() {
+    if (!window.ASSET_CONFIG.splMintAddress) {
+        console.log('资产尚未创建SPL Token');
+        return;
+    }
+
+    console.log('开始加载SPL Token信息:', window.ASSET_CONFIG.splMintAddress);
+
+    try {
+        // 并行加载各种信息
+        const [supplyResult, holdersResult, activityResult] = await Promise.allSettled([
+            loadTokenSupply(),
+            loadTokenHolders(),
+            loadTokenActivity()
+        ]);
+
+        // 处理供应量信息
+        if (supplyResult.status === 'fulfilled' && supplyResult.value.success) {
+            updateSupplyDisplay(supplyResult.value.data);
+        } else {
+            updateSupplyDisplay(null, 'Error loading');
+        }
+
+        // 处理持有者信息
+        if (holdersResult.status === 'fulfilled' && holdersResult.value.success) {
+            updateHoldersDisplay(holdersResult.value.data);
+        } else {
+            updateHoldersDisplay(null, 'Error loading');
+        }
+
+        // 处理活动信息
+        if (activityResult.status === 'fulfilled' && activityResult.value.success) {
+            updateActivityDisplay(activityResult.value.data);
+        } else {
+            updateActivityDisplay(null, 'Error loading');
+        }
+
+        // 更新Token状态
+        updateTokenStatus('healthy');
+
+    } catch (error) {
+        console.error('加载SPL Token信息失败:', error);
+        updateTokenStatus('error');
+    }
+}
+
+// 加载Token供应量
+async function loadTokenSupply() {
+    const response = await fetch(`/api/spl-token/supply-info/${window.ASSET_CONFIG.splMintAddress}`);
+    return await response.json();
+}
+
+// 加载Token持有者数量
+async function loadTokenHolders() {
+    const response = await fetch(`/api/spl-token/holder-count/${window.ASSET_CONFIG.splMintAddress}`);
+    return await response.json();
+}
+
+// 加载Token活动信息
+async function loadTokenActivity() {
+    const response = await fetch(`/api/spl-token/activity/${window.ASSET_CONFIG.splMintAddress}?hours=24`);
+    return await response.json();
+}
+
+// 更新供应量显示
+function updateSupplyDisplay(data, errorMsg = null) {
+    const element = document.getElementById('onChainSupply');
+    if (!element) return;
+
+    if (errorMsg) {
+        element.innerHTML = `<span class="text-danger">${errorMsg}</span>`;
+        return;
+    }
+
+    if (data && data.formatted_supply) {
+        element.innerHTML = `${data.formatted_supply}`;
+    } else {
+        element.innerHTML = '<span class="text-muted">--</span>';
+    }
+}
+
+// 更新持有者显示
+function updateHoldersDisplay(data, errorMsg = null) {
+    const element = document.getElementById('tokenHolders');
+    if (!element) return;
+
+    if (errorMsg) {
+        element.innerHTML = `<span class="text-danger">${errorMsg}</span>`;
+        return;
+    }
+
+    if (data && typeof data.holder_count === 'number') {
+        element.innerHTML = `${data.holder_count} holders`;
+    } else {
+        element.innerHTML = '<span class="text-muted">--</span>';
+    }
+}
+
+// 更新活动显示
+function updateActivityDisplay(data, errorMsg = null) {
+    const element = document.getElementById('tokenActivity');
+    if (!element) return;
+
+    if (errorMsg) {
+        element.innerHTML = `<span class="text-danger">${errorMsg}</span>`;
+        return;
+    }
+
+    if (data && data.activity_summary) {
+        const activity = data.activity_summary;
+        element.innerHTML = `${activity.total_transactions} txs / $${activity.total_volume_usdc.toFixed(0)}`;
+    } else {
+        element.innerHTML = '<span class="text-muted">No activity</span>';
+    }
+}
+
+// 更新Token状态
+function updateTokenStatus(status) {
+    const element = document.getElementById('tokenStatus');
+    if (!element) return;
+
+    let badgeClass = 'bg-secondary';
+    let statusText = 'Unknown';
+
+    switch (status) {
+        case 'healthy':
+            badgeClass = 'bg-success';
+            statusText = 'Healthy';
+            break;
+        case 'degraded':
+            badgeClass = 'bg-warning';
+            statusText = 'Degraded';
+            break;
+        case 'error':
+            badgeClass = 'bg-danger';
+            statusText = 'Error';
+            break;
+    }
+
+    element.className = `badge ${badgeClass}`;
+    element.textContent = statusText;
+}
+
+// Token健康检查
+async function performTokenHealthCheck(mintAddress) {
+    if (!mintAddress) {
+        alert('No SPL Token address available');
+        return;
+    }
+
+    const button = event.target;
+    const originalHtml = button.innerHTML;
+
+    try {
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Checking...';
+        button.disabled = true;
+
+        const response = await fetch(`/api/spl-token/health-check/${mintAddress}`);
+        const result = await response.json();
+
+        if (result.success) {
+            const healthData = result.data;
+            const overallStatus = healthData.overall_status;
+
+            // 创建健康检查结果模态框
+            showHealthCheckModal(healthData);
+
+            // 更新Token状态
+            updateTokenStatus(overallStatus.status);
+
+        } else {
+            alert(`Health check failed: ${result.message}`);
+        }
+
+    } catch (error) {
+        console.error('健康检查失败:', error);
+        alert('Health check failed due to network error');
+    } finally {
+        button.innerHTML = originalHtml;
+        button.disabled = false;
+    }
+}
+
+// 显示健康检查结果模态框
+function showHealthCheckModal(healthData) {
+    const modalHtml = `
+        <div class="modal fade" id="healthCheckModal" tabindex="-1" style="z-index: 10000;">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-heartbeat me-2"></i>Token Health Check Results
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Overall Status:</strong>
+                                <span class="badge bg-\${getStatusColor(healthData.overall_status.status)} ms-2">
+                                    \${healthData.overall_status.status.toUpperCase()}
+                                </span>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Health Score:</strong> \${healthData.overall_status.health_score}%
+                            </div>
+                        </div>
+
+                        <h6>Check Details:</h6>
+                        <div class="list-group">
+                            \${Object.entries(healthData.checks).map(([checkName, checkData]) => `
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>\${formatCheckName(checkName)}:</strong>
+                                        <div class="small text-muted">\${checkData.message}</div>
+                                    </div>
+                                    <span class="badge bg-\${getCheckStatusColor(checkData.status)}">
+                                        \${checkData.status.toUpperCase()}
+                                    </span>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="mt-3 small text-muted">
+                            Checked at: \${new Date(healthData.timestamp * 1000).toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 移除现有模态框
+    const existingModal = document.getElementById('healthCheckModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // 添加新模态框
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // 显示模态框
+    const modal = new bootstrap.Modal(document.getElementById('healthCheckModal'));
+    modal.show();
+}
+
+// 辅助函数
+function getStatusColor(status) {
+    switch (status) {
+        case 'healthy': return 'success';
+        case 'degraded': return 'warning';
+        case 'error': return 'danger';
+        default: return 'secondary';
+    }
+}
+
+function getCheckStatusColor(status) {
+    switch (status) {
+        case 'pass': return 'success';
+        case 'warning': return 'warning';
+        case 'fail': return 'danger';
+        default: return 'secondary';
+    }
+}
+
+function formatCheckName(checkName) {
+    return checkName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
 </script>
 {% endblock %}

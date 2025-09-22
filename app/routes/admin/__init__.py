@@ -20,6 +20,7 @@ from . import dashboard
 from . import commission
 from . import trades
 from . import utils
+from . import monitoring
 from . import news_hotspot  # 添加新闻热点模块
 from . import ip_security   # 添加IP安全管理模块
 
