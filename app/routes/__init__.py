@@ -37,7 +37,7 @@ from .solana_api import solana_api as solana_api_bp
 from .admin_solana import admin_solana_bp
 
 # 导入管理员API兼容路由
-from .admin_api import admin_compat_routes_bp, admin_v2_bp, admin_compat_bp, admin_frontend_bp
+from .admin_api import admin_v2_bp, admin_compat_bp, admin_frontend_bp
 
 # 导入新的模块化admin系统
 from .admin import admin_bp, admin_api_bp
@@ -86,16 +86,14 @@ def register_blueprints(app):
     
     # 注册Solana API蓝图
     app.register_blueprint(solana_api_bp)
-    
-    # 临时注释掉冲突的蓝图，等重构完成后再启用
-    # app.register_blueprint(admin_solana_bp)
-    app.register_blueprint(admin_v2_bp)           # 启用V2 API蓝图以支持新的认证系统
-    app.register_blueprint(admin_compat_bp)        # 启用兼容路由以支持前端API调用
-    app.register_blueprint(admin_compat_routes_bp) # 启用兼容路由以支持前端页面API调用
-    app.register_blueprint(admin_frontend_bp)        # 启用前端管理员蓝图
+
+    # 注册管理员API（保留核心功能）
+    app.register_blueprint(admin_v2_bp)           # V2 API蓝图
+    app.register_blueprint(admin_compat_bp)        # 兼容路由
+    app.register_blueprint(admin_frontend_bp)        # 前端管理员蓝图
     
     # 注册全局处理器
     register_global_handlers(app)
     app.logger.info('已注册全局URL前缀修正处理器')
-    
-    print("所有路由已注册（使用新模块化admin系统，临时禁用冲突蓝图）") 
+
+    app.logger.info("所有路由已注册（使用新模块化admin系统）") 

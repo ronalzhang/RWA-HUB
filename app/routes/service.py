@@ -103,39 +103,6 @@ def wallet_token_balance():
             'error': str(e)
         }), 500
 
-@service_bp.route('/user/assets')
-def get_user_assets():
-    """
-    获取用户的资产列表
-    
-    Query参数:
-        address: 钱包地址
-        wallet_type: 钱包类型（默认为metamask）
-    """
-    address = request.args.get('address')
-    wallet_type = request.args.get('wallet_type', 'metamask')
-    
-    if not address:
-        return jsonify({
-            'success': False,
-            'error': '未提供钱包地址'
-        }), 400
-    
-    try:
-        # 调用AssetService获取用户资产
-        assets = AssetService.get_user_assets(address, wallet_type)
-        
-        return jsonify({
-            'success': True,
-            'assets': assets
-        })
-    except Exception as e:
-        current_app.logger.error(f"获取用户资产出错: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500 
-
 @service_bp.route('/wallet/commission_balance')
 def wallet_commission_balance():
     """
