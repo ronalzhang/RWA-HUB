@@ -4,6 +4,10 @@ from ..models.asset import Asset, AssetStatus
 from ..models.user import User
 from ..utils import is_admin
 from . import main_bp
+from datetime import datetime, timedelta
+from sqlalchemy import and_
+from app.models.news_hotspot import NewsHotspot
+from app.extensions import db
 
 # 引入统一的资产过滤函数
 from .assets import get_filtered_assets_query
@@ -50,6 +54,67 @@ def index():
                              current_user_address=None,
                              AssetStatus=AssetStatus,
                              _=_)
+
+
+@main_bp.route('/news/<int:year>/<int:month>/<int:day>/<string:slug>')
+def news_detail(year, month, day, slug):
+    """新闻详情页：按日期与slug匹配 NewsHotspot 并渲染详情模板"""
+    try:
+        # 解析日期边界（UTC）
+        start_dt = datetime(year, month, day)
+        end_dt = start_dt + timedelta(days=1)
+
+        # 同日范围内按slug匹配（对比标题经相同规则slug化）
+        # 为避免在SQL中实现slug化，先获取当日候选记录再在Python中过滤，日数据通常很小
+        candidates = NewsHotspot.query.filter(
+            and_(
+                NewsHotspot.created_at >= start_dt,
+                NewsHotspot.created_at < end_dt,
+                NewsHotspot.is_active == True
+            )
+        ).order_by(NewsHotspot.created_at.desc()).all()
+
+        import re
+        def to_slug(text: str) -> str:
+            text = (text or '').strip().lower()
+            text = re.sub(r"\s+", "-", text)
+            text = re.sub(r"[^a-z0-9-]", "", text)
+            text = re.sub(r"-+", "-", text)
+            return text.strip('-')
+
+        target = None
+        for item in candidates:
+            if to_slug(item.title) == slug:
+                target = item
+                break
+
+        if not target:
+            current_app.logger.warning(f"新闻未找到: date={year}-{month}-{day}, slug={slug}")
+            return render_template('error.html', error=_('News not found')), 404
+
+        # 访问量+1
+        try:
+            target.increment_view_count()
+        except Exception as inc_err:
+            current_app.logger.warning(f"新闻访问量更新失败: {str(inc_err)}")
+
+        # 推荐新闻
+        related_news = []
+        try:
+            related_news = NewsHotspot.get_recommended_news(target.id, limit=2)
+        except Exception as rec_err:
+            current_app.logger.warning(f"获取推荐新闻失败: {str(rec_err)}")
+
+        # 获取当前用户地址（与首页一致来源）
+        eth_address = request.args.get('eth_address') or \
+                      request.headers.get('X-Eth-Address') or \
+                      request.cookies.get('eth_address')
+
+        return render_template('news_detail.html', hotspot=target, related_news=related_news, current_user_address=eth_address)
+
+    except Exception as e:
+        current_app.logger.error(f"新闻详情页异常: {str(e)}")
+        return render_template('error.html', error=_('Error rendering news page')), 500
 
 # 在文件末尾添加favicon路由
 @main_bp.route('/favicon.ico')

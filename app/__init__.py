@@ -11,6 +11,7 @@ from app.extensions import db, babel, limiter, scheduler, migrate, cors, configu
 from pathlib import Path
 from app.config import config
 from logging.handlers import RotatingFileHandler
+import re
 
 # 全局应用实例，供其他模块导入
 current_app = None
@@ -110,6 +111,33 @@ def create_app(config_name='development'):
             if value:
                 return json.loads(value)
             return []
+
+    @app.template_filter('news_slug')
+    def news_slug_filter(value):
+        """将新闻标题转换为URL友好的slug。
+        规则：
+        - 转小写、去首尾空格
+        - 空白字符替换为'-'
+        - 移除非字母数字和连字符
+        - 合并连续的连字符
+        - 去除首尾的连字符
+        """
+        try:
+            if not value:
+                return ''
+            text = str(value).strip().lower()
+            # 替换空白为连字符
+            text = re.sub(r"\s+", "-", text)
+            # 移除非字母数字和连字符
+            text = re.sub(r"[^a-z0-9-]", "", text)
+            # 合并连续连字符
+            text = re.sub(r"-+", "-", text)
+            # 去除首尾连字符
+            text = text.strip('-')
+            return text
+        except Exception as e:
+            app.logger.error(f"news_slug 过滤器执行出错: {str(e)}")
+            return ''
         except:
             return []
     

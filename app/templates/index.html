@@ -532,9 +532,28 @@
             </div>
         `;
 
-        // 添加点击事件
+        // 添加点击事件（统一为 /news/YYYY/MM/DD/slug 格式）
         container.onclick = function() {
-            window.location.href = `/news/${news.id}`;
+            try {
+                const createdAt = news.created_at || news.createdAt || news.created_at_iso;
+                if (!createdAt) {
+                    console.error('缺少 created_at 字段，无法构建新闻详情URL');
+                    return;
+                }
+                const d = new Date(createdAt);
+                if (isNaN(d.getTime())) {
+                    console.error('created_at 非法，无法构建新闻详情URL:', createdAt);
+                    return;
+                }
+                const year = d.getUTCFullYear();
+                const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+                const day = String(d.getUTCDate()).padStart(2, '0');
+                const slug = slugify(news.title || '');
+                const path = `/news/${year}/${month}/${day}/${slug}`;
+                window.location.href = path;
+            } catch (e) {
+                console.error('构建新闻详情URL失败:', e);
+            }
         };
 
         // 添加悬停效果
@@ -587,6 +606,20 @@
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    function slugify(text) {
+        if (!text) return '';
+        let t = String(text).trim().toLowerCase();
+        // 替换空白为连字符
+        t = t.replace(/\s+/g, '-');
+        // 移除非字母数字和连字符
+        t = t.replace(/[^a-z0-9-]/g, '');
+        // 合并连续连字符
+        t = t.replace(/-+/g, '-');
+        // 去除首尾连字符
+        t = t.replace(/^-+|-+$/g, '');
+        return t;
     }
 
     function formatDate(dateStr) {
