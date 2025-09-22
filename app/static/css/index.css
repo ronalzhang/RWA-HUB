@@ -10,6 +10,11 @@
     padding-bottom: 5rem !important;
 }
 
+/* 非响应式：确保页面宽度不小于设计宽度，避免布局被裁切，只显示左上角 */
+html, body {
+    min-width: 1200px !important;
+}
+
 /* Hero Section */
 .index-page .hero-section {
     background: var(--gradient) !important;

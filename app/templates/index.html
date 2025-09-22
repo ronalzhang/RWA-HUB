@@ -167,7 +167,7 @@
                                 <div class="progress" style="height: 6px;">
                                     {% set progress_percentage = ((asset.token_supply - asset.remaining_supply) / asset.token_supply * 100) if asset.token_supply > 0 else 0 %}
                                     <div class="progress-bar bg-success" role="progressbar"
-                                         style="width: {{ progress_percentage }}%"
+                                         data-width="{{ progress_percentage }}"
                                          aria-valuenow="{{ progress_percentage }}"
                                          aria-valuemin="0"
                                          aria-valuemax="100"></div>
@@ -306,7 +306,7 @@
     AOS.init({
         duration: 800,
         once: true,
-        offset: 100
+        offset: 0
     });
 
     // 发布资产按钮点击事件
@@ -317,10 +317,8 @@
     document.addEventListener('DOMContentLoaded', function() {
         console.log("🚀 页面加载完成");
 
-        // 延迟加载新闻热点，避免阻塞页面渲染
-        setTimeout(() => {
-            loadNewsHotspots(); // 添加热点卡片加载
-        }, 300);
+        // 立即加载新闻热点，避免需要滚动后才呈现
+        loadNewsHotspots();
 
         // 处理资产卡片
         const cards = document.querySelectorAll('#assets .card');
@@ -347,6 +345,14 @@
         }
 
         console.log("资产卡片处理完成");
+
+        // 设置进度条宽度，避免内联样式语法在模板中被误判
+        document.querySelectorAll('#assets .progress-bar[data-width]').forEach(function(bar){
+            const w = parseFloat(bar.getAttribute('data-width') || '0');
+            if (!isNaN(w)) {
+                bar.style.width = w + '%';
+            }
+        });
 
         // 可以选择性保留调试日志，或移除
         const assetLinks = document.querySelectorAll('.home-asset-card-link');
