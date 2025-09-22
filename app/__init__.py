@@ -111,6 +111,8 @@ def create_app(config_name='development'):
             if value:
                 return json.loads(value)
             return []
+        except Exception:
+            return []
 
     @app.template_filter('news_slug')
     def news_slug_filter(value):
@@ -138,8 +140,6 @@ def create_app(config_name='development'):
         except Exception as e:
             app.logger.error(f"news_slug 过滤器执行出错: {str(e)}")
             return ''
-        except:
-            return []
     
     # 初始化扩展
     from .extensions import init_extensions, bind_db_to_app
