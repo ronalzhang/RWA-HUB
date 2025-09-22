@@ -2,43 +2,13 @@
 <html lang="{{ g.locale }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=1200, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
     
-    <script>
-        (function() {
-            try {
-                var designWidth = 1200; // 固定版心宽度
-                var docEl = document.documentElement;
-                var deviceWidth = Math.max(window.innerWidth || 0, docEl.clientWidth || 0);
-                // 计算使整个1200px宽度正好适配屏幕宽度的缩放比例
-                var scale = deviceWidth / designWidth;
-                // 限制缩放范围，避免过大或过小
-                if (scale > 1) scale = 1; // 桌面或更宽设备不放大
-                if (scale < 0.25) scale = 0.25; // 过小设备设下限
-
-                var vp = document.querySelector('meta[name="viewport"]');
-                if (vp) {
-                    vp.setAttribute('content', 'width=' + designWidth + ', initial-scale=' + scale + ', maximum-scale=' + scale + ', minimum-scale=' + scale + ', user-scalable=no');
-                }
-
-                // 监听窗口变化，必要时微调（避免频繁触发）
-                var resizeTimer;
-                window.addEventListener('resize', function() {
-                    clearTimeout(resizeTimer);
-                    resizeTimer = setTimeout(function() {
-                        var w = Math.max(window.innerWidth || 0, docEl.clientWidth || 0);
-                        var s = w / designWidth;
-                        if (s > 1) s = 1;
-                        if (s < 0.25) s = 0.25;
-                        if (vp) vp.setAttribute('content', 'width=' + designWidth + ', initial-scale=' + s + ', maximum-scale=' + s + ', minimum-scale=' + s + ', user-scalable=no');
-                    }, 200);
-                });
-            } catch (e) {
-                console.warn('Viewport scale script failed:', e);
-            }
-        })();
-    </script>
+    <style>
+        /* 避免缩放后产生横向滚动条 */
+        body { overflow-x: hidden; }
+    </style>
 
     <!-- 阻止Font Awesome Kit的加载 -->
     <script>

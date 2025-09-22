@@ -11,9 +11,7 @@
 }
 
 /* 非响应式：确保页面宽度不小于设计宽度，避免布局被裁切，只显示左上角 */
-html, body {
-    min-width: 1200px !important;
-}
+/* 取消强制最小宽度，改为容器缩放方案以保持可读性与可手动缩放 */
 
 /* Hero Section */
 .index-page .hero-section {
