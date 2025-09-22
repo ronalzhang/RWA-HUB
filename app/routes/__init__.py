@@ -48,8 +48,8 @@ from .admin.news_hotspot import news_hotspot_bp, news_hotspot_api_bp
 # 导入佣金配置管理
 from .admin.commission_config import commission_config_bp
 
-# 导入IP统计管理
-from .admin.ip_stats import ip_stats_bp
+# 导入IP安全管理
+from .admin.ip_security import ip_security_bp
 
 # 导入分红管理
 from .dividend import bp as dividend_bp
@@ -71,9 +71,9 @@ def register_blueprints(app):
     
     # 注册佣金配置管理蓝图
     app.register_blueprint(commission_config_bp)
-    
-    # 注册IP统计管理蓝图
-    app.register_blueprint(ip_stats_bp)
+
+    # 注册IP安全管理蓝图
+    app.register_blueprint(ip_security_bp)
     
     # 注册分红管理蓝图
     app.register_blueprint(dividend_bp)

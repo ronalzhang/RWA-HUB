@@ -72,6 +72,18 @@ def share_messages_v2():
     """V2版本分享消息管理页面"""
     return render_template('admin_v2/share_messages.html')
 
+@admin_bp.route('/v2/news-hotspots')
+@admin_page_required
+def news_hotspots_v2():
+    """V2版本热点新闻管理页面"""
+    return render_template('admin_v2/news_hotspots.html')
+
+@admin_bp.route('/v2/ip-security')
+@admin_page_required
+def ip_security_v2():
+    """V2版本IP安全管理页面"""
+    return render_template('admin_v2/ip_security.html')
+
 @admin_bp.route('/share-messages')
 @admin_page_required
 def share_messages():

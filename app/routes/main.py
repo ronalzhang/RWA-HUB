@@ -23,9 +23,8 @@ def index():
         current_app.logger.info(f'- Args: {eth_address_args}')
         current_app.logger.info(f'最终使用地址: {eth_address}')
         
-        # 只显示状态为ON_CHAIN且未删除的资产
+        # 显示所有状态的资产（除了已删除的）
         query = Asset.query.filter(
-            Asset.status == AssetStatus.ON_CHAIN.value,
             Asset.deleted_at.is_(None)
         )
             
