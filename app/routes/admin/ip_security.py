@@ -21,7 +21,6 @@ def ip_security_page():
 
 @admin_api_bp.route('/ip-security/blacklist', methods=['GET'])
 @api_admin_required
-@api_endpoint(log_calls=True)
 def get_blacklist():
     """获取黑名单列表"""
     try:
@@ -45,7 +44,6 @@ def get_blacklist():
 
 @admin_api_bp.route('/ip-security/analyze/<string:ip_address>', methods=['GET'])
 @api_admin_required
-@api_endpoint(log_calls=True)
 def analyze_ip_address(ip_address):
     """分析指定IP的行为模式"""
     try:
@@ -63,7 +61,6 @@ def analyze_ip_address(ip_address):
 
 @admin_api_bp.route('/ip-security/suspicious', methods=['GET'])
 @api_admin_required
-@api_endpoint(log_calls=True)
 def get_suspicious_ips():
     """获取可疑IP列表"""
     try:
@@ -143,7 +140,6 @@ def get_suspicious_ips():
 
 @admin_api_bp.route('/ip-security/block', methods=['POST'])
 @api_admin_required
-@api_endpoint(log_calls=True)
 def block_ip():
     """手动封禁IP"""
     try:
@@ -176,7 +172,6 @@ def block_ip():
 
 @admin_api_bp.route('/ip-security/stats', methods=['GET'])
 @api_admin_required
-@api_endpoint(log_calls=True)
 def get_security_stats():
     """获取安全统计信息"""
     try:
@@ -225,7 +220,6 @@ def get_security_stats():
 
 @admin_api_bp.route('/ip-security/ip-list', methods=['GET'])
 @api_admin_required
-@api_endpoint(log_calls=True)
 def get_ip_list():
     """获取IP访问列表统计"""
     try:
@@ -358,7 +352,6 @@ def get_ip_list():
 
 @admin_api_bp.route('/ip-security/ip-details/<string:ip_address>', methods=['GET'])
 @api_admin_required
-@api_endpoint(log_calls=True)
 def get_ip_details(ip_address):
     """获取特定IP的详细访问信息"""
     try:
