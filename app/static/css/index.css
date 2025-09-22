@@ -346,4 +346,36 @@ section[id="assets"] .card .card-text,
 .index-page .card-text {
     font-size: 0.9rem !important;
     margin-bottom: 0.5rem !important;
-} 
+}
+
+/* 超窄屏幕按钮优化 */
+@media (max-width: 480px) {
+    .index-page .hero-buttons .btn {
+        padding: 0.5rem 1rem !important; /* 减小按钮内边距 */
+        font-size: 0.875rem !important; /* 稍微减小字体 */
+        min-width: 140px !important; /* 确保最小宽度一致 */
+        white-space: nowrap !important; /* 防止文字换行 */
+    }
+
+    .index-page .hero-buttons .d-flex {
+        gap: 0.5rem !important; /* 减小按钮间距 */
+        flex-wrap: nowrap !important; /* 强制单行显示 */
+    }
+
+    .index-page .hero-buttons .btn-lg {
+        padding: 0.5rem 1rem !important; /* 覆盖btn-lg的默认padding */
+    }
+}
+
+/* 极窄屏幕进一步优化 */
+@media (max-width: 360px) {
+    .index-page .hero-buttons .btn {
+        padding: 0.4rem 0.8rem !important; /* 进一步减小内边距 */
+        font-size: 0.8rem !important; /* 进一步减小字体 */
+        min-width: 120px !important; /* 适应更小的屏幕 */
+    }
+
+    .index-page .hero-buttons .d-flex {
+        gap: 0.25rem !important; /* 最小间距 */
+    }
+}

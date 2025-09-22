@@ -195,13 +195,6 @@
             }
         });
 
-        // 语言切换功能
-        function switchLanguage(locale) {
-            const url = new URL(window.location);
-            url.searchParams.set('lang', locale);
-            window.location.href = url.toString();
-        }
-
         // 性能监控
         window.addEventListener('load', function() {
             if ('performance' in window) {
