@@ -23,6 +23,7 @@ from . import utils
 from . import monitoring
 from . import news_hotspot  # 添加新闻热点模块
 from . import ip_security   # 添加IP安全管理模块
+from . import commission_config  # 添加佣金配置模块
 
 # 导出常用函数，保持向后兼容
 from .auth import admin_required, api_admin_required, admin_page_required, permission_required
