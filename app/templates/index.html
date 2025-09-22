@@ -3,7 +3,7 @@
 {% block title %}RWA-HUB - {{ _('Real World Asset Tokenization Platform') }}{% endblock %}
 
 {% block styles %}
-<link href="{{ url_for('static', filename='css/index.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/index.css') }}?v=20250922-fix" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/aos/aos.css') }}" rel="stylesheet">
 {% endblock %}
 
@@ -319,7 +319,6 @@
 
         // 延迟加载新闻热点，避免阻塞页面渲染
         setTimeout(() => {
-            loadNews();
             loadNewsHotspots(); // 添加热点卡片加载
         }, 300);
 
