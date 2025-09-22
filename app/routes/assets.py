@@ -76,8 +76,10 @@ def list_assets_page():
         assets = pagination.items
 
         # 记录每个资产的详细信息
+        print(f"DEBUG: 当前页面资产列表 ({len(assets)} 个):")
         current_app.logger.info(f'当前页面资产列表 ({len(assets)} 个):')
         for asset in assets:
+            print(f"DEBUG: - ID: {asset.id}, 名称: {asset.name}, 状态: {asset.status}, 符号: {asset.token_symbol}")
             current_app.logger.info(
                 f'- ID: {asset.id}, '
                 f'名称: {asset.name}, '
@@ -87,8 +89,9 @@ def list_assets_page():
             )
 
         # 渲染模板
-        return render_template('assets/list.html', 
-                             assets=assets, 
+        print(f"DEBUG: 即将渲染模板，assets长度: {len(assets)}, pagination: {pagination}")
+        return render_template('assets/list.html',
+                             assets=assets,
                              pagination=pagination,
                              current_user_address=current_user_address,
                              is_admin=is_admin_user)
