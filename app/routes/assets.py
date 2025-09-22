@@ -60,10 +60,12 @@ def list_assets_page():
         per_page = 9  # 每页显示9个资产
 
         # 使用统一的资产过滤函数
+        print(f"DEBUG: current_user_address={current_user_address}, is_admin_user={is_admin_user}")
         query = get_filtered_assets_query(current_user_address, is_admin_user)
 
         # 记录过滤后的查询结果数量
         filtered_count = query.count()
+        print(f"DEBUG: 过滤后的资产数量: {filtered_count}")
         current_app.logger.info(f'过滤后的资产数量: {filtered_count}')
 
         # 按创建时间倒序排序
@@ -1076,12 +1078,15 @@ def get_filtered_assets_query(current_user_address=None, is_admin_user=False):
         Query: 过滤后的资产查询对象
     """
     query = Asset.query
+    print(f"DEBUG FILTER: current_user_address={current_user_address}, is_admin_user={is_admin_user}")
 
     if current_user_address and is_admin_user:
+        print('DEBUG FILTER: 管理员用户：显示所有未删除资产')
         current_app.logger.info('管理员用户：显示所有未删除资产')
         # 管理员可以看到所有未删除的资产
         query = query.filter(Asset.deleted_at.is_(None))
     else:
+        print('DEBUG FILTER: 普通用户或未登录用户：只显示已通过且未删除的资产')
         current_app.logger.info('普通用户或未登录用户：只显示已通过且未删除的资产')
         # 普通用户或未登录用户：只显示已通过且未删除的资产
         query = query.filter(
@@ -1092,6 +1097,7 @@ def get_filtered_assets_query(current_user_address=None, is_admin_user=False):
         # 额外日志记录，确保过滤器有效
         count_before = Asset.query.count()
         count_after = query.count()
+        print(f'DEBUG FILTER: 过滤前总资产数: {count_before}, 过滤后资产数: {count_after}')
         current_app.logger.info(f'过滤前总资产数: {count_before}, 过滤后资产数: {count_after}')
 
     return query
