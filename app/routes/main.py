@@ -23,9 +23,10 @@ def index():
         current_app.logger.info(f'- Args: {eth_address_args}')
         current_app.logger.info(f'最终使用地址: {eth_address}')
         
-        # 显示所有状态的资产（除了已删除的）
+        # 只显示已通过/已上链的资产（status=2）
         query = Asset.query.filter(
-            Asset.deleted_at.is_(None)
+            Asset.deleted_at.is_(None),
+            Asset.status == AssetStatus.APPROVED.value
         )
             
         # 获取最新3个资产

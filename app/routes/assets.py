@@ -202,6 +202,14 @@ def asset_detail_by_symbol(token_symbol):
         except Exception as div_e:
             current_app.logger.error(f'[DETAIL_PAGE_DIVIDEND_ERROR] 获取累计分红数据失败: {str(div_e)}')
         
+        # 获取分红记录数量，用于决定是否显示分红信息模块
+        dividend_records_count = 0
+        try:
+            from app.models.dividend import DividendRecord
+            dividend_records_count = DividendRecord.get_count_by_asset(asset.id)
+        except Exception as dividend_count_e:
+            current_app.logger.error(f'[DETAIL_PAGE_DIVIDEND_COUNT_ERROR] 获取分红记录数量失败: {str(dividend_count_e)}')
+
         # Log right before rendering
         current_app.logger.info(f'[DETAIL_PAGE_RENDER_START] 准备渲染模板 detail.html for {token_symbol}.')
         context = {
@@ -211,6 +219,7 @@ def asset_detail_by_symbol(token_symbol):
             'is_admin_user': is_admin_user,
             'current_user_address': current_user_address,
             'total_dividends': total_dividends,
+            'dividend_records_count': dividend_records_count,
             'platform_fee_address': ConfigManager.get_platform_fee_address(),
             'PLATFORM_FEE_RATE': getattr(Config, 'PLATFORM_FEE_RATE', 0.035)
         }
