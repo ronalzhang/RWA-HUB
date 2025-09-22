@@ -16,6 +16,9 @@ from app.blockchain.solana_service import execute_transfer_transaction
 # 从__init__.py导入正确的API蓝图
 from . import api_bp
 
+# 引入统一的资产过滤函数
+from .assets import get_filtered_assets_query
+
 # 日志记录器
 logger = logging.getLogger(__name__)
 
@@ -25,15 +28,21 @@ def list_assets():
     try:
         current_app.logger.info("请求资产列表")
         
+        # 获取用户信息进行权限判断
+        from app.utils import is_admin
         from app.models.asset import Asset, AssetStatus
-        from app.models.user import User
         from sqlalchemy import desc
-        
-        # 构建查询 - 只显示已上链且未删除的资产
-        query = Asset.query.filter(
-            Asset.status == AssetStatus.ON_CHAIN.value,
-            Asset.deleted_at.is_(None)  # 排除已删除的资产
-        )
+
+        eth_address_header = request.headers.get('X-Eth-Address')
+        eth_address_cookie = request.cookies.get('eth_address')
+        eth_address_args = request.args.get('eth_address')
+
+        # 按优先级获取钱包地址
+        current_user_address = eth_address_args or eth_address_header or eth_address_cookie
+        is_admin_user = is_admin(current_user_address) if current_user_address else False
+
+        # 使用统一的资产过滤函数
+        query = get_filtered_assets_query(current_user_address, is_admin_user)
         
         # 获取分页参数
         page = request.args.get('page', 1, type=int)

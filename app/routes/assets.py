@@ -1082,10 +1082,10 @@ def get_filtered_assets_query(current_user_address=None, is_admin_user=False):
         # 管理员可以看到所有未删除的资产
         query = query.filter(Asset.deleted_at.is_(None))
     else:
-        current_app.logger.info('普通用户或未登录用户：显示已通过且未删除的资产（包括待审核和已通过状态）')
-        # 普通用户或未登录用户：显示待审核和已通过的资产（临时修复，显示status=1和status=2）
+        current_app.logger.info('普通用户或未登录用户：只显示已通过且未删除的资产')
+        # 普通用户或未登录用户：只显示已通过且未删除的资产
         query = query.filter(
-            Asset.status.in_([AssetStatus.PENDING.value, AssetStatus.APPROVED.value]),
+            Asset.status == AssetStatus.APPROVED.value,
             Asset.deleted_at.is_(None)
         )
 
