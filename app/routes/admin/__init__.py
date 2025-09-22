@@ -14,12 +14,14 @@ admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
 
 # 导入所有子模块，确保路由被注册
 from . import auth
-from . import assets  
+from . import assets
 from . import users
 from . import dashboard
 from . import commission
 from . import trades
 from . import utils
+from . import news_hotspot  # 添加新闻热点模块
+from . import ip_security   # 添加IP安全管理模块
 
 # 导出常用函数，保持向后兼容
 from .auth import admin_required, api_admin_required, admin_page_required, permission_required
