@@ -80,6 +80,7 @@ def list_assets_page():
         current_app.logger.info(f'当前页面资产列表 ({len(assets)} 个):')
         for asset in assets:
             print(f"DEBUG: - ID: {asset.id}, 名称: {asset.name}, 状态: {asset.status}, 符号: {asset.token_symbol}")
+            print(f"DEBUG:   图片: {asset.images}, 类型: {type(asset.images)}")
             current_app.logger.info(
                 f'- ID: {asset.id}, '
                 f'名称: {asset.name}, '
@@ -90,11 +91,19 @@ def list_assets_page():
 
         # 渲染模板
         print(f"DEBUG: 即将渲染模板，assets长度: {len(assets)}, pagination: {pagination}")
-        return render_template('assets/list.html',
-                             assets=assets,
-                             pagination=pagination,
-                             current_user_address=current_user_address,
-                             is_admin=is_admin_user)
+        try:
+            result = render_template('assets/list.html',
+                                 assets=assets,
+                                 pagination=pagination,
+                                 current_user_address=current_user_address,
+                                 is_admin=is_admin_user)
+            print(f"DEBUG: 模板渲染成功，HTML长度: {len(result)}")
+            return result
+        except Exception as template_error:
+            print(f"DEBUG: 模板渲染失败: {str(template_error)}")
+            import traceback
+            traceback.print_exc()
+            raise template_error
 
     except Exception as e:
         current_app.logger.warning(f'获取资产列表失败: {str(e)}')
