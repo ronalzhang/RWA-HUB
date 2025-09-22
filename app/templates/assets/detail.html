@@ -17,11 +17,27 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- Solana库 -->
-<script src="{{ url_for('static', filename='js/contracts/solana-web3.iife.js') }}"></script>
+<!-- Solana Web3.js 库由 base.html 统一加载，避免版本冲突 -->
 <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
 
+<!-- 钱包和购买处理 -->
+<script src="{{ url_for('static', filename='js/wallet_manager.js') }}"></script>
+<script src="{{ url_for('static', filename='js/smart_contract_deployment.js') }}"></script>
+<!-- 统一购买处理器已在base.html中加载 -->
+
 <style>
+/* 固定宽度布局样式 */
+body {
+    min-width: 1200px;
+    overflow-x: auto;
+}
+
+.container {
+    width: 1200px;
+    max-width: none;
+    margin: 0 auto;
+}
+
 .asset-detail-page .card {
     border-radius: 12px;
     box-shadow: 0 3px 15px rgba(0,0,0,0.08);
@@ -98,7 +114,15 @@
                         {% if asset.images and asset.images|length > 0 %}
                         {% for image in asset.images %}
                         <div class="carousel-item {% if loop.first %}active{% endif %}">
-                            <img src="{{ image }}" class="d-block w-100" alt="Asset Image">
+                            {% if image.startswith('/static/') %}
+                            <img src="{{ image }}"
+                                 class="d-block w-100" alt="Asset Image"
+                                 onerror="this.src='{{ url_for('static', filename='images/placeholder.jpg') }}'; this.onerror=null;">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + image) }}"
+                                 class="d-block w-100" alt="Asset Image"
+                                 onerror="this.src='{{ url_for('static', filename='images/placeholder.jpg') }}'; this.onerror=null;">
+                            {% endif %}
                         </div>
                         {% endfor %}
                         {% else %}
@@ -137,11 +161,28 @@
                                     <strong>Creator:</strong>
                                     <span id="creatorAddressFull" style="display: none;">{{ asset.creator_address }}</span>
                                     <span title="{{ asset.creator_address }}">{{ asset.creator_address[:6] }}...{{ asset.creator_address[-4:] }}</span>
-                                    <button class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1" 
+                                    <button class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1"
                                             onclick="copyToClipboard('creatorAddressFull', this)">
                                         <i class="far fa-copy"></i>
                                     </button>
                                 </li>
+                                {% if asset.spl_mint_address %}
+                                <li class="mb-2">
+                                    <i class="fas fa-coins text-muted me-2"></i>
+                                    <strong>SPL Token Address:</strong>
+                                    <span id="splTokenAddressFullDetails" style="display: none;">{{ asset.spl_mint_address }}</span>
+                                    <span title="{{ asset.spl_mint_address }}">{{ asset.spl_mint_address[:6] }}...{{ asset.spl_mint_address[-4:] }}</span>
+                                    <button class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1"
+                                            onclick="copyToClipboard('splTokenAddressFullDetails', this)">
+                                        <i class="far fa-copy"></i>
+                                    </button>
+                                    <a href="https://solscan.io/token/{{ asset.spl_mint_address }}"
+                                       target="_blank" class="btn btn-sm btn-outline-info ms-1 py-0 px-1"
+                                       title="View on Solscan">
+                                        <i class="fas fa-external-link-alt"></i>
+                                    </a>
+                                </li>
+                                {% endif %}
                             </ul>
                         </div>
                     </div>
@@ -265,13 +306,27 @@
                                 <span class="input-group-text">USDC</span>
                             </div>
                         </div>
-                        
+
                         <div id="buy-error" class="alert alert-danger" style="display: none;"></div>
-                        
-                        <button type="button" id="buy-button" class="btn btn-primary w-100 py-2" 
-                                data-token-price="{{ asset.token_price }}" data-asset-id="{{ asset.id }}">
-                            <i class="fas fa-shopping-cart me-2"></i>Purchase
+
+                        {% if asset.contract_address and asset.status == 2 %}
+                        <button type="button" id="buy-button" class="btn btn-primary w-100 py-2"
+                                data-token-price="{{ asset.token_price }}"
+                                data-asset-id="{{ asset.id }}">
+                            <i class="fas fa-shopping-cart me-2"></i>Buy Tokens
                         </button>
+                        {% elif asset.status != 2 %}
+                        <button type="button" class="btn btn-warning w-100 py-2"
+                                onclick="deploySmartContract({{ asset.id }})">
+                            <i class="fas fa-rocket me-2"></i>Deploy Smart Contract
+                        </button>
+                        <small class="text-muted mt-2 d-block">Smart contract must be deployed before trading</small>
+                        {% else %}
+                        <button type="button" class="btn btn-secondary w-100 py-2" disabled>
+                            <i class="fas fa-hourglass-half me-2"></i>Processing...
+                        </button>
+                        <small class="text-muted mt-2 d-block">Asset is being processed. Please refresh shortly.</small>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -359,21 +414,9 @@ window.ASSET_CONFIG = {
     totalSupply: parseInt("{{ asset.token_supply }}"),
     remainingSupply: parseInt("{{ remaining_supply }}"),
     platformFeeRate: 0.035,
-    splMintAddress: "{{ asset.spl_mint_address|default('') }}"
+    splMintAddress: "{{ asset.spl_mint_address or '' }}",
+    metadataUri: "{{ asset.metadata_uri or '' }}"
 };
-
-// 调试模板变量
-console.log('模板变量调试:');
-console.log('is_admin_user:', "{{ is_admin_user|default('None') }}");
-console.log('is_owner:', "{{ is_owner|default('None') }}"); 
-console.log('current_user_address:', "{{ current_user_address|default('None') }}");
-console.log('asset.owner_address:', "{{ asset.owner_address|default('None') }}");
-
-// 详细的权限检查调试
-console.log('权限检查详情:');
-console.log('- is_admin_user类型:', typeof("{{ is_admin_user|default('None') }}"));
-console.log('- is_owner类型:', typeof("{{ is_owner|default('None') }}"));
-console.log('- 分红按钮应该显示:', "{{ (is_admin_user or is_owner)|string }}");
 
 // 分享功能
 window.shareAsset = function() {

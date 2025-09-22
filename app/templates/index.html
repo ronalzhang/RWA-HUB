@@ -114,9 +114,17 @@
                                 <!-- Asset Type Label -->
                                 <div class="position-absolute top-0 end-0 m-2">
                                     {% if asset.asset_type == 10 %}
-                                    <span class="badge bg-primary">{{ _('Real Estate') }}</span>
+                                    <span class="badge bg-primary">{{ _('Real Property') }}</span>
+                                    {% elif asset.asset_type == 20 %}
+                                    <span class="badge bg-info">{{ _('Securities') }}</span>
+                                    {% elif asset.asset_type == 30 %}
+                                    <span class="badge bg-warning">{{ _('Quasi Property') }}</span>
+                                    {% elif asset.asset_type == 40 %}
+                                    <span class="badge bg-dark">{{ _('Land') }}</span>
+                                    {% elif asset.asset_type == 50 %}
+                                    <span class="badge bg-secondary">{{ _('Industrial') }}</span>
                                     {% else %}
-                                    <span class="badge bg-info">{{ _('Similar Assets') }}</span>
+                                    <span class="badge bg-light text-dark">{{ _('Other Assets') }}</span>
                                     {% endif %}
                                 </div>
                             </div>
@@ -127,28 +135,43 @@
                                     <h5 class="card-title text-truncate mb-0 text-dark">{{ asset.name }}</h5>
                                     <span class="badge bg-secondary">{{ asset.token_symbol }}</span>
                                 </div>
-                                <p class="card-text text-muted small mb-2">
+                                <p class="card-text text-muted small mb-2 text-truncate">
                                     <i class="fas fa-map-marker-alt me-1"></i>{{ asset.location }}
                                 </p>
                                 {% if asset.asset_type == 10 %}
                                 <p class="card-text mb-2">
                                     <span class="text-muted">{{ _('Area') }}：</span>
-                                    <span class="fw-bold text-dark">{{ asset.area|number_format(field_name='area') }} ㎡</span>
+                                    <span class="fw-bold text-dark text-nowrap">{{ asset.area|number_format(field_name='area') }} ㎡</span>
+                                </p>
+                                {% elif asset.asset_type in [20, 30] %}
+                                <p class="card-text mb-2">
+                                    <span class="text-muted">{{ _('Total Value') }}：</span>
+                                    <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|compact_number(field_name='total_value', asset_type=asset.asset_type) }} USDC</span>
                                 </p>
                                 {% else %}
                                 <p class="card-text mb-2">
                                     <span class="text-muted">{{ _('Total Value') }}：</span>
-                                    <span class="fw-bold text-dark">{{ asset.total_value|number_format(field_name='total_value') }} USDC</span>
+                                    <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|number_format(field_name='total_value') }} USDC</span>
                                 </p>
                                 {% endif %}
-                                <p class="card-text mb-2">
+                                <p class="card-text mb-3">
                                     <span class="text-muted">{{ _('Token Price') }}：</span>
-                                    <span class="fw-bold text-dark">{{ asset.token_price|number_format(field_name='token_price') }} USDC</span>
+                                    <span class="fw-bold text-primary text-nowrap">{{ asset.token_price|number_format(field_name='token_price') }} USDC</span>
                                 </p>
-                                <p class="card-text">
-                                    <span class="text-muted">{{ _('Expected Annual Revenue') }}：</span>
-                                    <span class="fw-bold text-success">{{ asset.annual_revenue|number_format(field_name='annual_revenue') }} USDC</span>
-                                </p>
+
+                                <!-- Progress bar for remaining supply -->
+                                <div class="d-flex justify-content-between align-items-center text-muted small mb-1">
+                                    <span>{{ _('Available') }}</span>
+                                    <span>{{ asset.remaining_supply|number_format }}/{{ asset.token_supply|number_format }}</span>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    {% set progress_percentage = ((asset.token_supply - asset.remaining_supply) / asset.token_supply * 100) if asset.token_supply > 0 else 0 %}
+                                    <div class="progress-bar bg-success" role="progressbar"
+                                         style="width: {{ progress_percentage }}%"
+                                         aria-valuenow="{{ progress_percentage }}"
+                                         aria-valuemin="0"
+                                         aria-valuemax="100"></div>
+                                </div>
                             </div>
                         </div>
                     </a>
@@ -226,47 +249,50 @@
                     <div class="asset-type-icon mb-4">
                         <i class="fas fa-home"></i>
                     </div>
-                    <h4 class="mb-3">{{ _('Real Property') }}</h4>
-                    <p class="text-muted mb-3">{{ _('Including residential, commercial, industrial and land properties with stable value and income potential') }}</p>
-                    <ul class="list-unstyled text-muted small">
-                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Residential Properties') }}</li>
-                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Commercial Buildings') }}</li>
-                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Industrial Facilities') }}</li>
-                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Land Assets') }}</li>
+                    <h4 class="mb-3">
+                        {{ _('Real Property') }}<br>
+                        (RH-10YYYY)
+                    </h4>
+                    <ul class="list-unstyled text-muted">
+                        <li><i class="fas fa-check me-2"></i>{{ _('Token amount = Area × 10000') }}</li>
+                        <li><i class="fas fa-check me-2"></i>{{ _('Requires property certificate, land certificate, etc.') }}</li>
+                        <li><i class="fas fa-check me-2"></i>{{ _('Shows total asset area') }}</li>
                     </ul>
                 </div>
             </div>
 
-            <!-- Securities (50) -->
+            <!-- Securities (20) -->
             <div class="col-md-4" data-aos="fade-up" data-aos-delay="300">
                 <div class="asset-type-card h-100">
                     <div class="asset-type-icon mb-4">
                         <i class="fas fa-chart-line"></i>
                     </div>
-                    <h4 class="mb-3">{{ _('Securities') }}</h4>
-                    <p class="text-muted mb-3">{{ _('Traditional and digital securities with liquidity and growth potential') }}</p>
-                    <ul class="list-unstyled text-muted small">
-                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Stocks and Bonds') }}</li>
-                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Investment Funds') }}</li>
-                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Cryptocurrency') }}</li>
-                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Digital Assets') }}</li>
+                    <h4 class="mb-3">
+                        {{ _('Securities') }}<br>
+                        (RH-20YYYY)
+                    </h4>
+                    <ul class="list-unstyled text-muted">
+                        <li><i class="fas fa-check me-2"></i>{{ _('Stocks, ETFs, and financial assets') }}</li>
+                        <li><i class="fas fa-check me-2"></i>{{ _('Customizable token amount') }}</li>
+                        <li><i class="fas fa-check me-2"></i>{{ _('Shows total asset value with M/K units') }}</li>
                     </ul>
                 </div>
             </div>
 
-            <!-- Commercial Assets (20-99) -->
+            <!-- Quasi Property (30) -->
             <div class="col-md-4" data-aos="fade-up" data-aos-delay="400">
                 <div class="asset-type-card h-100">
                     <div class="asset-type-icon mb-4">
-                        <i class="fas fa-gem"></i>
+                        <i class="fas fa-boxes"></i>
                     </div>
-                    <h4 class="mb-3">{{ _('Commercial Assets') }}</h4>
-                    <p class="text-muted mb-3">{{ _('High-value commercial and luxury assets with appreciation potential') }}</p>
-                    <ul class="list-unstyled text-muted small">
-                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Art and Collectibles') }}</li>
-                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Luxury Goods') }}</li>
-                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Intellectual Property') }}</li>
-                        <li><i class="fas fa-check me-2 text-success"></i>{{ _('Other Commercial Assets') }}</li>
+                    <h4 class="mb-3">
+                        {{ _('Quasi Property') }}<br>
+                        (RH-30YYYY)
+                    </h4>
+                    <ul class="list-unstyled text-muted">
+                        <li><i class="fas fa-check me-2"></i>{{ _('Commercial and similar real estate') }}</li>
+                        <li><i class="fas fa-check me-2"></i>{{ _('Requires auction, exhibition documents, etc.') }}</li>
+                        <li><i class="fas fa-check me-2"></i>{{ _('Shows total asset value with M/K units') }}</li>
                     </ul>
                 </div>
             </div>
@@ -289,7 +315,15 @@
     });
 
     document.addEventListener('DOMContentLoaded', function() {
-        console.log("DOM加载完成，开始处理资产卡片");
+        console.log("🚀 页面加载完成");
+
+        // 延迟加载新闻热点，避免阻塞页面渲染
+        setTimeout(() => {
+            loadNews();
+            loadNewsHotspots(); // 添加热点卡片加载
+        }, 300);
+
+        // 处理资产卡片
         const cards = document.querySelectorAll('#assets .card');
         console.log("找到资产卡片数量:", cards.length);
 
