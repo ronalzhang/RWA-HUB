@@ -60,12 +60,10 @@ def list_assets_page():
         per_page = 9  # 每页显示9个资产
 
         # 使用统一的资产过滤函数
-        print(f"DEBUG: current_user_address={current_user_address}, is_admin_user={is_admin_user}")
         query = get_filtered_assets_query(current_user_address, is_admin_user)
 
         # 记录过滤后的查询结果数量
         filtered_count = query.count()
-        print(f"DEBUG: 过滤后的资产数量: {filtered_count}")
         current_app.logger.info(f'过滤后的资产数量: {filtered_count}')
 
         # 按创建时间倒序排序
@@ -76,11 +74,8 @@ def list_assets_page():
         assets = pagination.items
 
         # 记录每个资产的详细信息
-        print(f"DEBUG: 当前页面资产列表 ({len(assets)} 个):")
         current_app.logger.info(f'当前页面资产列表 ({len(assets)} 个):')
         for asset in assets:
-            print(f"DEBUG: - ID: {asset.id}, 名称: {asset.name}, 状态: {asset.status}, 符号: {asset.token_symbol}")
-            print(f"DEBUG:   图片: {asset.images}, 类型: {type(asset.images)}")
             current_app.logger.info(
                 f'- ID: {asset.id}, '
                 f'名称: {asset.name}, '
@@ -90,20 +85,11 @@ def list_assets_page():
             )
 
         # 渲染模板
-        print(f"DEBUG: 即将渲染模板，assets长度: {len(assets)}, pagination: {pagination}")
-        try:
-            result = render_template('assets/list.html',
-                                 assets=assets,
-                                 pagination=pagination,
-                                 current_user_address=current_user_address,
-                                 is_admin=is_admin_user)
-            print(f"DEBUG: 模板渲染成功，HTML长度: {len(result)}")
-            return result
-        except Exception as template_error:
-            print(f"DEBUG: 模板渲染失败: {str(template_error)}")
-            import traceback
-            traceback.print_exc()
-            raise template_error
+        return render_template('assets/list.html',
+                             assets=assets,
+                             pagination=pagination,
+                             current_user_address=current_user_address,
+                             is_admin=is_admin_user)
 
     except Exception as e:
         current_app.logger.warning(f'获取资产列表失败: {str(e)}')
@@ -1090,15 +1076,12 @@ def get_filtered_assets_query(current_user_address=None, is_admin_user=False):
         Query: 过滤后的资产查询对象
     """
     query = Asset.query
-    print(f"DEBUG FILTER: current_user_address={current_user_address}, is_admin_user={is_admin_user}")
 
     if current_user_address and is_admin_user:
-        print('DEBUG FILTER: 管理员用户：显示所有未删除资产')
         current_app.logger.info('管理员用户：显示所有未删除资产')
         # 管理员可以看到所有未删除的资产
         query = query.filter(Asset.deleted_at.is_(None))
     else:
-        print('DEBUG FILTER: 普通用户或未登录用户：只显示已通过且未删除的资产')
         current_app.logger.info('普通用户或未登录用户：只显示已通过且未删除的资产')
         # 普通用户或未登录用户：只显示已通过且未删除的资产
         query = query.filter(
@@ -1109,7 +1092,6 @@ def get_filtered_assets_query(current_user_address=None, is_admin_user=False):
         # 额外日志记录，确保过滤器有效
         count_before = Asset.query.count()
         count_after = query.count()
-        print(f'DEBUG FILTER: 过滤前总资产数: {count_before}, 过滤后资产数: {count_after}')
         current_app.logger.info(f'过滤前总资产数: {count_before}, 过滤后资产数: {count_after}')
 
     return query

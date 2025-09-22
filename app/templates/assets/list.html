@@ -87,26 +87,26 @@
                             {% if asset.asset_type == 10 %}
                             <p class="card-text mb-2">
                                 <span class="text-muted">{{ _('Area') }}：</span>
-                                <span class="fw-bold text-dark text-nowrap">{{ asset.area|number_format(field_name='area') }} ㎡</span>
+                                <span class="fw-bold text-dark text-nowrap">{{ asset.area|round(2) }} ㎡</span>
                             </p>
                             {% elif asset.asset_type in [20, 30] %}
                             <p class="card-text mb-2">
                                 <span class="text-muted">{{ _('Total Value') }}：</span>
-                                <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|compact_number(field_name='total_value', asset_type=asset.asset_type) }} USDC</span>
+                                <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|round(2) }} USDC</span>
                             </p>
                             {% else %}
                             <p class="card-text mb-2">
                                 <span class="text-muted">{{ _('Total Value') }}：</span>
-                                <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|number_format(field_name='total_value') }} USDC</span>
+                                <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|round(2) }} USDC</span>
                             </p>
                             {% endif %}
                             <p class="card-text mb-3">
                                 <span class="text-muted">{{ _('Token Price') }}：</span>
-                                <span class="fw-bold text-primary text-nowrap">{{ asset.token_price|number_format(field_name='token_price') }} USDC</span>
+                                <span class="fw-bold text-primary text-nowrap">{{ asset.token_price|round(6) }} USDC</span>
                             </p>
                             <p class="card-text">
                                 <span class="text-muted">{{ _('Expected Annual Revenue') }}：</span>
-                                <span class="fw-bold text-success">{{ asset.annual_revenue|number_format(field_name='annual_revenue') }} USDC</span>
+                                <span class="fw-bold text-success">{{ asset.annual_revenue|round(2) }} USDC</span>
                             </p>
                         </div>
                     </div>
