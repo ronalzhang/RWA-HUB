@@ -141,28 +141,28 @@
                                 {% if asset.asset_type == 10 %}
                                 <p class="card-text mb-2">
                                     <span class="text-muted">{{ _('Area') }}：</span>
-                                    <span class="fw-bold text-dark text-nowrap">{{ asset.area|number_format(field_name='area') }} ㎡</span>
+                                    <span class="fw-bold text-dark text-nowrap">{{ asset.area|round(2) }} ㎡</span>
                                 </p>
                                 {% elif asset.asset_type in [20, 30] %}
                                 <p class="card-text mb-2">
                                     <span class="text-muted">{{ _('Total Value') }}：</span>
-                                    <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|compact_number(field_name='total_value', asset_type=asset.asset_type) }} USDC</span>
+                                    <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|round(2) }} USDC</span>
                                 </p>
                                 {% else %}
                                 <p class="card-text mb-2">
                                     <span class="text-muted">{{ _('Total Value') }}：</span>
-                                    <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|number_format(field_name='total_value') }} USDC</span>
+                                    <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|round(2) }} USDC</span>
                                 </p>
                                 {% endif %}
                                 <p class="card-text mb-3">
                                     <span class="text-muted">{{ _('Token Price') }}：</span>
-                                    <span class="fw-bold text-primary text-nowrap">{{ asset.token_price|number_format(field_name='token_price') }} USDC</span>
+                                    <span class="fw-bold text-primary text-nowrap">{{ asset.token_price|round(6) }} USDC</span>
                                 </p>
 
                                 <!-- Progress bar for remaining supply -->
                                 <div class="d-flex justify-content-between align-items-center text-muted small mb-1">
                                     <span>{{ _('Available') }}</span>
-                                    <span>{{ asset.remaining_supply|number_format }}/{{ asset.token_supply|number_format }}</span>
+                                    <span>{{ asset.remaining_supply|round(0) }}/{{ asset.token_supply|round(0) }}</span>
                                 </div>
                                 <div class="progress" style="height: 6px;">
                                     {% set progress_percentage = ((asset.token_supply - asset.remaining_supply) / asset.token_supply * 100) if asset.token_supply > 0 else 0 %}
