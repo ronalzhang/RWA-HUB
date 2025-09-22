@@ -8,7 +8,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="index-page" id="pageRoot" style="transform-origin: top left;">
+<div class="index-page">
 <!-- Hero Section -->
 <div class="hero-section position-relative overflow-hidden">
     <div class="hero-bg-pattern"></div>
@@ -317,25 +317,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         console.log("🚀 页面加载完成");
 
-        // 非响应式容器缩放：将1200px设计宽度缩放以适配当前屏宽
-        (function() {
-            try {
-                const designWidth = 1200;
-                const root = document.getElementById('pageRoot');
-                const resize = () => {
-                    const w = window.innerWidth || document.documentElement.clientWidth || 0;
-                    let scale = w / designWidth;
-                    if (scale > 1) scale = 1; // 不放大桌面
-                    if (scale < 0.25) scale = 0.25; // 过窄设下限，避免太小
-                    if (root) {
-                        root.style.width = designWidth + 'px';
-                        root.style.transform = 'scale(' + scale + ')';
-                    }
-                };
-                resize();
-                window.addEventListener('resize', function() { requestAnimationFrame(resize); });
-            } catch (e) { console.warn('scale init failed', e); }
-        })();
+        // 移除容器缩放方案，保留最小宽度 + 固定 viewport 策略
 
         // 立即加载新闻热点，避免需要滚动后才呈现
         loadNewsHotspots();
