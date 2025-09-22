@@ -678,7 +678,22 @@ async function loadTradeHistory(page = 1) {
         console.log('交易历史API返回数据:', data);
         
         if (!data.trades || data.trades.length === 0) {
-            container.innerHTML = '<div class="text-center text-muted my-4">No Trade Records</div>';
+            container.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="mb-3">
+                        <i class="fas fa-exchange-alt fa-3x text-muted"></i>
+                    </div>
+                    <h5 class="text-muted">No Trading History</h5>
+                    <p class="text-muted small">No trades have been recorded for this asset yet.</p>
+                </div>
+            `;
+
+            // 重置分页显示
+            document.getElementById('currentPageDisplay').textContent = '1';
+            document.getElementById('totalPagesDisplay').textContent = '1';
+            document.getElementById('prevPageBtn').disabled = true;
+            document.getElementById('nextPageBtn').disabled = true;
+
             return;
         }
                 
@@ -716,7 +731,24 @@ async function loadTradeHistory(page = 1) {
         console.log(`交易历史加载完成，显示 ${data.trades.length} 条记录`);
     } catch (error) {
         console.error('Failed to Load Trade History:', error);
-        container.innerHTML = '<div class="alert alert-warning">Unable to load trading history at the moment</div>';
+        container.innerHTML = `
+            <div class="text-center py-4">
+                <div class="mb-3">
+                    <i class="fas fa-exclamation-triangle fa-3x text-warning"></i>
+                </div>
+                <h5 class="text-warning">Unable to Load Trading History</h5>
+                <p class="text-muted small">There was an error loading the trading history. Please try refreshing the page.</p>
+                <button class="btn btn-sm btn-outline-primary mt-2" onclick="loadTradeHistory(1)">
+                    <i class="fas fa-redo me-1"></i>Retry
+                </button>
+            </div>
+        `;
+
+        // 重置分页显示
+        document.getElementById('currentPageDisplay').textContent = '1';
+        document.getElementById('totalPagesDisplay').textContent = '1';
+        document.getElementById('prevPageBtn').disabled = true;
+        document.getElementById('nextPageBtn').disabled = true;
     }
 }
 
