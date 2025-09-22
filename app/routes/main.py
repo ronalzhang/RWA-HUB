@@ -5,6 +5,9 @@ from ..models.user import User
 from ..utils import is_admin
 from . import main_bp
 
+# 引入统一的资产过滤函数
+from .assets import get_filtered_assets_query
+
 @main_bp.route('/')
 def index():
     """首页"""
@@ -22,13 +25,13 @@ def index():
         current_app.logger.info(f'- Cookie: {eth_address_cookie}')
         current_app.logger.info(f'- Args: {eth_address_args}')
         current_app.logger.info(f'最终使用地址: {eth_address}')
-        
-        # 只显示已通过/已上链的资产（status=2）
-        query = Asset.query.filter(
-            Asset.deleted_at.is_(None),
-            Asset.status == AssetStatus.APPROVED.value
-        )
-            
+
+        # 检查是否是管理员
+        is_admin_user = is_admin(eth_address) if eth_address else False
+
+        # 使用统一的资产过滤函数
+        query = get_filtered_assets_query(eth_address, is_admin_user)
+
         # 获取最新3个资产
         assets = query.order_by(Asset.created_at.desc()).limit(3).all()
         current_app.logger.info(f'获取资产列表成功: 找到 {len(assets)} 个资产')

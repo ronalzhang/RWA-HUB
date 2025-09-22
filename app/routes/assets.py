@@ -59,27 +59,9 @@ def list_assets_page():
         page = request.args.get('page', 1, type=int)
         per_page = 9  # 每页显示9个资产
 
-        # 构建基础查询
-        query = Asset.query
-        
-        # 根据用户身份过滤资产
-        if current_user_address and is_admin_user:
-            current_app.logger.info('管理员用户：显示所有未删除资产')
-            # 管理员可以看到所有未删除的资产
-            query = query.filter(Asset.deleted_at.is_(None))
-        else:
-            current_app.logger.info('普通用户或未登录用户：只显示已上链且未删除的资产')
-            # 普通用户或未登录用户：只显示已上链且未删除的资产
-            query = query.filter(
-                Asset.status == AssetStatus.ON_CHAIN.value,
-                Asset.deleted_at.is_(None)
-            )
-            
-            # 额外日志记录，确保过滤器有效
-            count_before = Asset.query.count()
-            count_after = query.count()
-            current_app.logger.info(f'过滤前总资产数: {count_before}, 过滤后资产数: {count_after}')
-        
+        # 使用统一的资产过滤函数
+        query = get_filtered_assets_query(current_user_address, is_admin_user)
+
         # 记录过滤后的查询结果数量
         filtered_count = query.count()
         current_app.logger.info(f'过滤后的资产数量: {filtered_count}')
@@ -1081,3 +1063,35 @@ def create_asset_api():
             'success': False,
             'error': f'处理请求失败: {str(e)}'
         }), 500
+
+def get_filtered_assets_query(current_user_address=None, is_admin_user=False):
+    """
+    统一的资产过滤查询函数，避免重复代码
+
+    Args:
+        current_user_address: 当前用户钱包地址
+        is_admin_user: 是否是管理员用户
+
+    Returns:
+        Query: 过滤后的资产查询对象
+    """
+    query = Asset.query
+
+    if current_user_address and is_admin_user:
+        current_app.logger.info('管理员用户：显示所有未删除资产')
+        # 管理员可以看到所有未删除的资产
+        query = query.filter(Asset.deleted_at.is_(None))
+    else:
+        current_app.logger.info('普通用户或未登录用户：显示已通过且未删除的资产（包括待审核和已通过状态）')
+        # 普通用户或未登录用户：显示待审核和已通过的资产（临时修复，显示status=1和status=2）
+        query = query.filter(
+            Asset.status.in_([AssetStatus.PENDING.value, AssetStatus.APPROVED.value]),
+            Asset.deleted_at.is_(None)
+        )
+
+        # 额外日志记录，确保过滤器有效
+        count_before = Asset.query.count()
+        count_after = query.count()
+        current_app.logger.info(f'过滤前总资产数: {count_before}, 过滤后资产数: {count_after}')
+
+    return query
