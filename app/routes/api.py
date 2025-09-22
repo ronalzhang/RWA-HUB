@@ -1734,3 +1734,52 @@ def get_asset_dividend_stats_by_symbol(token_symbol):
             'error': str(e),
             'total_amount': 0
         }), 500
+
+@api_bp.route('/debug/asset-stats', methods=['GET'])
+def debug_asset_stats():
+    """临时调试端点：检查资产状态分布"""
+    try:
+        from app.models.asset import Asset, AssetStatus
+
+        # 统计各种状态的资产数量
+        total_assets = Asset.query.count()
+        deleted_assets = Asset.query.filter(Asset.deleted_at.is_not(None)).count()
+        active_assets = Asset.query.filter(Asset.deleted_at.is_(None)).count()
+
+        # 按状态分组统计
+        status_counts = {}
+        for status_value in [1, 2, 3, 4, 5, 6, 7, 8]:
+            count = Asset.query.filter(
+                Asset.status == status_value,
+                Asset.deleted_at.is_(None)
+            ).count()
+            if count > 0:
+                status_name = {
+                    1: 'PENDING', 2: 'APPROVED', 3: 'REJECTED', 4: 'DELETED',
+                    5: 'CONFIRMED', 6: 'PAYMENT_FAILED', 7: 'DEPLOYMENT_FAILED', 8: 'PAYMENT_PROCESSING'
+                }.get(status_value, f'STATUS_{status_value}')
+                status_counts[f'{status_value}_{status_name}'] = count
+
+        # 获取最新几个资产的详细信息
+        recent_assets = Asset.query.filter(Asset.deleted_at.is_(None)).order_by(Asset.created_at.desc()).limit(5).all()
+        recent_info = []
+        for asset in recent_assets:
+            recent_info.append({
+                'id': asset.id,
+                'name': asset.name,
+                'token_symbol': asset.token_symbol,
+                'status': asset.status,
+                'created_at': asset.created_at.strftime('%Y-%m-%d %H:%M:%S') if asset.created_at else None
+            })
+
+        return jsonify({
+            'total_assets': total_assets,
+            'deleted_assets': deleted_assets,
+            'active_assets': active_assets,
+            'status_distribution': status_counts,
+            'recent_assets': recent_info
+        })
+
+    except Exception as e:
+        current_app.logger.error(f'调试资产统计失败: {str(e)}')
+        return jsonify({'error': str(e)}), 500
