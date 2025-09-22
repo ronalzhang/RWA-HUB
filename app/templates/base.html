@@ -2,9 +2,23 @@
 <html lang="{{ g.locale }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=1200">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
-    
+    <script>
+        (function() {
+            try {
+                var designWidth = 1200;
+                var vp = document.querySelector('meta[name="viewport"]');
+                var w = Math.max(window.innerWidth || 0, document.documentElement.clientWidth || 0);
+                if (w < designWidth && vp) {
+                    var scale = w / designWidth;
+                    if (scale > 1) scale = 1; // 桌面不放大
+                    // 仅在小屏首屏设置一次，允许用户手动缩放
+                    vp.setAttribute('content', 'width=' + designWidth + ', initial-scale=' + scale);
+                }
+            } catch (e) { /* noop */ }
+        })();
+    </script>
     
 
     <!-- 阻止Font Awesome Kit的加载 -->
