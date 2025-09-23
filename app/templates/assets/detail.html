@@ -543,23 +543,72 @@ document.addEventListener('DOMContentLoaded', function() {
         window.spl_token = SolanaToken;
         window.splToken = SolanaToken;
     }
-    
+
     // 初始化页面功能
     initializePage();
 });
 
+// 备用初始化机制，防止DOMContentLoaded未触发
+setTimeout(function() {
+    if (!window.pageInitialized) {
+        console.log('备用初始化触发');
+        initializePage();
+    }
+}, 2000);
+
 // 页面初始化函数
 function initializePage() {
+    if (window.pageInitialized) {
+        console.log('页面已经初始化过，跳过重复初始化');
+        return;
+    }
+
+    window.pageInitialized = true;
     console.log('开始初始化页面...');
-    setupTradeForm();
-    loadTradeHistory();
-    loadTotalDividends();
-    checkDividendAccess();
-    updateBuyButtonState();
+
+    try {
+        setupTradeForm();
+        console.log('交易表单设置完成');
+    } catch (error) {
+        console.error('设置交易表单时出错:', error);
+    }
+
+    try {
+        loadTradeHistory();
+        console.log('开始加载交易历史');
+    } catch (error) {
+        console.error('加载交易历史时出错:', error);
+    }
+
+    try {
+        loadTotalDividends();
+        console.log('开始加载分红信息');
+    } catch (error) {
+        console.error('加载分红信息时出错:', error);
+    }
+
+    try {
+        checkDividendAccess();
+        console.log('检查分红权限完成');
+    } catch (error) {
+        console.error('检查分红权限时出错:', error);
+    }
+
+    try {
+        updateBuyButtonState();
+        console.log('更新购买按钮状态完成');
+    } catch (error) {
+        console.error('更新购买按钮状态时出错:', error);
+    }
 
     // 加载SPL Token信息
     if (window.ASSET_CONFIG && window.ASSET_CONFIG.splMintAddress) {
-        loadSplTokenInfo();
+        try {
+            loadSplTokenInfo();
+            console.log('开始加载SPL Token信息');
+        } catch (error) {
+            console.error('加载SPL Token信息时出错:', error);
+        }
     }
 
     console.log('页面初始化完成');
@@ -1014,6 +1063,8 @@ document.addEventListener('keydown', function(event) {
 async function loadSplTokenInfo() {
     if (!window.ASSET_CONFIG.splMintAddress) {
         console.log('资产尚未创建SPL Token');
+        updateSupplyDisplay(null, 'No SPL Token');
+        updateTokenStatus('warning');
         return;
     }
 
@@ -1027,32 +1078,45 @@ async function loadSplTokenInfo() {
             loadTokenActivity()
         ]);
 
+        console.log('SPL Token API调用结果:', {
+            supply: supplyResult.status,
+            holders: holdersResult.status,
+            activity: activityResult.status
+        });
+
         // 处理供应量信息
         if (supplyResult.status === 'fulfilled' && supplyResult.value.success) {
             updateSupplyDisplay(supplyResult.value.data);
         } else {
-            updateSupplyDisplay(null, 'Error loading');
+            console.warn('供应量信息加载失败:', supplyResult.reason || supplyResult.value);
+            updateSupplyDisplay(null, 'API Error');
         }
 
         // 处理持有者信息
         if (holdersResult.status === 'fulfilled' && holdersResult.value.success) {
             updateHoldersDisplay(holdersResult.value.data);
         } else {
-            updateHoldersDisplay(null, 'Error loading');
+            console.warn('持有者信息加载失败:', holdersResult.reason || holdersResult.value);
+            updateHoldersDisplay(null, 'API Error');
         }
 
         // 处理活动信息
         if (activityResult.status === 'fulfilled' && activityResult.value.success) {
             updateActivityDisplay(activityResult.value.data);
         } else {
-            updateActivityDisplay(null, 'Error loading');
+            console.warn('活动信息加载失败:', activityResult.reason || activityResult.value);
+            updateActivityDisplay(null, 'API Error');
         }
 
         // 更新Token状态
-        updateTokenStatus('healthy');
+        const hasAnySuccess = [supplyResult, holdersResult, activityResult].some(
+            result => result.status === 'fulfilled' && result.value && result.value.success
+        );
+        updateTokenStatus(hasAnySuccess ? 'degraded' : 'error');
 
     } catch (error) {
         console.error('加载SPL Token信息失败:', error);
+        updateSupplyDisplay(null, 'Load Failed');
         updateTokenStatus('error');
     }
 }
