@@ -117,7 +117,7 @@ class SplTokenService:
             if solana_connection is None:
                 initialize_solana_connection()
             client = solana_connection
-            recent_blockhash = client.get_latest_blockhash().value.blockhash
+            recent_blockhash = client.get_latest_blockhash()['result']['value']['blockhash']
 
             # 7. 计算所需的账户租金
             mint_account_space = 82  # SPL Token Mint账户大小
@@ -330,7 +330,7 @@ class SplTokenService:
             logger.info(f"[{operation_id}] 创建了 {len(instructions)} 个指令")
 
             # 8. 构建和发送交易
-            recent_blockhash = client.get_latest_blockhash().value.blockhash
+            recent_blockhash = client.get_latest_blockhash()['result']['value']['blockhash']
             message = Message.new_with_blockhash(
                 instructions,
                 platform_keypair.pubkey(),
@@ -899,7 +899,7 @@ class SplTokenService:
             logger.info(f"[{operation_id}] 创建了 {len(instructions)} 个指令")
 
             # 9. 构建交易
-            recent_blockhash = client.get_latest_blockhash().value.blockhash
+            recent_blockhash = client.get_latest_blockhash()['result']['value']['blockhash']
 
             # 确定交易支付者
             if from_private_key:
@@ -1065,7 +1065,7 @@ class SplTokenService:
             logger.info(f"[{operation_id}] 创建了 {len(instructions)} 个指令")
 
             # 8. 构建并签名交易
-            recent_blockhash = client.get_latest_blockhash().value.blockhash
+            recent_blockhash = client.get_latest_blockhash()['result']['value']['blockhash']
             message = Message.new_with_blockhash(
                 instructions,
                 owner_keypair.pubkey(),
