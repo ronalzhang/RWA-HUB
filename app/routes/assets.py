@@ -11,7 +11,7 @@ from app.models.asset import AssetStatus, AssetType
 from app.models.trade import Trade, TradeType, TradeStatus  # 添加Trade和交易状态枚举
 from app.models.referral import UserReferral as NewUserReferral  # 使用新版UserReferral
 from app.utils import is_admin, save_files
-from app.utils.decorators import eth_address_required, admin_required, permission_required
+from app.utils.decorators import eth_address_required, admin_required, permission_required, wallet_address_required
 from app.utils.storage import storage
 import os
 import json
@@ -223,18 +223,18 @@ def asset_detail_by_symbol(token_symbol):
         return render_template('error.html', error=_('Error accessing asset details')), 500
 
 @assets_bp.route('/create')
-@eth_address_required
+@wallet_address_required
 def create_asset_page():
     """创建资产页面"""
     try:
         # 检查钱包连接状态
-        if not g.eth_address:
+        if not g.wallet_address:
             flash('请先连接钱包', 'error')
             return redirect(url_for('main.index'))
-            
+
         # 记录创建者地址
-        current_app.logger.info(f'用户 {g.eth_address} 访问创建资产页面')
-        return render_template('assets/create.html', creator_address=g.eth_address)
+        current_app.logger.info(f'用户 {g.wallet_address} 访问创建资产页面')
+        return render_template('assets/create.html', creator_address=g.wallet_address)
     except Exception as e:
         current_app.logger.warning(f'加载创建资产页面失败: {str(e)}')
         flash('系统错误，请稍后重试', 'warning')

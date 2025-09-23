@@ -88,7 +88,7 @@ function handleBuy(assetId, amountInput, buyButton) {
   // 设置按钮加载状态
   if (buyButton) {
     buyButton.disabled = true;
-    buyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...';
+    buyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
   }
   
   // 检查资产ID
@@ -119,8 +119,8 @@ function handleBuy(assetId, amountInput, buyButton) {
   // 检查钱包连接状态
   const walletConnected = isWalletConnected();
   if (!walletConnected) {
-    showError('请先连接您的钱包');
-    resetButton(buyButton, '<i class="fas fa-wallet me-2"></i>请先连接钱包');
+    showError('Please connect your wallet first');
+    resetButton(buyButton, '<i class="fas fa-wallet me-2"></i>Connect Wallet First');
     buyButton.disabled = true;
     return;
   }
@@ -138,7 +138,7 @@ function handleBuy(assetId, amountInput, buyButton) {
   };
   
   // 显示加载状态
-  showLoadingState('正在准备购买...');
+  showLoadingState('Preparing purchase...');
   
   // 发送准备购买请求
   console.log('Sending prepare purchase request:', purchaseData);
@@ -173,7 +173,7 @@ function handleBuy(assetId, amountInput, buyButton) {
     }
     
     // 更新加载状态
-    showLoadingState('请在钱包中确认交易...');
+    showLoadingState('Please confirm transaction in your wallet...');
     
     // 检查钱包API是否可用
     if (!window.walletState || typeof window.walletState.transferSolanaToken !== 'function') {
@@ -209,7 +209,7 @@ function handleBuy(assetId, amountInput, buyButton) {
     console.log('Purchase completed:', result);
     
     // 显示成功消息
-    showSuccessMessage('购买成功！', `您已成功购买 ${amount} 个代币，交易将在链上确认后到账。`);
+    showSuccessMessage('Purchase Successful!', `You have successfully purchased ${amount} tokens. They will be credited after on-chain confirmation.`);
     
     // 重置按钮状态
     resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
@@ -226,7 +226,7 @@ function handleBuy(assetId, amountInput, buyButton) {
     console.error('Purchase processing failed:', error);
     
     // 显示错误消息
-    showError(error.message || '购买失败，请稍后重试');
+    showError(error.message || 'Purchase failed, please try again later');
     
     // 重置按钮状态
     resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
@@ -246,7 +246,7 @@ function handleBuy(assetId, amountInput, buyButton) {
  */
 function confirmPurchase(purchaseId, signature, assetId, walletAddress, amount) {
   // 更新加载状态
-  showLoadingState('正在确认购买...');
+  showLoadingState('Confirming purchase...');
   
   // 确认购买数据
   const confirmData = { 
@@ -284,7 +284,7 @@ function confirmPurchase(purchaseId, signature, assetId, walletAddress, amount) 
       success: true,
       transaction_hash: signature,
       purchase_id: purchaseId,
-      message: '购买已确认，交易将在链上完成后到账'
+      message: 'Purchase confirmed, tokens will be credited after on-chain completion'
     };
   });
 }
@@ -346,8 +346,8 @@ function updateBuyButtonState() {
     } else {
         if (shouldLog) console.log('钱包未连接，禁用购买按钮');
       buyButton.disabled = true;
-      buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
-      buyButton.title = '请先连接钱包';
+      buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>Connect Wallet First';
+      buyButton.title = 'Connect wallet first';
       }
     }
   });
@@ -437,7 +437,7 @@ function showSuccessMessage(title, message) {
  * 显示加载状态
  * @param {string} message - 加载消息
  */
-function showLoadingState(message = '处理中...') {
+function showLoadingState(message = 'Processing...') {
   if (typeof window.showLoadingOverlay === 'function') {
     window.showLoadingOverlay(message);
   } else {
