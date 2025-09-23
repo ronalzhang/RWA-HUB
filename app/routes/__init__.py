@@ -51,6 +51,9 @@ from .admin.commission_config import commission_config_bp
 # 导入分红管理
 from .dividend import bp as dividend_bp
 
+# 导入SPL Token管理
+from .spl_token_routes import spl_token_bp
+
 # 注册蓝图到app
 def register_blueprints(app):
     """初始化所有路由"""
@@ -71,6 +74,9 @@ def register_blueprints(app):
     
     # 注册分红管理蓝图
     app.register_blueprint(dividend_bp)
+
+    # 注册SPL Token管理蓝图
+    app.register_blueprint(spl_token_bp)
     
     # 注册API蓝图
     app.register_blueprint(api_bp)
