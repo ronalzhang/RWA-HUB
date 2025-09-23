@@ -530,9 +530,9 @@ def prepare_transaction(user_address, asset_id, token_symbol, amount, price, tra
         
         # 获取最新的区块哈希
         try:
-            recent_blockhash = solana_connection.get_latest_blockhash()
-            if recent_blockhash and 'result' in recent_blockhash:
-                blockhash = recent_blockhash['result']['value']['blockhash']
+            recent_blockhash_response = solana_connection.get_latest_blockhash()
+            if recent_blockhash_response and recent_blockhash_response.value:
+                blockhash = recent_blockhash_response.value.blockhash
                 transaction.set_recent_blockhash(blockhash)
                 logger.info(f"使用真实区块哈希: {blockhash}")
             else:
