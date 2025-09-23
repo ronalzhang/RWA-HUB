@@ -25,7 +25,7 @@ from sqlalchemy import func
 from app.extensions import db
 from app.models import Asset, Trade, Holding
 from app.models.trade import TradeStatus
-from app.blockchain.solana_service import get_solana_client, get_latest_blockhash_with_cache
+from app.blockchain.solana_service import solana_connection, initialize_solana_connection
 from app.utils.crypto_manager import CryptoManager
 from datetime import datetime, timedelta
 
@@ -113,8 +113,11 @@ class SplTokenService:
             platform_pubkey = platform_keypair.pubkey()
 
             # 6. 获取Solana客户端和最新区块哈希
-            client = get_solana_client()
-            recent_blockhash = get_latest_blockhash_with_cache()
+            # 确保连接已初始化
+            if solana_connection is None:
+                initialize_solana_connection()
+            client = solana_connection
+            recent_blockhash = client.get_latest_blockhash().value.blockhash
 
             # 7. 计算所需的账户租金
             mint_account_space = 82  # SPL Token Mint账户大小
@@ -295,7 +298,10 @@ class SplTokenService:
                 }
 
             # 6. 检查用户代币账户是否存在
-            client = get_solana_client()
+            # 确保连接已初始化
+            if solana_connection is None:
+                initialize_solana_connection()
+            client = solana_connection
             account_info = client.get_account_info(user_token_account)
 
             instructions = []
@@ -324,7 +330,7 @@ class SplTokenService:
             logger.info(f"[{operation_id}] 创建了 {len(instructions)} 个指令")
 
             # 8. 构建和发送交易
-            recent_blockhash = get_latest_blockhash_with_cache()
+            recent_blockhash = client.get_latest_blockhash().value.blockhash
             message = Message.new_with_blockhash(
                 instructions,
                 platform_keypair.pubkey(),
@@ -386,7 +392,10 @@ class SplTokenService:
             dict: 包含供应量信息的结果
         """
         try:
-            client = get_solana_client()
+            # 确保连接已初始化
+            if solana_connection is None:
+                initialize_solana_connection()
+            client = solana_connection
             mint_pubkey = Pubkey.from_string(mint_address)
 
             response = client.get_token_supply(mint_pubkey)
@@ -426,7 +435,10 @@ class SplTokenService:
             dict: 用户代币余额信息
         """
         try:
-            client = get_solana_client()
+            # 确保连接已初始化
+            if solana_connection is None:
+                initialize_solana_connection()
+            client = solana_connection
             user_pubkey = Pubkey.from_string(user_address)
             mint_pubkey = Pubkey.from_string(mint_address)
 
@@ -833,7 +845,10 @@ class SplTokenService:
             to_token_account = get_associated_token_address(to_pubkey, mint_pubkey)
 
             # 4. 获取Solana客户端
-            client = get_solana_client()
+            # 确保连接已初始化
+            if solana_connection is None:
+                initialize_solana_connection()
+            client = solana_connection
 
             # 5. 检查发送者代币账户余额
             from_account_info = client.get_token_account_balance(from_token_account)
@@ -884,7 +899,7 @@ class SplTokenService:
             logger.info(f"[{operation_id}] 创建了 {len(instructions)} 个指令")
 
             # 9. 构建交易
-            recent_blockhash = get_latest_blockhash_with_cache()
+            recent_blockhash = client.get_latest_blockhash().value.blockhash
 
             # 确定交易支付者
             if from_private_key:
@@ -998,7 +1013,10 @@ class SplTokenService:
             owner_token_account = get_associated_token_address(owner_pubkey, mint_pubkey)
 
             # 4. 获取Solana客户端
-            client = get_solana_client()
+            # 确保连接已初始化
+            if solana_connection is None:
+                initialize_solana_connection()
+            client = solana_connection
 
             # 5. 检查拥有者代币账户余额
             account_info = client.get_token_account_balance(owner_token_account)
@@ -1047,7 +1065,7 @@ class SplTokenService:
             logger.info(f"[{operation_id}] 创建了 {len(instructions)} 个指令")
 
             # 8. 构建并签名交易
-            recent_blockhash = get_latest_blockhash_with_cache()
+            recent_blockhash = client.get_latest_blockhash().value.blockhash
             message = Message.new_with_blockhash(
                 instructions,
                 owner_keypair.pubkey(),
@@ -1221,7 +1239,10 @@ class SplTokenService:
         logger.info(f"[{operation_id}] 获取Token供应量信息: {mint_address}")
 
         try:
-            client = get_solana_client()
+            # 确保连接已初始化
+            if solana_connection is None:
+                initialize_solana_connection()
+            client = solana_connection
             mint_pubkey = Pubkey.from_string(mint_address)
 
             # 获取mint账户信息
@@ -1286,7 +1307,10 @@ class SplTokenService:
         logger.info(f"[{operation_id}] 获取Token持有者数量: {mint_address}")
 
         try:
-            client = get_solana_client()
+            # 确保连接已初始化
+            if solana_connection is None:
+                initialize_solana_connection()
+            client = solana_connection
             mint_pubkey = Pubkey.from_string(mint_address)
 
             # 获取所有关联代币账户
