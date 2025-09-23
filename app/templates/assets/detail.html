@@ -427,7 +427,7 @@ window.ASSET_CONFIG = {
 
 // 分享功能
 window.shareAsset = function() {
-    console.log('分享功能被调用');
+    console.log('Share function called');
     
     // 显示模态框
     const modal = document.getElementById('shareModal');
@@ -437,12 +437,12 @@ window.shareAsset = function() {
         
         // 获取钱包地址用于创建短链接
         const ethAddress = localStorage.getItem('eth_address') || window.ethereum?.selectedAddress;
-        console.log('当前钱包地址:', ethAddress);
+        console.log('Current wallet address:', ethAddress);
         
         // 构建分享链接（包含推荐码）
         const baseUrl = window.location.origin + window.location.pathname;
         const shareUrl = ethAddress ? `${baseUrl}?ref=${ethAddress.slice(-8)}` : baseUrl;
-        console.log('原始分享链接:', shareUrl);
+        console.log('Original share link:', shareUrl);
         
         // 并行获取分享消息和创建短链接
         Promise.all([
@@ -457,7 +457,7 @@ window.shareAsset = function() {
                     }
                 })
                 .catch(error => {
-                    console.error('获取分享消息失败:', error);
+                    console.error('Failed to get share message:', error);
                     return '🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，高透明度，稳定收益。';
                 }),
             
@@ -482,13 +482,13 @@ window.shareAsset = function() {
                     }
                 })
                 .catch(error => {
-                    console.error('创建短链接失败:', error);
+                    console.error('Failed to create short link:', error);
                     return shareUrl; // 如果短链接创建失败，使用原始链接
                 })
         ])
         .then(([shareMessage, finalShareUrl]) => {
-            console.log('获取到分享消息:', shareMessage);
-            console.log('最终分享链接:', finalShareUrl);
+            console.log('Got share message:', shareMessage);
+            console.log('Final share URL:', finalShareUrl);
             
             // 更新模态框内容
             const messageElement = document.querySelector('#shareModal .modal-body .alert p');
@@ -505,7 +505,7 @@ window.shareAsset = function() {
             window.currentShareUrl = finalShareUrl;
         })
         .catch(error => {
-            console.error('分享准备失败:', error);
+            console.error('Share preparation failed:', error);
             // 使用默认值
             const messageElement = document.querySelector('#shareModal .modal-body .alert p');
             if (messageElement) {
@@ -525,11 +525,11 @@ window.shareAsset = function() {
 // 检查DOM中是否存在分红按钮
 document.addEventListener('DOMContentLoaded', function() {
     const dividendBtn = document.getElementById('dividendManagementBtn');
-    console.log('分红按钮DOM检查:');
-    console.log('- 分红按钮存在:', !!dividendBtn);
+    console.log('Dividend button DOM check:');
+    console.log('- Dividend button exists:', !!dividendBtn);
     if (dividendBtn) {
-        console.log('- 分红按钮可见:', dividendBtn.style.display !== 'none');
-        console.log('- 分红按钮HTML:', dividendBtn.outerHTML);
+        console.log('- Dividend button visible:', dividendBtn.style.display !== 'none');
+        console.log('- Dividend button HTML:', dividendBtn.outerHTML);
     }
 });
 
@@ -551,7 +551,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // 备用初始化机制，防止DOMContentLoaded未触发
 setTimeout(function() {
     if (!window.pageInitialized) {
-        console.log('备用初始化触发');
+        console.log('Backup initialization triggered');
         initializePage();
     }
 }, 2000);
@@ -559,44 +559,44 @@ setTimeout(function() {
 // 页面初始化函数
 function initializePage() {
     if (window.pageInitialized) {
-        console.log('页面已经初始化过，跳过重复初始化');
+        console.log('Page already initialized, skipping duplicate initialization');
         return;
     }
 
     window.pageInitialized = true;
-    console.log('开始初始化页面...');
+    console.log('Starting page initialization...');
 
     try {
         setupTradeForm();
-        console.log('交易表单设置完成');
+        console.log('Trade form setup completed');
     } catch (error) {
-        console.error('设置交易表单时出错:', error);
+        console.error('Error setting up trade form:', error);
     }
 
     try {
         loadTradeHistory();
-        console.log('开始加载交易历史');
+        console.log('Starting to load trade history');
     } catch (error) {
-        console.error('加载交易历史时出错:', error);
+        console.error('Error loading trade history:', error);
     }
 
     try {
         loadTotalDividends();
-        console.log('开始加载分红信息');
+        console.log('Starting to load dividend info');
     } catch (error) {
-        console.error('加载分红信息时出错:', error);
+        console.error('Error loading dividend info:', error);
     }
 
     try {
         checkDividendAccess();
-        console.log('检查分红权限完成');
+        console.log('Dividend access check completed');
     } catch (error) {
-        console.error('检查分红权限时出错:', error);
+        console.error('Error checking dividend access:', error);
     }
 
     try {
         updateBuyButtonState();
-        console.log('更新购买按钮状态完成');
+        console.log('Buy button state update completed');
     } catch (error) {
         console.error('更新购买按钮状态时出错:', error);
     }

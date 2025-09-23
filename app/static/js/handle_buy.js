@@ -31,7 +31,7 @@ function updatePriceDisplay() {
     const buyButton = document.getElementById('buy-button');
     
     if (!amountInput || !totalPriceDisplay || !buyButton) {
-      console.log('价格更新：找不到必要元素');
+      console.log('Price update: Required elements not found');
       return;
     }
     
@@ -43,9 +43,9 @@ function updatePriceDisplay() {
     const totalPrice = (amount * pricePerToken).toFixed(2);
     totalPriceDisplay.value = totalPrice;
     
-    console.log(`价格更新：${amount} × ${pricePerToken} = ${totalPrice}`);
+    console.log(`Price update: ${amount} × ${pricePerToken} = ${totalPrice}`);
   } catch (error) {
-    console.error('更新价格显示失败:', error);
+    console.error('Failed to update price display:', error);
   }
 }
 
@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
  * @param {HTMLElement} buyButton - 购买按钮元素
  */
 function handleBuy(assetId, amountInput, buyButton) {
-  console.log('购买函数被调用:', { assetId });
+  console.log('Buy function called:', { assetId });
   
   // 如果已有计时器运行，清除它
   if (window.buyTimeoutId) {
@@ -81,7 +81,7 @@ function handleBuy(assetId, amountInput, buyButton) {
   
   // 防止重复点击
   if (buyButton && buyButton.disabled) {
-    console.log('购买处理中，请稍候...');
+    console.log('Purchase processing, please wait...');
     return;
   }
   
@@ -93,7 +93,7 @@ function handleBuy(assetId, amountInput, buyButton) {
   
   // 检查资产ID
   if (!assetId) {
-    console.error('资产ID未提供');
+    console.error('Asset ID not provided');
     resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
     showError('资产ID未提供，无法完成交易');
     return;
@@ -141,7 +141,7 @@ function handleBuy(assetId, amountInput, buyButton) {
   showLoadingState('正在准备购买...');
   
   // 发送准备购买请求
-  console.log('发送准备购买请求:', purchaseData);
+  console.log('Sending prepare purchase request:', purchaseData);
   fetch('/api/trades/prepare_purchase', {
     method: 'POST',
     headers: {
@@ -158,7 +158,7 @@ function handleBuy(assetId, amountInput, buyButton) {
     return response.json();
   })
   .then(data => {
-    console.log('准备购买响应:', data);
+    console.log('Prepare purchase response:', data);
     
     if (data.error) {
       throw new Error(data.error);
@@ -186,14 +186,14 @@ function handleBuy(assetId, amountInput, buyButton) {
     purchaseData.purchase_id = data.purchase_id || data.id;
     
     // 执行支付
-    console.log(`使用钱包API执行USDC转账: ${totalAmount} USDC 到 ${recipientAddress}`);
+    console.log(`Executing USDC transfer via wallet API: ${totalAmount} USDC to ${recipientAddress}`);
     return window.walletState.transferSolanaToken('USDC', recipientAddress, totalAmount)
       .then(paymentResult => {
         if (!paymentResult.success) {
           throw new Error(paymentResult.error || '钱包转账失败');
         }
         
-        console.log('支付成功，交易哈希:', paymentResult.txHash);
+        console.log('Payment successful, transaction hash:', paymentResult.txHash);
         
         // 确认购买
         return confirmPurchase(
@@ -206,7 +206,7 @@ function handleBuy(assetId, amountInput, buyButton) {
       });
   })
   .then(result => {
-    console.log('购买完成:', result);
+    console.log('Purchase completed:', result);
     
     // 显示成功消息
     showSuccessMessage('购买成功！', `您已成功购买 ${amount} 个代币，交易将在链上确认后到账。`);
@@ -223,7 +223,7 @@ function handleBuy(assetId, amountInput, buyButton) {
     }, 3000);
   })
   .catch(error => {
-    console.error('购买处理失败:', error);
+    console.error('Purchase processing failed:', error);
     
     // 显示错误消息
     showError(error.message || '购买失败，请稍后重试');
@@ -257,7 +257,7 @@ function confirmPurchase(purchaseId, signature, assetId, walletAddress, amount) 
     amount: amount
   };
   
-  console.log('发送确认购买请求:', confirmData);
+  console.log('Sending confirm purchase request:', confirmData);
   
   // 发送确认购买请求
   return fetch('/api/trades/confirm_purchase', {
@@ -279,7 +279,7 @@ function confirmPurchase(purchaseId, signature, assetId, walletAddress, amount) 
       throw new Error(data.error);
     }
     
-    console.log('确认购买成功:', data);
+    console.log('Confirm purchase successful:', data);
     return {
       success: true,
       transaction_hash: signature,
