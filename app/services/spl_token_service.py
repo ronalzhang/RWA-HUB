@@ -1273,6 +1273,17 @@ class SplTokenService:
                     'message': 'Mint账户数据为空'
                 }
 
+            # 处理不同格式的data字段
+            if isinstance(data_str, list) and len(data_str) > 0:
+                # 如果data是列表格式，取第一个元素作为base64字符串
+                data_str = data_str[0]
+            elif not isinstance(data_str, str):
+                return {
+                    'success': False,
+                    'error': 'INVALID_MINT_DATA',
+                    'message': f'Mint账户数据格式无效: {type(data_str)}'
+                }
+
             # 解码base64数据
             import base64
             try:
