@@ -213,13 +213,13 @@ function updateUiForAdminStatus(isAdmin) {
     // 类不动产代币数量
         const tokenSupplyInput = document.getElementById('token_supply');
         if (tokenSupplyInput) {
-        tokenSupplyInput.addEventListener('input', updateTokenPriceSimilar);
+        tokenSupplyInput.addEventListener('input', updateTotalValueSimilar);
         }
-        
-    // 类不动产总价值
-        const totalValueSimilarInput = document.getElementById('total_value_similar');
-        if (totalValueSimilarInput) {
-        totalValueSimilarInput.addEventListener('input', updateTokenPriceSimilar);
+
+    // 类不动产代币价格
+        const tokenPriceSimilarInput = document.getElementById('token_price_similar');
+        if (tokenPriceSimilarInput) {
+            tokenPriceSimilarInput.addEventListener('input', updateTotalValueSimilar);
         }
 
     // 准不动产代币数量
@@ -452,24 +452,24 @@ function updateTokenPrice() {
     calculatePublishingFee();
             }
 
-// 更新类不动产代币价格
-function updateTokenPriceSimilar() {
-            const tokenSupply = parseInt(document.getElementById('token_supply').value) || 0;
-            const totalValue = parseFloat(document.getElementById('total_value_similar').value) || 0;
-            const tokenPriceElement = document.getElementById('calculatedTokenPriceSimilar');
-            
-    if (!tokenPriceElement) return;
-    
-                if (tokenSupply > 0 && totalValue > 0) {
-                    const tokenPrice = totalValue / tokenSupply;
-                    tokenPriceElement.textContent = tokenPrice.toFixed(CONFIG.CALCULATION.PRICE_DECIMALS);
-                } else {
-                    tokenPriceElement.textContent = '0.000000';
-        }
-        
-    // 计算发布费用
-        calculatePublishingFee();
+// 更新证券总价值 (Securities)
+function updateTotalValueSimilar() {
+    const tokenSupply = parseInt(document.getElementById('token_supply').value) || 0;
+    const tokenPrice = parseFloat(document.getElementById('token_price_similar').value) || 0;
+    const totalValueElement = document.getElementById('calculatedTotalValueSimilar');
+
+    if (!totalValueElement) return;
+
+    if (tokenSupply > 0 && tokenPrice > 0) {
+        const totalValue = tokenSupply * tokenPrice;
+        totalValueElement.textContent = totalValue.toFixed(CONFIG.CALCULATION.VALUE_DECIMALS);
+    } else {
+        totalValueElement.textContent = '0.00';
     }
+
+    // 计算发布费用
+    calculatePublishingFee();
+}
 
 // 更新准不动产总价值
 function updateTotalValueQuasi() {
@@ -1148,10 +1148,10 @@ function validateForm() {
             return false;
             }
 
-        // 检查total_value_similar字段
-        const totalValueInput = form.elements['total_value_similar'];
-        if (!totalValueInput || !parseFloat(totalValueInput.value)) {
-            showError(`Please fill in ${getFieldLabel('total_value')}`);
+        // 检查token_price_similar字段
+        const tokenPriceInput = form.elements['token_price_similar'];
+        if (!tokenPriceInput || !parseFloat(tokenPriceInput.value)) {
+            showError(`Please fill in Token Price`);
             return false;
         }
     } else if (assetType === '30') { // 准不动产 (Quasi Property)
@@ -1960,12 +1960,12 @@ function getAssetFormData() {
         const annualRevenueElement = form.elements['annual_revenue'];
         formData.annual_revenue = annualRevenueElement ? (parseFloat(annualRevenueElement.value) || 1) : 1;
     } else if (assetType === '20') { // 证券 (Securities)
-        formData.total_value = parseFloat(form.elements['total_value_similar'].value) || 0;
         formData.token_supply = parseInt(form.elements['token_supply'].value) || 0;
+        formData.token_price = parseFloat(form.elements['token_price_similar'].value) || 0;
 
-        // 代币价格可能是自动计算的
-        const tokenPriceElement = document.getElementById('calculatedTokenPriceSimilar');
-        formData.token_price = parseFloat(tokenPriceElement.textContent) || 0;
+        // 总价值是自动计算的
+        const totalValueElement = document.getElementById('calculatedTotalValueSimilar');
+        formData.total_value = parseFloat(totalValueElement.textContent) || 0;
 
         // 年收益率 - 首先检查元素是否存在
         const annualRevenueElement = form.elements['annual_revenue'];

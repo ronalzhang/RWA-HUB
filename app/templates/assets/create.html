@@ -355,16 +355,16 @@
                                         <div class="invalid-feedback">{{ _('Please enter valid token count (greater than 0)') }}</div>
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label for="total_value_similar" class="form-label">{{ _('Total Value (USDC)') }} <span class="text-danger">*</span></label>
-                                        <input type="number" class="form-control" id="total_value_similar" name="total_value_similar" step="0.01" min="0.01" placeholder="0.00">
-                                        <div class="invalid-feedback">{{ _('Please enter valid total value (greater than 0)') }}</div>
+                                        <label for="token_price_similar" class="form-label">{{ _('Token Price (USDC)') }} <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="token_price_similar" name="token_price_similar" step="0.000001" min="0.000001" placeholder="0.000000">
+                                        <div class="invalid-feedback">{{ _('Please enter valid token price (greater than 0)') }}</div>
                                     </div>
                                 </div>
                                 <div class="row mb-3">
                                     <div class="col-md-6">
-                                        <label class="form-label">{{ _('Token Price (USDC)') }}</label>
-                                        <div class="form-control" id="calculatedTokenPriceSimilar">0.000000</div>
-                                        <small class="form-text text-muted">{{ _('Total Value / Token Count') }}</small>
+                                        <label class="form-label">{{ _('Total Value (USDC)') }}</label>
+                                        <div class="form-control bg-light" id="calculatedTotalValueSimilar">0.00</div>
+                                        <small class="form-text text-muted">{{ _('Token Count × Token Price') }}</small>
                                     </div>
                                     <div class="col-md-6">
                                         <label for="expectedAnnualRevenueSimilar" class="form-label">{{ _('Expected Annual Revenue*') }}</label>

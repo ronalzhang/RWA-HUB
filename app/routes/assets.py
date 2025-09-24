@@ -499,7 +499,8 @@ def calculate_tokens():
             token_price = total_value / token_count if token_count > 0 else 0
         elif asset_type == '20':  # 证券 (Securities)
             token_count = int(data.get('token_count', 0))
-            token_price = total_value / token_count if token_count > 0 else 0
+            token_price = float(data.get('token_price', 0))
+            total_value = token_count * token_price
         elif asset_type == '30':  # 准不动产 (Quasi Property)
             token_count = int(data.get('token_count', 0))
             token_price = float(data.get('token_price', 0))
