@@ -1270,52 +1270,55 @@ async function performTokenHealthCheck(mintAddress) {
 
 // 显示健康检查结果模态框
 function showHealthCheckModal(healthData) {
-    const modalHtml = `
-        <div class="modal fade" id="healthCheckModal" tabindex="-1" style="z-index: 10000;">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-heartbeat me-2"></i>Token Health Check Results
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <strong>Overall Status:</strong>
-                                <span class="badge bg-${getStatusColor(healthData.overall_status.status)} ms-2">
-                                    ${healthData.overall_status.status.toUpperCase()}
-                                </span>
-                            </div>
-                            <div class="col-md-6">
-                                <strong>Health Score:</strong> ${healthData.overall_status.health_score}%
-                            </div>
-                        </div>
+    // 构建检查详情HTML
+    let checksHtml = '';
+    if (healthData.checks) {
+        for (const [checkName, checkData] of Object.entries(healthData.checks)) {
+            checksHtml += '<div class="list-group-item d-flex justify-content-between align-items-center">';
+            checksHtml += '<div>';
+            checksHtml += '<strong>' + formatCheckName(checkName) + ':</strong>';
+            checksHtml += '<div class="small text-muted">' + checkData.message + '</div>';
+            checksHtml += '</div>';
+            checksHtml += '<span class="badge bg-' + getCheckStatusColor(checkData.status) + '">';
+            checksHtml += checkData.status.toUpperCase();
+            checksHtml += '</span>';
+            checksHtml += '</div>';
+        }
+    }
 
-                        <h6>Check Details:</h6>
-                        <div class="list-group">
-                            ${Object.entries(healthData.checks).map(([checkName, checkData]) =>
-                                '<div class="list-group-item d-flex justify-content-between align-items-center">' +
-                                    '<div>' +
-                                        '<strong>' + formatCheckName(checkName) + ':</strong>' +
-                                        '<div class="small text-muted">' + checkData.message + '</div>' +
-                                    '</div>' +
-                                    '<span class="badge bg-' + getCheckStatusColor(checkData.status) + '">' +
-                                        checkData.status.toUpperCase() +
-                                    '</span>' +
-                                '</div>'
-                            ).join('')}
-                        </div>
-
-                        <div class="mt-3 small text-muted">
-                            Checked at: ${new Date(healthData.timestamp * 1000).toLocaleString()}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
+    const modalHtml =
+        '<div class="modal fade" id="healthCheckModal" tabindex="-1" style="z-index: 10000;">' +
+            '<div class="modal-dialog modal-lg">' +
+                '<div class="modal-content">' +
+                    '<div class="modal-header">' +
+                        '<h5 class="modal-title">' +
+                            '<i class="fas fa-heartbeat me-2"></i>Token Health Check Results' +
+                        '</h5>' +
+                        '<button type="button" class="btn-close" data-bs-dismiss="modal"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                        '<div class="row mb-3">' +
+                            '<div class="col-md-6">' +
+                                '<strong>Overall Status:</strong>' +
+                                '<span class="badge bg-' + getStatusColor(healthData.overall_status.status) + ' ms-2">' +
+                                    healthData.overall_status.status.toUpperCase() +
+                                '</span>' +
+                            '</div>' +
+                            '<div class="col-md-6">' +
+                                '<strong>Health Score:</strong> ' + healthData.overall_status.health_score + '%' +
+                            '</div>' +
+                        '</div>' +
+                        '<h6>Check Details:</h6>' +
+                        '<div class="list-group">' +
+                            checksHtml +
+                        '</div>' +
+                        '<div class="mt-3 small text-muted">' +
+                            'Checked at: ' + new Date(healthData.timestamp * 1000).toLocaleString() +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
 
     // 移除现有模态框
     const existingModal = document.getElementById('healthCheckModal');
