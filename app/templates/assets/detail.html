@@ -559,68 +559,53 @@ setTimeout(function() {
 // 页面初始化函数
 function initializePage() {
     if (window.pageInitialized) {
-        console.log('Page already initialized, skipping duplicate initialization');
         return;
     }
 
     window.pageInitialized = true;
-    console.log('Starting page initialization...');
 
     try {
         setupTradeForm();
-        console.log('Trade form setup completed');
     } catch (error) {
         console.error('Error setting up trade form:', error);
     }
 
     try {
         loadTradeHistory();
-        console.log('Starting to load trade history');
     } catch (error) {
         console.error('Error loading trade history:', error);
     }
 
     try {
         loadTotalDividends();
-        console.log('Starting to load dividend info');
     } catch (error) {
         console.error('Error loading dividend info:', error);
     }
 
     try {
         checkDividendAccess();
-        console.log('Dividend access check completed');
     } catch (error) {
         console.error('Error checking dividend access:', error);
     }
 
     try {
         updateBuyButtonState();
-        console.log('Buy button state update completed');
     } catch (error) {
-        console.error('更新购买按钮状态时出错:', error);
+        console.error('Error updating buy button state:', error);
     }
 
     // 加载SPL Token信息
-    console.log('检查SPL Token加载条件:');
-    console.log('- window.ASSET_CONFIG:', window.ASSET_CONFIG);
-    console.log('- splMintAddress:', window.ASSET_CONFIG ? window.ASSET_CONFIG.splMintAddress : 'undefined');
-
     if (window.ASSET_CONFIG && window.ASSET_CONFIG.splMintAddress) {
         try {
             loadSplTokenInfo();
-            console.log('开始加载SPL Token信息');
         } catch (error) {
-            console.error('加载SPL Token信息时出错:', error);
+            console.error('Error loading SPL Token info:', error);
         }
     } else {
-        console.log('跳过SPL Token信息加载 - 未满足条件');
         // 直接显示无Token状态
-        updateSupplyDisplay(null, 'No SPL Token');
-        updateTokenStatus('warning');
+        updateSupplyDisplay(null, 'Token Not Created');
+        updateTokenStatus('warning', 'No Token');
     }
-
-    console.log('页面初始化完成');
 }
 
 // 设置交易表单
@@ -710,14 +695,9 @@ function checkDividendAccess() {
 // 加载交易历史
 async function loadTradeHistory(page = 1) {
     const container = document.getElementById('trade-history');
-    if (!container) {
-        console.error('交易历史容器不存在');
-        return;
-    }
+    if (!container) return;
 
     try {
-        console.log(`开始加载交易历史，页码: ${page}, 资产ID: ${window.ASSET_CONFIG.id}`);
-        console.log('API URL:', `/api/trades?asset_id=${window.ASSET_CONFIG.id}&page=${page}&per_page=5`);
         container.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p class="mt-2">Loading trading history...</p></div>';
 
         const response = await fetch(`/api/trades?asset_id=${window.ASSET_CONFIG.id}&page=${page}&per_page=5`, {
@@ -727,15 +707,12 @@ async function loadTradeHistory(page = 1) {
             }
         });
 
-        console.log(`交易历史API响应状态: ${response.status}`);
-
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
         const data = await response.json();
-        console.log('交易历史API返回数据:', data);
-        
+
         if (!data.trades || data.trades.length === 0) {
             container.innerHTML = `
                 <div class="text-center py-4">
@@ -755,7 +732,7 @@ async function loadTradeHistory(page = 1) {
 
             return;
         }
-                
+
         // 创建表格
         const table = document.createElement('table');
         table.className = 'table table-striped';
@@ -772,22 +749,21 @@ async function loadTradeHistory(page = 1) {
             </thead>
             <tbody></tbody>
         `;
-        
+
         const tbody = table.querySelector('tbody');
         data.trades.forEach(trade => {
             const row = createTradeRow(trade);
             tbody.appendChild(row);
         });
-        
+
         container.innerHTML = '';
         container.appendChild(table);
-        
+
         // 更新分页
         if (data.pagination) {
             updatePagination(data.pagination);
         }
-        
-        console.log(`交易历史加载完成，显示 ${data.trades.length} 条记录`);
+
     } catch (error) {
         console.error('Failed to Load Trade History:', error);
         container.innerHTML = `
@@ -875,34 +851,26 @@ function updatePagination(pagination) {
 // 加载累计分红信息
 async function loadTotalDividends() {
     const element = document.getElementById('totalDividendsDistributed');
-    if (!element) {
-        console.error('分红信息元素不存在');
-        return;
-    }
-    
+    if (!element) return;
+
     try {
-        console.log(`开始加载分红信息，Token Symbol: ${window.ASSET_CONFIG.tokenSymbol}`);
         element.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Loading...';
-        
+
         const response = await fetch(`/api/assets/symbol/${window.ASSET_CONFIG.tokenSymbol}/dividend_stats`, {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             }
         });
-        
-        console.log(`分红API响应状态: ${response.status}`);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const stats = await response.json();
-        console.log('分红API返回数据:', stats);
-        
+
         if (stats.success) {
             element.innerHTML = `${Number(stats.total_amount || 0).toLocaleString()} USDC`;
-            console.log(`分红信息加载完成: ${stats.total_amount} USDC`);
         } else {
             throw new Error(stats.error || 'Unknown error');
         }
@@ -1072,13 +1040,10 @@ document.addEventListener('keydown', function(event) {
 // 加载SPL Token信息
 async function loadSplTokenInfo() {
     if (!window.ASSET_CONFIG.splMintAddress) {
-        console.log('资产尚未创建SPL Token');
-        updateSupplyDisplay(null, 'No SPL Token');
-        updateTokenStatus('warning');
+        updateSupplyDisplay(null, 'Token Not Created');
+        updateTokenStatus('warning', 'No Token');
         return;
     }
-
-    console.log('开始加载SPL Token信息:', window.ASSET_CONFIG.splMintAddress);
 
     try {
         // 并行加载各种信息
@@ -1088,17 +1053,10 @@ async function loadSplTokenInfo() {
             loadTokenActivity()
         ]);
 
-        console.log('SPL Token API调用结果:', {
-            supply: supplyResult.status,
-            holders: holdersResult.status,
-            activity: activityResult.status
-        });
-
         // 处理供应量信息
         if (supplyResult.status === 'fulfilled' && supplyResult.value.success) {
             updateSupplyDisplay(supplyResult.value.data);
         } else {
-            console.warn('供应量信息加载失败:', supplyResult.reason || supplyResult.value);
             const errorMsg = getTokenErrorMessage(supplyResult.value);
             updateSupplyDisplay(null, errorMsg);
         }
@@ -1107,7 +1065,6 @@ async function loadSplTokenInfo() {
         if (holdersResult.status === 'fulfilled' && holdersResult.value.success) {
             updateHoldersDisplay(holdersResult.value.data);
         } else {
-            console.warn('持有者信息加载失败:', holdersResult.reason || holdersResult.value);
             const errorMsg = getTokenErrorMessage(holdersResult.value);
             updateHoldersDisplay(null, errorMsg);
         }
@@ -1116,7 +1073,6 @@ async function loadSplTokenInfo() {
         if (activityResult.status === 'fulfilled' && activityResult.value.success) {
             updateActivityDisplay(activityResult.value.data);
         } else {
-            console.warn('活动信息加载失败:', activityResult.reason || activityResult.value);
             const errorMsg = getTokenErrorMessage(activityResult.value);
             updateActivityDisplay(null, errorMsg);
         }
@@ -1139,7 +1095,7 @@ async function loadSplTokenInfo() {
         }
 
     } catch (error) {
-        console.error('加载SPL Token信息失败:', error);
+        console.error('Failed to load SPL Token info:', error);
         updateSupplyDisplay(null, 'Load Failed');
         updateTokenStatus('error');
     }
