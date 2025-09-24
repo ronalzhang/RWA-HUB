@@ -1243,10 +1243,9 @@ class SplTokenService:
             if solana_connection is None:
                 initialize_solana_connection()
             client = solana_connection
-            mint_pubkey = Pubkey.from_string(mint_address)
 
-            # 获取mint账户信息
-            mint_info = client.get_account_info(mint_pubkey)
+            # 直接使用字符串地址而不是Pubkey对象，避免JSON序列化错误
+            mint_info = client.get_account_info(mint_address)
 
             # 检查RPC响应结构
             if not mint_info or 'result' not in mint_info:
