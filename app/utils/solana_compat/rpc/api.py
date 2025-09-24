@@ -28,7 +28,14 @@ class Client:
         # 始终尝试发送真实的RPC请求
         try:
             logger.info(f"发送Solana RPC请求: {method} 到 {self.endpoint}")
-            logger.debug(f"请求参数: {json.dumps(params) if params else 'None'}")
+            # 安全的参数日志记录，避免JSON序列化错误
+            if params:
+                try:
+                    logger.debug(f"请求参数: {json.dumps(params)}")
+                except (TypeError, ValueError):
+                    logger.debug(f"请求参数: {params} (无法JSON序列化)")
+            else:
+                logger.debug("请求参数: None")
             
             response = self.session.post(self.endpoint, json=data, timeout=30)
             
