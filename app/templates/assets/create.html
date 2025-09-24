@@ -5,31 +5,40 @@
 {% block head %}
 <style>
     .dropzone[data-page="create-asset"] {
-        border: 2px dashed #dee2e6;
-        border-radius: 0.5rem;
-        padding: 2rem;
+        border: 3px dashed #bbb;
+        border-radius: 12px;
+        padding: 3rem 2rem;
         text-align: center;
         cursor: pointer;
-        transition: border-color 0.3s ease;
+        transition: all 0.3s ease;
         background-color: #f8f9fa;
+        min-height: 150px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        position: relative;
     }
 
     .dropzone[data-page="create-asset"]:hover,
     .dropzone[data-page="create-asset"].border-primary {
         border-color: #0d6efd;
-        background-color: #fff;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e3f2fd 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(13, 110, 253, 0.15);
     }
 
     .dropzone[data-page="create-asset"] i {
-        font-size: 2rem;
-        color: #adb5bd;
-        margin-bottom: 1rem;
+        font-size: 3.5rem;
+        color: #6c757d;
+        margin-bottom: 1.5rem;
         display: block;
-        transition: color 0.3s ease;
+        transition: all 0.3s ease;
     }
 
     .dropzone[data-page="create-asset"]:hover i {
         color: #0d6efd;
+        transform: scale(1.1);
     }
 
     .form-control.bg-light {
@@ -223,6 +232,36 @@
     .token-symbol-container .form-control:disabled {
         cursor: not-allowed;
     }
+
+    /* 增强拖拽区域的点击提示 */
+    .dropzone[data-page="create-asset"]::after {
+        content: "📤 点击或拖拽上传";
+        position: absolute;
+        bottom: 15px;
+        right: 20px;
+        font-size: 0.75rem;
+        color: #6c757d;
+        background: rgba(255,255,255,0.8);
+        padding: 4px 8px;
+        border-radius: 12px;
+        backdrop-filter: blur(2px);
+        transition: all 0.3s ease;
+    }
+
+    .dropzone[data-page="create-asset"]:hover::after {
+        color: #0d6efd;
+        background: rgba(13, 110, 253, 0.1);
+    }
+
+    /* 文档上传区域保持较小 */
+    #documentDropzone {
+        min-height: 100px;
+        padding: 2rem;
+    }
+
+    #documentDropzone i {
+        font-size: 2.5rem !important;
+    }
 </style>
 {% endblock %}
 
@@ -407,13 +446,14 @@
                     <!-- 图片上传 -->
                     <div class="card mb-4">
                         <div class="card-header">
-                            <h5 class="card-title mb-0">{{ _('Asset Images') }} <small class="text-muted">{{ _('(Optional)') }}</small></h5>
+                            <h5 class="card-title mb-0">{{ _('Asset Images') }} <span class="text-danger">*</span></h5>
                         </div>
                         <div class="card-body">
                             <div class="dropzone" data-page="create-asset" id="imageDropzone">
-                                <i class="fas fa-cloud-upload-alt text-muted"></i>
-                                <p class="mb-0 text-muted">{{ _('Drag and drop images here or click to select') }}</p>
-                                <small class="text-muted d-block mt-2">{{ _('Maximum 5 files, 5MB each. Supported formats: JPG, PNG') }}</small>
+                                <i class="fas fa-images"></i>
+                                <h6 class="mb-2 fw-bold">{{ _('Upload Asset Images') }}</h6>
+                                <p class="mb-2 text-muted fs-6">{{ _('Drag and drop images here or click to select files') }}</p>
+                                <small class="text-muted d-block">{{ _('Required: 1-5 images, max 5MB each. Supported: JPG, PNG, WEBP') }}</small>
                                 <input type="file" id="imageInput" multiple accept="image/*" class="d-none">
                             </div>
                             <div id="imageUploadProgress" class="upload-progress">
