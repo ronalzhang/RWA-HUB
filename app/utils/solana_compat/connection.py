@@ -9,6 +9,9 @@ class Connection:
     
     def __init__(self, endpoint: str, commitment: Optional[str] = "confirmed"):
         """初始化连接"""
+        # 确保commitment是字符串，防止意外传入Pubkey对象
+        if commitment is not None and not isinstance(commitment, str):
+            commitment = str(commitment)
         self.commitment = commitment
         self.rpc_client = Client(endpoint)
     
@@ -17,16 +20,22 @@ class Connection:
     ) -> Dict[str, Any]:
         """
         获取账户信息
-        
+
         Args:
             public_key: 要获取信息的账户公钥
             commitment: 可选的承诺级别
-            
+
         Returns:
             Dict包含账户信息
         """
+        # 确保public_key是字符串
         pubkey_str = str(public_key) if isinstance(public_key, PublicKey) else public_key
-        return self.rpc_client.get_account_info(pubkey_str, commitment or self.commitment)
+        # 确保commitment是字符串或None
+        commitment_str = commitment or self.commitment
+        if commitment_str is not None and not isinstance(commitment_str, str):
+            commitment_str = str(commitment_str)
+
+        return self.rpc_client.get_account_info(pubkey_str, commitment_str)
     
     def get_balance(
         self, public_key: Union[PublicKey, str], commitment: Optional[str] = None
