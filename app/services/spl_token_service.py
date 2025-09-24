@@ -1273,14 +1273,10 @@ class SplTokenService:
                     'message': 'Mint账户数据为空'
                 }
 
-            # DEBUG: 记录原始数据结构
-            logger.info(f"[{operation_id}] 原始data字段类型: {type(data_str)}, 内容: {data_str}")
-
             # 处理不同格式的data字段
             if isinstance(data_str, list) and len(data_str) > 0:
                 # 如果data是列表格式，取第一个元素作为base64字符串
                 data_str = data_str[0]
-                logger.info(f"[{operation_id}] 提取列表第一个元素: {data_str[:50]}...")
             elif not isinstance(data_str, str):
                 return {
                     'success': False,
@@ -1292,18 +1288,13 @@ class SplTokenService:
             import base64
             import base58
             try:
-                logger.info(f"[{operation_id}] 尝试解码字符串长度: {len(data_str)}")
                 # 首先尝试base58解码（Solana常用）
                 try:
                     mint_data = base58.b58decode(data_str)
-                    logger.info(f"[{operation_id}] base58解码成功，数据长度: {len(mint_data)}")
-                except Exception as b58_error:
+                except Exception:
                     # 如果base58失败，尝试base64
-                    logger.info(f"[{operation_id}] base58解码失败，尝试base64: {str(b58_error)}")
                     mint_data = base64.b64decode(data_str)
-                    logger.info(f"[{operation_id}] base64解码成功，数据长度: {len(mint_data)}")
             except Exception as e:
-                logger.error(f"[{operation_id}] 所有解码方式失败，原始字符串: '{data_str[:100]}'")
                 return {
                     'success': False,
                     'error': 'DECODE_ERROR',

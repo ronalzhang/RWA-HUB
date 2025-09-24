@@ -27,31 +27,29 @@ class Client:
         
         # 始终尝试发送真实的RPC请求
         try:
-            logger.info(f"发送Solana RPC请求: {method} 到 {self.endpoint}")
+            logger.debug(f"发送Solana RPC请求: {method} 到 {self.endpoint}")
             # 安全的参数日志记录，避免JSON序列化错误
             if params:
                 try:
                     logger.debug(f"请求参数: {json.dumps(params)}")
                 except (TypeError, ValueError):
                     logger.debug(f"请求参数: {params} (无法JSON序列化)")
-            else:
-                logger.debug("请求参数: None")
-            
+
             response = self.session.post(self.endpoint, json=data, timeout=30)
-            
+
             # 检查HTTP响应状态
             if response.status_code != 200:
                 logger.error(f"Solana RPC请求失败，HTTP状态码: {response.status_code}")
                 return {"error": {"message": f"HTTP错误: {response.status_code}", "status_code": response.status_code}}
-            
+
             # 解析JSON响应
             result = response.json()
             logger.debug(f"RPC响应: {json.dumps(result)}")
-            
+
             # 检查是否有RPC错误
             if "error" in result:
                 logger.error(f"Solana RPC返回错误: {result['error']}")
-            
+
             return result
             
         except requests.exceptions.RequestException as e:
