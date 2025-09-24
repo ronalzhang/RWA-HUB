@@ -1247,7 +1247,18 @@ class SplTokenService:
 
             # 获取mint账户信息
             mint_info = client.get_account_info(mint_pubkey)
-            if not mint_info or not hasattr(mint_info, 'value') or not mint_info.value:
+
+            # 检查RPC响应结构
+            if not mint_info or 'result' not in mint_info:
+                return {
+                    'success': False,
+                    'error': 'RPC_ERROR',
+                    'message': f'RPC请求失败: {mint_address}'
+                }
+
+            # 检查账户是否存在
+            account_data = mint_info.get('result', {}).get('value')
+            if not account_data:
                 return {
                     'success': False,
                     'error': 'MINT_NOT_FOUND',
@@ -1255,7 +1266,24 @@ class SplTokenService:
                 }
 
             # 解析mint账户数据获取供应量
-            mint_data = mint_info.value.data
+            data_str = account_data.get('data')
+            if not data_str:
+                return {
+                    'success': False,
+                    'error': 'INVALID_MINT_DATA',
+                    'message': 'Mint账户数据为空'
+                }
+
+            # 解码base64数据
+            import base64
+            try:
+                mint_data = base64.b64decode(data_str)
+            except Exception as e:
+                return {
+                    'success': False,
+                    'error': 'DECODE_ERROR',
+                    'message': f'无法解码mint数据: {str(e)}'
+                }
             if len(mint_data) < 82:  # SPL Token mint账户至少82字节
                 return {
                     'success': False,
