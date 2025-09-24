@@ -66,10 +66,12 @@ class Client:
     
     def get_account_info(self, pubkey: str, commitment: Optional[str] = None) -> Dict[str, Any]:
         """Get account info."""
-        params = [pubkey]
+        # 确保pubkey是字符串，防止Pubkey对象序列化错误
+        pubkey_str = str(pubkey) if hasattr(pubkey, '__str__') else pubkey
+        params = [pubkey_str]
         if commitment:
             params.append({"commitment": commitment})
-        
+
         return self._make_request("getAccountInfo", params)
     
     def send_transaction(self, transaction, opts: Optional[TxOpts] = None) -> Dict[str, Any]:
