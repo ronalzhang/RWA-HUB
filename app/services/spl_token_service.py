@@ -1273,10 +1273,14 @@ class SplTokenService:
                     'message': 'Mint账户数据为空'
                 }
 
+            # DEBUG: 记录原始数据结构
+            logger.info(f"[{operation_id}] 原始data字段类型: {type(data_str)}, 内容: {data_str}")
+
             # 处理不同格式的data字段
             if isinstance(data_str, list) and len(data_str) > 0:
                 # 如果data是列表格式，取第一个元素作为base64字符串
                 data_str = data_str[0]
+                logger.info(f"[{operation_id}] 提取列表第一个元素: {data_str[:50]}...")
             elif not isinstance(data_str, str):
                 return {
                     'success': False,
@@ -1287,8 +1291,11 @@ class SplTokenService:
             # 解码base64数据
             import base64
             try:
+                logger.info(f"[{operation_id}] 尝试解码base64字符串长度: {len(data_str)}")
                 mint_data = base64.b64decode(data_str)
+                logger.info(f"[{operation_id}] 解码成功，数据长度: {len(mint_data)}")
             except Exception as e:
+                logger.error(f"[{operation_id}] Base64解码失败，原始字符串: '{data_str[:100]}'")
                 return {
                     'success': False,
                     'error': 'DECODE_ERROR',
