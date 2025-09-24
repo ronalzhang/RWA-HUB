@@ -761,7 +761,7 @@ class SplTokenService:
         """
         try:
             # 从数据库查找对应的资产
-            asset = Asset.query.filter_by(spl_mint_address=mint_address).first()
+            asset = Asset.query.filter_by(token_address=mint_address).first()
             if not asset or not asset.metadata_uri:
                 return {
                     'success': False,
@@ -1247,7 +1247,7 @@ class SplTokenService:
 
             # 获取mint账户信息
             mint_info = client.get_account_info(mint_pubkey)
-            if not mint_info.value:
+            if not mint_info or not hasattr(mint_info, 'value') or not mint_info.value:
                 return {
                     'success': False,
                     'error': 'MINT_NOT_FOUND',
@@ -1323,7 +1323,7 @@ class SplTokenService:
             holder_count = 0
 
             # 尝试从数据库获取估算值
-            asset = Asset.query.filter_by(spl_mint_address=mint_address).first()
+            asset = Asset.query.filter_by(token_address=mint_address).first()
             if asset:
                 db_holder_count = db.session.query(func.count(Holding.id)).filter(
                     Holding.asset_id == asset.id,
@@ -1347,7 +1347,7 @@ class SplTokenService:
             logger.error(f"[{operation_id}] 获取持有者数量失败: {e}", exc_info=True)
             # 在出错时返回估算值（基于数据库记录）
             try:
-                asset = Asset.query.filter_by(spl_mint_address=mint_address).first()
+                asset = Asset.query.filter_by(token_address=mint_address).first()
                 if asset:
                     db_holder_count = db.session.query(func.count(Holding.id)).filter(
                         Holding.asset_id == asset.id,
@@ -1397,7 +1397,7 @@ class SplTokenService:
             start_time = end_time - timedelta(hours=hours)
 
             # 获取相关资产
-            asset = Asset.query.filter_by(spl_mint_address=mint_address).first()
+            asset = Asset.query.filter_by(token_address=mint_address).first()
             if not asset:
                 return {
                     'success': False,
