@@ -1288,14 +1288,22 @@ class SplTokenService:
                     'message': f'Mint账户数据格式无效: {type(data_str)}'
                 }
 
-            # 解码base64数据
+            # 解码数据（Solana通常使用base58编码）
             import base64
+            import base58
             try:
-                logger.info(f"[{operation_id}] 尝试解码base64字符串长度: {len(data_str)}")
-                mint_data = base64.b64decode(data_str)
-                logger.info(f"[{operation_id}] 解码成功，数据长度: {len(mint_data)}")
+                logger.info(f"[{operation_id}] 尝试解码字符串长度: {len(data_str)}")
+                # 首先尝试base58解码（Solana常用）
+                try:
+                    mint_data = base58.b58decode(data_str)
+                    logger.info(f"[{operation_id}] base58解码成功，数据长度: {len(mint_data)}")
+                except Exception as b58_error:
+                    # 如果base58失败，尝试base64
+                    logger.info(f"[{operation_id}] base58解码失败，尝试base64: {str(b58_error)}")
+                    mint_data = base64.b64decode(data_str)
+                    logger.info(f"[{operation_id}] base64解码成功，数据长度: {len(mint_data)}")
             except Exception as e:
-                logger.error(f"[{operation_id}] Base64解码失败，原始字符串: '{data_str[:100]}'")
+                logger.error(f"[{operation_id}] 所有解码方式失败，原始字符串: '{data_str[:100]}'")
                 return {
                     'success': False,
                     'error': 'DECODE_ERROR',
