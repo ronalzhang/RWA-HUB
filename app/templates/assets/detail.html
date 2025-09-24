@@ -602,6 +602,10 @@ function initializePage() {
     }
 
     // 加载SPL Token信息
+    console.log('检查SPL Token加载条件:');
+    console.log('- window.ASSET_CONFIG:', window.ASSET_CONFIG);
+    console.log('- splMintAddress:', window.ASSET_CONFIG ? window.ASSET_CONFIG.splMintAddress : 'undefined');
+
     if (window.ASSET_CONFIG && window.ASSET_CONFIG.splMintAddress) {
         try {
             loadSplTokenInfo();
@@ -609,6 +613,11 @@ function initializePage() {
         } catch (error) {
             console.error('加载SPL Token信息时出错:', error);
         }
+    } else {
+        console.log('跳过SPL Token信息加载 - 未满足条件');
+        // 直接显示无Token状态
+        updateSupplyDisplay(null, 'No SPL Token');
+        updateTokenStatus('warning');
     }
 
     console.log('页面初始化完成');
@@ -705,20 +714,21 @@ async function loadTradeHistory(page = 1) {
         console.error('交易历史容器不存在');
         return;
     }
-    
+
     try {
         console.log(`开始加载交易历史，页码: ${page}, 资产ID: ${window.ASSET_CONFIG.id}`);
+        console.log('API URL:', `/api/trades?asset_id=${window.ASSET_CONFIG.id}&page=${page}&per_page=5`);
         container.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p class="mt-2">Loading trading history...</p></div>';
-        
+
         const response = await fetch(`/api/trades?asset_id=${window.ASSET_CONFIG.id}&page=${page}&per_page=5`, {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             }
         });
-        
+
         console.log(`交易历史API响应状态: ${response.status}`);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
