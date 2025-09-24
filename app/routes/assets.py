@@ -223,18 +223,17 @@ def asset_detail_by_symbol(token_symbol):
         return render_template('error.html', error=_('Error accessing asset details')), 500
 
 @assets_bp.route('/create')
-@wallet_address_required
 def create_asset_page():
     """创建资产页面"""
     try:
-        # 检查钱包连接状态
-        if not g.wallet_address:
-            flash('请先连接钱包', 'error')
-            return redirect(url_for('main.index'))
+        # 允许访问页面，钱包地址可选
+        creator_address = g.get('wallet_address', '')
 
-        # 记录创建者地址
-        current_app.logger.info(f'用户 {g.wallet_address} 访问创建资产页面')
-        return render_template('assets/create.html', creator_address=g.wallet_address)
+        # 记录访问（如果有钱包地址）
+        if creator_address:
+            current_app.logger.info(f'用户 {creator_address} 访问创建资产页面')
+
+        return render_template('assets/create.html', creator_address=creator_address)
     except Exception as e:
         current_app.logger.warning(f'加载创建资产页面失败: {str(e)}')
         flash('系统错误，请稍后重试', 'warning')
