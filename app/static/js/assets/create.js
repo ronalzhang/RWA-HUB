@@ -210,26 +210,26 @@ function updateUiForAdminStatus(isAdmin) {
         totalValueInput.addEventListener('input', updateTokenPrice);
         }
         
-    // 类不动产代币数量
+    // 证券字段事件监听器
         const tokenSupplyInput = document.getElementById('token_supply');
         if (tokenSupplyInput) {
-        tokenSupplyInput.addEventListener('input', updateTotalValueSimilar);
+            tokenSupplyInput.addEventListener('input', updateTotalValue);
         }
 
-    // 类不动产代币价格
-        const tokenPriceSimilarInput = document.getElementById('token_price_similar');
-        if (tokenPriceSimilarInput) {
-            tokenPriceSimilarInput.addEventListener('input', updateTotalValueSimilar);
+    // 证券代币价格
+        const tokenPriceInput = document.getElementById('token_price');
+        if (tokenPriceInput) {
+            tokenPriceInput.addEventListener('input', updateTotalValue);
         }
 
     // 准不动产代币数量
-        const tokenSupplyQuasiInput = document.getElementById('token_supply_quasi');
+        const tokenSupplyQuasiInput = document.getElementById('token_supply');
         if (tokenSupplyQuasiInput) {
             tokenSupplyQuasiInput.addEventListener('input', updateTotalValueQuasi);
         }
 
     // 准不动产代币价格
-        const tokenPriceQuasiInput = document.getElementById('token_price_quasi');
+        const tokenPriceQuasiInput = document.getElementById('token_price');
         if (tokenPriceQuasiInput) {
             tokenPriceQuasiInput.addEventListener('input', updateTotalValueQuasi);
         }
@@ -384,25 +384,25 @@ function initializeFileUploads() {
 // 处理资产类型切换
     function toggleAssetTypeFields(type) {
         const realEstateFields = document.querySelectorAll('.asset-type-field.real-estate');
-        const similarAssetsFields = document.querySelectorAll('.asset-type-field.similar-assets');
+        const securitiesFields = document.querySelectorAll('.asset-type-field.securities');
         const quasiPropertyFields = document.querySelectorAll('.asset-type-field.quasi-property');
 
         if (type === '10') { // 不动产 (Real Property)
             realEstateFields.forEach(el => el.style.display = 'block');
-            similarAssetsFields.forEach(el => el.style.display = 'none');
+            securitiesFields.forEach(el => el.style.display = 'none');
             quasiPropertyFields.forEach(el => el.style.display = 'none');
         } else if (type === '20') { // 证券 (Securities)
             realEstateFields.forEach(el => el.style.display = 'none');
-            similarAssetsFields.forEach(el => el.style.display = 'block');
+            securitiesFields.forEach(el => el.style.display = 'block');
             quasiPropertyFields.forEach(el => el.style.display = 'none');
         } else if (type === '30') { // 准不动产 (Quasi Property)
             realEstateFields.forEach(el => el.style.display = 'none');
-            similarAssetsFields.forEach(el => el.style.display = 'none');
+            securitiesFields.forEach(el => el.style.display = 'none');
             quasiPropertyFields.forEach(el => el.style.display = 'block');
         } else {
             // 隐藏所有字段
             realEstateFields.forEach(el => el.style.display = 'none');
-            similarAssetsFields.forEach(el => el.style.display = 'none');
+            securitiesFields.forEach(el => el.style.display = 'none');
             quasiPropertyFields.forEach(el => el.style.display = 'none');
         }
     }
@@ -447,16 +447,27 @@ function updateTokenPrice() {
                 } else {
                     tokenPriceElement.textContent = '0.000000';
                 }
+            }
+
+            // 更新不动产的token_price显示 (统一使用token_price ID)
+            const tokenPriceElement = document.getElementById('token_price');
+            if (tokenPriceElement) {
+                if (tokenCount > 0 && totalValue > 0) {
+                    const tokenPrice = totalValue / tokenCount;
+                    tokenPriceElement.textContent = tokenPrice.toFixed(CONFIG.CALCULATION.PRICE_DECIMALS);
+                } else {
+                    tokenPriceElement.textContent = '0.000000';
+                }
     
     // 计算发布费用
     calculatePublishingFee();
             }
 
-// 更新证券总价值 (Securities)
-function updateTotalValueSimilar() {
+// 更新证券总价值 (Securities) - 统一函数名
+function updateTotalValue() {
     const tokenSupply = parseInt(document.getElementById('token_supply').value) || 0;
-    const tokenPrice = parseFloat(document.getElementById('token_price_similar').value) || 0;
-    const totalValueElement = document.getElementById('calculatedTotalValueSimilar');
+    const tokenPrice = parseFloat(document.getElementById('token_price').value) || 0;
+    const totalValueElement = document.getElementById('calculatedTotalValue');
 
     if (!totalValueElement) return;
 
@@ -473,9 +484,9 @@ function updateTotalValueSimilar() {
 
 // 更新准不动产总价值
 function updateTotalValueQuasi() {
-    const tokenSupply = parseInt(document.getElementById('token_supply_quasi').value) || 0;
-    const tokenPrice = parseFloat(document.getElementById('token_price_quasi').value) || 0;
-    const totalValueElement = document.getElementById('calculatedTotalValueQuasi');
+    const tokenSupply = parseInt(document.getElementById('token_supply').value) || 0;
+    const tokenPrice = parseFloat(document.getElementById('token_price').value) || 0;
+    const totalValueElement = document.getElementById('calculatedTotalValue');
 
     if (!totalValueElement) return;
 
@@ -502,8 +513,27 @@ function updateTotalValueQuasi() {
     
     if (assetType === '10') { // 不动产
         totalValue = parseFloat(document.getElementById('total_value').value) || 0;
-    } else { // 类不动产
-        totalValue = parseFloat(document.getElementById('total_value_similar').value) || 0;
+    } else if (assetType === '20') { // 证券 Securities
+        // 从计算出的总价值获取，或者从token价格*数量计算
+        const calculatedElement = document.getElementById('calculatedTotalValue');
+        if (calculatedElement) {
+            totalValue = parseFloat(calculatedElement.textContent) || 0;
+        } else {
+            // 备用方案：从token价格和数量计算
+            const tokenSupply = parseFloat(document.getElementById('token_supply').value) || 0;
+            const tokenPrice = parseFloat(document.getElementById('token_price').value) || 0;
+            totalValue = tokenSupply * tokenPrice;
+        }
+    } else if (assetType === '30') { // 准不动产 Quasi Property
+        const calculatedElement = document.getElementById('calculatedTotalValue');
+        if (calculatedElement) {
+            totalValue = parseFloat(calculatedElement.textContent) || 0;
+        } else {
+            // 备用方案：从token价格和数量计算
+            const tokenSupply = parseFloat(document.getElementById('token_supply').value) || 0;
+            const tokenPrice = parseFloat(document.getElementById('token_price').value) || 0;
+            totalValue = tokenSupply * tokenPrice;
+        }
     }
     
     // 计算发布费用 - 从API动态获取
@@ -940,7 +970,7 @@ function loadDraft() {
         if (typeSelect && typeSelect.value === '10') {
             handleAreaChange();
         } else {
-            updateTokenPriceSimilar();
+            updateTotalValue();
             }
     } catch (error) {
         console.error('加载草稿失败:', error);
@@ -983,15 +1013,7 @@ function validateAndSubmitForm() {
             showError(`Please fill in ${getFieldLabel('token_supply')}`);
             return;
         }
-        
-        // 检查total_value_similar字段（使用ID而不是name属性）
-        const totalValueInput = form.elements['total_value_similar'];
-        if (!totalValueInput || !parseFloat(totalValueInput.value)) {
-            showError(`Please fill in ${getFieldLabel('total_value')}`);
-            return;
-            }
-        }
-        
+
     // TODO: 提交表单逻辑
     console.log('表单验证通过，准备提交');
     alert('表单验证通过，功能待实现');
@@ -1006,7 +1028,6 @@ function validateAndSubmitForm() {
         'tokensymbol': 'Token Symbol',
         'area': 'Asset Area',
         'total_value': 'Total Value',
-        'total_value_similar': 'Total Value',
         'token_supply': 'Token Supply'
         };
         
@@ -1148,22 +1169,22 @@ function validateForm() {
             return false;
             }
 
-        // 检查token_price_similar字段
-        const tokenPriceInput = form.elements['token_price_similar'];
+        // 检查证券代币价格字段
+        const tokenPriceInput = form.elements['token_price'];
         if (!tokenPriceInput || !parseFloat(tokenPriceInput.value)) {
             showError(`Please fill in Token Price`);
             return false;
         }
     } else if (assetType === '30') { // 准不动产 (Quasi Property)
-        // 检查token_supply_quasi字段
-        const tokenSupplyQuasiInput = form.elements['token_supply_quasi'];
+        // 检查token_supply字段
+        const tokenSupplyQuasiInput = form.elements['token_supply'];
         if (!tokenSupplyQuasiInput || !parseInt(tokenSupplyQuasiInput.value)) {
             showError(`Please fill in Token Count`);
             return false;
         }
 
-        // 检查token_price_quasi字段
-        const tokenPriceQuasiInput = form.elements['token_price_quasi'];
+        // 检查token_price字段
+        const tokenPriceQuasiInput = form.elements['token_price'];
         if (!tokenPriceQuasiInput || !parseFloat(tokenPriceQuasiInput.value)) {
             showError(`Please fill in Token Price`);
             return false;
@@ -1366,7 +1387,7 @@ function closePreview() {
                                 <div class="col-md-6">
                                 <h6 class="text-muted">${window._("Asset Details")}</h6>
                                     <ul class="list-unstyled">
-                                    <li><strong>${window._("Type")}:</strong> ${data.asset_type === 10 ? window._("Real Estate") : window._("Similar Assets")}</li>
+                                    <li><strong>${window._("Type")}:</strong> ${data.asset_type === 10 ? window._("Real Estate") : data.asset_type === 20 ? window._("Securities") : window._("Quasi Property")}</li>
                                     <li><strong>${window._("Location")}:</strong> ${data.location}</li>
                                     ${data.asset_type === 10 ? `
                                         <li><strong>${window._("Area")}:</strong> ${data.area} ${window._("sqm")}</li>
@@ -1956,31 +1977,31 @@ function getAssetFormData() {
         formData.token_supply = parseInt(tokenCountElement.textContent.replace(/,/g, '')) || 0;
         formData.token_price = parseFloat(tokenPriceElement.textContent) || 0;
 
-        // 年收益率 - 首先检查元素是否存在
-        const annualRevenueElement = form.elements['annual_revenue'];
+        // 年收益率 - 统一使用annual_revenue ID
+        const annualRevenueElement = document.getElementById('annual_revenue');
         formData.annual_revenue = annualRevenueElement ? (parseFloat(annualRevenueElement.value) || 1) : 1;
     } else if (assetType === '20') { // 证券 (Securities)
         formData.token_supply = parseInt(form.elements['token_supply'].value) || 0;
-        formData.token_price = parseFloat(form.elements['token_price_similar'].value) || 0;
+        formData.token_price = parseFloat(form.elements['token_price'].value) || 0;
 
         // 总价值是自动计算的
-        const totalValueElement = document.getElementById('calculatedTotalValueSimilar');
+        const totalValueElement = document.getElementById('calculatedTotalValue');
         formData.total_value = parseFloat(totalValueElement.textContent) || 0;
 
-        // 年收益率 - 首先检查元素是否存在
-        const annualRevenueElement = form.elements['annual_revenue'];
+        // 年收益率 - 统一使用annual_revenue ID (证券)
+        const annualRevenueElement = document.getElementById('annual_revenue');
         formData.annual_revenue = annualRevenueElement ? (parseFloat(annualRevenueElement.value) || 1) : 1;
     } else if (assetType === '30') { // 准不动产 (Quasi Property)
-        formData.token_supply = parseInt(form.elements['token_supply_quasi'].value) || 0;
-        formData.token_price = parseFloat(form.elements['token_price_quasi'].value) || 0;
+        formData.token_supply = parseInt(form.elements['token_supply'].value) || 0;
+        formData.token_price = parseFloat(form.elements['token_price'].value) || 0;
 
         // 总价值是自动计算的
-        const totalValueElement = document.getElementById('calculatedTotalValueQuasi');
+        const totalValueElement = document.getElementById('calculatedTotalValue');
         formData.total_value = parseFloat(totalValueElement.textContent) || 0;
 
-        // 年收益率 - 首先检查元素是否存在
-        const annualRevenueElement = form.elements['annual_revenue'];
-        formData.annual_revenue = annualRevenueElement ? (parseFloat(annualRevenueElement.value) || 1) : 1;
+        // 年收益率 - 统一使用annual_revenue ID (准不动产)
+        const annualRevenueQuasiElement = document.getElementById('annual_revenue');
+        formData.annual_revenue = annualRevenueQuasiElement ? (parseFloat(annualRevenueQuasiElement.value) || 1) : 1;
     }
     
     console.log('获取的表单数据:', formData);

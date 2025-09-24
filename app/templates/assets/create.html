@@ -233,7 +233,7 @@
         cursor: not-allowed;
     }
 
-    /* 增强拖拽区域的点击提示 */
+    /* 增强拖拽区域的点击提示和视觉效果 */
     .dropzone[data-page="create-asset"]::after {
         content: "📤 点击或拖拽上传";
         position: absolute;
@@ -241,16 +241,71 @@
         right: 20px;
         font-size: 0.75rem;
         color: #6c757d;
-        background: rgba(255,255,255,0.8);
-        padding: 4px 8px;
-        border-radius: 12px;
-        backdrop-filter: blur(2px);
+        background: rgba(255,255,255,0.9);
+        padding: 6px 12px;
+        border-radius: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        backdrop-filter: blur(4px);
         transition: all 0.3s ease;
+        font-weight: 500;
+        border: 1px solid rgba(108, 117, 125, 0.2);
     }
 
     .dropzone[data-page="create-asset"]:hover::after {
         color: #0d6efd;
-        background: rgba(13, 110, 253, 0.1);
+        background: rgba(13, 110, 253, 0.15);
+        border-color: rgba(13, 110, 253, 0.3);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.2);
+    }
+
+    /* 确保图片上传区域优先级最高 */
+    #imageDropzone {
+        border: 3px dashed #bbb !important;
+        border-radius: 12px !important;
+        padding: 3rem 2rem !important;
+        text-align: center !important;
+        cursor: pointer !important;
+        transition: all 0.3s ease !important;
+        background-color: #f8f9fa !important;
+        min-height: 150px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: center !important;
+        position: relative !important;
+    }
+
+    #imageDropzone:hover {
+        border-color: #0d6efd !important;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e3f2fd 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 20px rgba(13, 110, 253, 0.15) !important;
+    }
+
+    #imageDropzone i {
+        font-size: 3.5rem !important;
+        color: #6c757d !important;
+        margin-bottom: 1.5rem !important;
+        display: block !important;
+        transition: all 0.3s ease !important;
+    }
+
+    #imageDropzone:hover i {
+        color: #0d6efd !important;
+        transform: scale(1.1) !important;
+    }
+
+    #imageDropzone h6 {
+        color: #495057 !important;
+        margin-bottom: 1rem !important;
+        font-weight: 600 !important;
+    }
+
+    #imageDropzone p {
+        color: #6c757d !important;
+        font-size: 1rem !important;
+        margin-bottom: 0.5rem !important;
     }
 
     /* 文档上传区域保持较小 */
@@ -385,8 +440,8 @@
                                 </div>
                             </div>
 
-                            <!-- 类不动产字段 (Securities) -->
-                            <div class="asset-type-field similar-assets hidden">
+                            <!-- 证券字段 (Securities) -->
+                            <div class="asset-type-field securities hidden">
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <label for="token_supply" class="form-label">{{ _('Token Count') }} <span class="text-danger">*</span></label>
@@ -394,20 +449,20 @@
                                         <div class="invalid-feedback">{{ _('Please enter valid token count (greater than 0)') }}</div>
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label for="token_price_similar" class="form-label">{{ _('Token Price (USDC)') }} <span class="text-danger">*</span></label>
-                                        <input type="number" class="form-control" id="token_price_similar" name="token_price_similar" step="0.000001" min="0.000001" placeholder="0.000000">
+                                        <label for="token_price" class="form-label">{{ _('Token Price (USDC)') }} <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="token_price" name="token_price" step="0.000001" min="0.000001" placeholder="0.000000">
                                         <div class="invalid-feedback">{{ _('Please enter valid token price (greater than 0)') }}</div>
                                     </div>
                                 </div>
                                 <div class="row mb-3">
                                     <div class="col-md-6">
                                         <label class="form-label">{{ _('Total Value (USDC)') }}</label>
-                                        <div class="form-control bg-light" id="calculatedTotalValueSimilar">0.00</div>
+                                        <div class="form-control bg-light" id="calculatedTotalValue">0.00</div>
                                         <small class="form-text text-muted">{{ _('Token Count × Token Price') }}</small>
                                     </div>
                                     <div class="col-md-6">
-                                        <label for="expectedAnnualRevenueSimilar" class="form-label">{{ _('Expected Annual Revenue*') }}</label>
-                                        <input type="number" class="form-control" id="expectedAnnualRevenueSimilar" name="annual_revenue" step="0.01" min="0" placeholder="0.00">
+                                        <label for="annual_revenue" class="form-label">{{ _('Expected Annual Revenue*') }}</label>
+                                        <input type="number" class="form-control" id="annual_revenue" name="annual_revenue" step="0.01" min="0" placeholder="0.00">
                                         <small class="form-text text-muted">{{ _('Expected annual revenue in USDC') }}</small>
                                     </div>
                                 </div>
@@ -417,25 +472,25 @@
                             <div class="asset-type-field quasi-property hidden">
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
-                                        <label for="token_supply_quasi" class="form-label">{{ _('Token Count') }} <span class="text-danger">*</span></label>
-                                        <input type="number" class="form-control" id="token_supply_quasi" name="token_supply_quasi" step="1" min="1" placeholder="0">
+                                        <label for="token_supply" class="form-label">{{ _('Token Count') }} <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="token_supply" name="token_supply" step="1" min="1" placeholder="0">
                                         <div class="invalid-feedback">{{ _('Please enter valid token count (greater than 0)') }}</div>
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label for="token_price_quasi" class="form-label">{{ _('Token Price (USDC)') }} <span class="text-danger">*</span></label>
-                                        <input type="number" class="form-control" id="token_price_quasi" name="token_price_quasi" step="0.000001" min="0.000001" placeholder="0.000000">
+                                        <label for="token_price" class="form-label">{{ _('Token Price (USDC)') }} <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="token_price" name="token_price" step="0.000001" min="0.000001" placeholder="0.000000">
                                         <div class="invalid-feedback">{{ _('Please enter valid token price (greater than 0)') }}</div>
                                     </div>
                                 </div>
                                 <div class="row mb-3">
                                     <div class="col-md-6">
                                         <label class="form-label">{{ _('Total Value (USDC)') }}</label>
-                                        <div class="form-control bg-light" id="calculatedTotalValueQuasi">0.00</div>
+                                        <div class="form-control bg-light" id="calculatedTotalValue">0.00</div>
                                         <small class="form-text text-muted">{{ _('Token Count × Token Price') }}</small>
                                     </div>
                                     <div class="col-md-6">
-                                        <label for="expectedAnnualRevenueQuasi" class="form-label">{{ _('Expected Annual Revenue*') }}</label>
-                                        <input type="number" class="form-control" id="expectedAnnualRevenueQuasi" name="annual_revenue" step="0.01" min="0" placeholder="0.00">
+                                        <label for="annual_revenue" class="form-label">{{ _('Expected Annual Revenue*') }}</label>
+                                        <input type="number" class="form-control" id="annual_revenue" name="annual_revenue" step="0.01" min="0" placeholder="0.00">
                                         <small class="form-text text-muted">{{ _('Expected annual revenue in USDC') }}</small>
                                     </div>
                                 </div>
@@ -487,12 +542,12 @@
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="similar-assets-docs">
-                                        <h6 class="text-muted">{{ _('Suggested Documents for Similar Assets') }}:</h6>
+                                    <div class="securities-docs">
+                                        <h6 class="text-muted">{{ _('Suggested Documents for Securities') }}:</h6>
                                         <ul class="list-unstyled text-muted">
-                                            <li><i class="far fa-circle me-2"></i>{{ _('Auction Certificate') }}</li>
-                                            <li><i class="far fa-circle me-2"></i>{{ _('Exhibition Documents') }}</li>
-                                            <li><i class="far fa-circle me-2"></i>{{ _('Asset Proof') }}</li>
+                                            <li><i class="far fa-circle me-2"></i>{{ _('Securities Certificate') }}</li>
+                                            <li><i class="far fa-circle me-2"></i>{{ _('Valuation Report') }}</li>
+                                            <li><i class="far fa-circle me-2"></i>{{ _('Legal Documentation') }}</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -754,9 +809,6 @@
         }
     });
 </script>
-
-<!-- 引入钱包相关脚本 -->
-<script src="{{ url_for('static', filename='js/wallet.js') }}?v=20241231-fix3&t=1735659600"></script>
 
 <!-- 引入资产创建脚本 -->
     <script src="{{ url_for('static', filename='js/assets/create.js') }}?v=20241231-ux-opt&t=1735662000"></script>
