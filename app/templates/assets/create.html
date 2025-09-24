@@ -277,7 +277,7 @@
                                         <option value="">{{ _('Please select asset type') }}</option>
                                         <option value="10">{{ _('Real Property') }}</option>
                                         <option value="20">{{ _('Securities') }}</option>
-                                        <option value="30">{{ _('Commercial Assets') }}</option>
+                                        <option value="30">{{ _('Quasi Property') }}</option>
                                     </select>
                                     <div class="invalid-feedback">{{ _('Please select asset type') }}</div>
                                 </div>
@@ -346,7 +346,7 @@
                                 </div>
                             </div>
 
-                            <!-- 类不动产字段 -->
+                            <!-- 类不动产字段 (Securities) -->
                             <div class="asset-type-field similar-assets hidden">
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
@@ -369,6 +369,34 @@
                                     <div class="col-md-6">
                                         <label for="expectedAnnualRevenueSimilar" class="form-label">{{ _('Expected Annual Revenue*') }}</label>
                                         <input type="number" class="form-control" id="expectedAnnualRevenueSimilar" name="annual_revenue" step="0.01" min="0" placeholder="0.00">
+                                        <small class="form-text text-muted">{{ _('Expected annual revenue in USDC') }}</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 准不动产字段 (Quasi Property) -->
+                            <div class="asset-type-field quasi-property hidden">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="token_supply_quasi" class="form-label">{{ _('Token Count') }} <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="token_supply_quasi" name="token_supply_quasi" step="1" min="1" placeholder="0">
+                                        <div class="invalid-feedback">{{ _('Please enter valid token count (greater than 0)') }}</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="token_price_quasi" class="form-label">{{ _('Token Price (USDC)') }} <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="token_price_quasi" name="token_price_quasi" step="0.000001" min="0.000001" placeholder="0.000000">
+                                        <div class="invalid-feedback">{{ _('Please enter valid token price (greater than 0)') }}</div>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">{{ _('Total Value (USDC)') }}</label>
+                                        <div class="form-control bg-light" id="calculatedTotalValueQuasi">0.00</div>
+                                        <small class="form-text text-muted">{{ _('Token Count × Token Price') }}</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="expectedAnnualRevenueQuasi" class="form-label">{{ _('Expected Annual Revenue*') }}</label>
+                                        <input type="number" class="form-control" id="expectedAnnualRevenueQuasi" name="annual_revenue" step="0.01" min="0" placeholder="0.00">
                                         <small class="form-text text-muted">{{ _('Expected annual revenue in USDC') }}</small>
                                     </div>
                                 </div>

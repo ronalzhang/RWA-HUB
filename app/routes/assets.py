@@ -497,13 +497,22 @@ def calculate_tokens():
         if asset_type == '10':  # 不动产
             token_count = area * 10000  # 每平方米10000个代币
             token_price = total_value / token_count if token_count > 0 else 0
-        else:  # 类不动产
+        elif asset_type == '20':  # 证券 (Securities)
+            token_count = int(data.get('token_count', 0))
+            token_price = total_value / token_count if token_count > 0 else 0
+        elif asset_type == '30':  # 准不动产 (Quasi Property)
+            token_count = int(data.get('token_count', 0))
+            token_price = float(data.get('token_price', 0))
+            total_value = token_count * token_price
+        else:
+            # 默认处理方式
             token_count = int(data.get('token_count', 0))
             token_price = total_value / token_count if token_count > 0 else 0
             
         return jsonify({
             'token_count': int(token_count),
-            'token_price': round(token_price, 6)
+            'token_price': round(token_price, 6),
+            'total_value': round(total_value, 2)
         })
     except Exception as e:
         current_app.logger.error(f'计算代币数量和价格失败: {str(e)}')
