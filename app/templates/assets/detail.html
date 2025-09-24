@@ -1086,8 +1086,10 @@ async function loadSplTokenInfo() {
             result => result.status === 'fulfilled' && result.value && result.value.error === 'MINT_NOT_FOUND'
         );
 
+        // 检查结果，并根据health check API设置正确状态
         if (hasAnySuccess) {
-            updateTokenStatus('degraded');
+            // 如果基础API有成功，直接调用health check获取准确状态
+            loadTokenHealthStatus();
         } else if (hasMintNotFoundError) {
             updateTokenStatus('warning', 'Token Not Found');
         } else {
@@ -1220,6 +1222,31 @@ function updateTokenStatus(status, customText = null) {
 }
 
 // Token健康检查
+// 加载Token健康状态（不显示模态框）
+async function loadTokenHealthStatus() {
+    const mintAddress = '{{ asset.token_address }}';
+    if (!mintAddress) return;
+
+    try {
+        const response = await fetch(`/api/spl-token/health-check/${mintAddress}`);
+        const result = await response.json();
+
+        if (result.success) {
+            const healthData = result.data;
+            const overallStatus = healthData.overall_status;
+
+            // 直接更新Token状态，不显示模态框
+            updateTokenStatus(overallStatus.status);
+        } else {
+            // Health check失败，设置为警告状态
+            updateTokenStatus('warning', 'Health check failed');
+        }
+    } catch (error) {
+        console.error('Failed to load token health status:', error);
+        updateTokenStatus('warning', 'Status check failed');
+    }
+}
+
 async function performTokenHealthCheck(mintAddress) {
     if (!mintAddress) {
         alert('No SPL Token address available');
