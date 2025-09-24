@@ -1099,7 +1099,8 @@ async function loadSplTokenInfo() {
             updateSupplyDisplay(supplyResult.value.data);
         } else {
             console.warn('供应量信息加载失败:', supplyResult.reason || supplyResult.value);
-            updateSupplyDisplay(null, 'API Error');
+            const errorMsg = getTokenErrorMessage(supplyResult.value);
+            updateSupplyDisplay(null, errorMsg);
         }
 
         // 处理持有者信息
@@ -1107,7 +1108,8 @@ async function loadSplTokenInfo() {
             updateHoldersDisplay(holdersResult.value.data);
         } else {
             console.warn('持有者信息加载失败:', holdersResult.reason || holdersResult.value);
-            updateHoldersDisplay(null, 'API Error');
+            const errorMsg = getTokenErrorMessage(holdersResult.value);
+            updateHoldersDisplay(null, errorMsg);
         }
 
         // 处理活动信息
@@ -1115,14 +1117,26 @@ async function loadSplTokenInfo() {
             updateActivityDisplay(activityResult.value.data);
         } else {
             console.warn('活动信息加载失败:', activityResult.reason || activityResult.value);
-            updateActivityDisplay(null, 'API Error');
+            const errorMsg = getTokenErrorMessage(activityResult.value);
+            updateActivityDisplay(null, errorMsg);
         }
 
-        // 更新Token状态
+        // 更新Token状态 - 针对MINT_NOT_FOUND使用warning状态
         const hasAnySuccess = [supplyResult, holdersResult, activityResult].some(
             result => result.status === 'fulfilled' && result.value && result.value.success
         );
-        updateTokenStatus(hasAnySuccess ? 'degraded' : 'error');
+
+        const hasMintNotFoundError = [supplyResult, holdersResult, activityResult].some(
+            result => result.status === 'fulfilled' && result.value && result.value.error === 'MINT_NOT_FOUND'
+        );
+
+        if (hasAnySuccess) {
+            updateTokenStatus('degraded');
+        } else if (hasMintNotFoundError) {
+            updateTokenStatus('warning', 'Token Not Found');
+        } else {
+            updateTokenStatus('error');
+        }
 
     } catch (error) {
         console.error('加载SPL Token信息失败:', error);
@@ -1201,26 +1215,47 @@ function updateActivityDisplay(data, errorMsg = null) {
     }
 }
 
+// 获取Token错误的友好消息
+function getTokenErrorMessage(errorResponse) {
+    if (!errorResponse || typeof errorResponse !== 'object') {
+        return 'Load Failed';
+    }
+
+    if (errorResponse.error === 'MINT_NOT_FOUND') {
+        return 'Token Not Created';
+    }
+
+    if (errorResponse.error === 'RPC_ERROR') {
+        return 'Network Error';
+    }
+
+    return 'API Error';
+}
+
 // 更新Token状态
-function updateTokenStatus(status) {
+function updateTokenStatus(status, customText = null) {
     const element = document.getElementById('tokenStatus');
     if (!element) return;
 
     let badgeClass = 'bg-secondary';
-    let statusText = 'Unknown';
+    let statusText = customText || 'Unknown';
 
     switch (status) {
         case 'healthy':
             badgeClass = 'bg-success';
-            statusText = 'Healthy';
+            statusText = customText || 'Healthy';
             break;
         case 'degraded':
             badgeClass = 'bg-warning';
-            statusText = 'Degraded';
+            statusText = customText || 'Degraded';
+            break;
+        case 'warning':
+            badgeClass = 'bg-warning';
+            statusText = customText || 'Warning';
             break;
         case 'error':
             badgeClass = 'bg-danger';
-            statusText = 'Error';
+            statusText = customText || 'Error';
             break;
     }
 
