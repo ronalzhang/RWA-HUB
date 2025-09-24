@@ -656,17 +656,25 @@ def token_health_check(mint_address):
 
         # 检查1: Mint账户是否存在
         try:
-            from app.blockchain.solana_service import get_solana_client
-            from solders.pubkey import Pubkey
+            from app.blockchain.solana_service import solana_connection, initialize_solana_connection
 
-            client = get_solana_client()
-            mint_pubkey = Pubkey.from_string(mint_address)
-            mint_info = client.get_account_info(mint_pubkey)
+            # 确保连接已初始化
+            if solana_connection is None:
+                initialize_solana_connection()
+            client = solana_connection
 
-            health_data['checks']['mint_account_exists'] = {
-                'status': 'pass' if mint_info.value else 'fail',
-                'message': 'Mint account exists' if mint_info.value else 'Mint account not found'
-            }
+            mint_info = client.get_account_info(mint_address)
+
+            if mint_info and 'result' in mint_info and mint_info['result']['value']:
+                health_data['checks']['mint_account_exists'] = {
+                    'status': 'pass',
+                    'message': 'Mint account exists'
+                }
+            else:
+                health_data['checks']['mint_account_exists'] = {
+                    'status': 'fail',
+                    'message': 'Mint account not found'
+                }
         except Exception as e:
             health_data['checks']['mint_account_exists'] = {
                 'status': 'error',
@@ -675,7 +683,7 @@ def token_health_check(mint_address):
 
         # 检查2: 数据库记录是否存在
         try:
-            asset = Asset.query.filter_by(spl_mint_address=mint_address).first()
+            asset = Asset.query.filter_by(token_address=mint_address).first()
             health_data['checks']['database_record'] = {
                 'status': 'pass' if asset else 'fail',
                 'message': 'Database record exists' if asset else 'Database record not found',
