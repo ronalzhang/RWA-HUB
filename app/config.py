@@ -13,7 +13,7 @@ else:
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
     PURCHASE_CONTRACT_ADDRESS = os.environ.get('PURCHASE_CONTRACT_ADDRESS', 'rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql://rwa_hub_user:password@localhost/rwa_hub?sslmode=require')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql://rwa_hub_user:password@localhost/rwa_hub?sslmode=disable')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static/uploads')
 
@@ -84,8 +84,8 @@ class ProductionConfig(Config):
     DEBUG = False
     
     # !! 关键改动：直接指定生产环境使用本地数据库 (SSL enabled) !!
-    SQLALCHEMY_DATABASE_URI = 'postgresql://rwa_hub_user:password@localhost/rwa_hub?sslmode=require'
-    print(f"生产环境强制使用本地数据库 (SSL enabled): {SQLALCHEMY_DATABASE_URI}")
+    SQLALCHEMY_DATABASE_URI = 'postgresql://rwa_hub_user:password@localhost/rwa_hub?sslmode=disable'
+    print(f"生产环境强制使用本地数据库 (SSL disabled): {SQLALCHEMY_DATABASE_URI}")
     
     @staticmethod
     def init_app(app):
