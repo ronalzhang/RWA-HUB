@@ -263,8 +263,8 @@ function updateUiForAdminStatus(isAdmin) {
         });
     }
     
-    // 初始化计算
-    calculatePublishingFee();
+    // 初始化计算（延迟执行，确保DOM已就绪）
+    setTimeout(calculatePublishingFee, 100);
     
     // 初始化文件上传
     initializeFileUploads();
@@ -505,8 +505,13 @@ function updateTotalValueQuasi() {
     function calculatePublishingFee() {
     const typeSelect = document.getElementById('type');
         const publishingFeeElement = document.getElementById('publishingFee');
-    
-    if (!typeSelect || !publishingFeeElement) return;
+
+    // 如果DOM元素不存在，延迟执行
+    if (!typeSelect || !publishingFeeElement) {
+        console.log('DOM元素未就绪，延迟计算发布费用');
+        setTimeout(calculatePublishingFee, 100);
+        return;
+    }
     
     const assetType = typeSelect.value;
     let totalValue = 0;
