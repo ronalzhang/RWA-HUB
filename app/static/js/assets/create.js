@@ -2200,3 +2200,4 @@ async function _pollTransactionStatus(txHash, assetId, maxRetries = 12, retryInt
     // 延迟几秒后开始轮询
     setTimeout(checkStatus, 2000);
 }
+}
