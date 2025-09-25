@@ -594,6 +594,13 @@ const walletState = {
      */
     updateUI() {
         try {
+            // 添加方法调用的调试信息
+            console.log('[updateUI] 方法被调用，当前状态:', {
+                connected: this.connected,
+                address: this.address ? this.address.substring(0, 10) + '...' : null,
+                condition: !!(this.connected && this.address)
+            });
+
             // 减少日志输出频率
             if (!this._lastUIUpdate || (Date.now() - this._lastUIUpdate > 2000)) {
                 debugLog('更新钱包UI, 连接状态:', this.connected);
@@ -3583,6 +3590,14 @@ checkIfReturningFromWalletApp(walletType) {
             this.walletType = walletType;
             this.connected = true;
             this.provider = provider;
+
+            // 添加状态设置后的调试信息
+            console.log(`[afterSuccessfulConnection] 钱包状态已更新:`, {
+                address: this.address,
+                walletType: this.walletType,
+                connected: this.connected,
+                provider: !!this.provider
+            });
             
             // 保存状态到本地存储
             localStorage.setItem('walletType', walletType);
