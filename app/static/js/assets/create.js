@@ -70,22 +70,45 @@ function initializeCreatePage() {
     // 延迟检查钱包状态，给钱包状态管理器更多初始化时间
     setTimeout(initializeWalletCheck, 800);
 
-    // 添加定期重检钱包状态，确保能及时响应状态变化
-    let retryCount = 0;
-    const maxRetries = 5;
-    const checkWalletStatus = () => {
-        if (retryCount >= maxRetries) return;
+    // 监听钱包状态变化事件，确保能响应钱包连接状态变化
+    document.addEventListener('walletStateChanged', function(event) {
+        console.log('收到钱包状态变化事件:', event.detail);
+        setTimeout(initializeWalletCheck, 100);
+    });
 
-        console.log(`钱包状态重检 #${retryCount + 1}`);
+    // 添加强化的重试机制，确保钱包状态能被正确检测
+    let retryCount = 0;
+    const maxRetries = 8;
+    const checkWalletStatus = () => {
+        console.log(`钱包状态重检 #${retryCount + 1}/${maxRetries}`);
+
+        // 检查当前钱包状态
+        const currentState = {
+            hasWalletState: !!window.walletState,
+            connected: window.walletState?.connected,
+            address: window.walletState?.address,
+            initialized: window.walletState?.initialized
+        };
+        console.log('当前钱包状态详情:', currentState);
+
         initializeWalletCheck();
         retryCount++;
 
-        // 如果还没检测到连接状态且重试次数未到上限，继续重试
-        if (retryCount < maxRetries && (!window.walletState || !window.walletState.connected)) {
+        // 如果钱包仍未连接且未达到重试上限，继续重试
+        const shouldRetry = retryCount < maxRetries &&
+                           (!window.walletState || !window.walletState.connected || !window.walletState.address);
+
+        if (shouldRetry) {
+            console.log(`将在1秒后进行第${retryCount + 1}次重试`);
             setTimeout(checkWalletStatus, 1000);
+        } else if (retryCount >= maxRetries) {
+            console.warn('已达到最大重试次数，停止钱包状态检查');
+        } else {
+            console.log('钱包状态检查完成，无需继续重试');
         }
     };
 
+    // 1.5秒后开始重试机制
     setTimeout(checkWalletStatus, 1500);
 
     // 初始化表单元素
