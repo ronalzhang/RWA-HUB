@@ -117,13 +117,33 @@ function initializeWalletCheck() {
     }
 
     // 统一使用window.walletState作为唯一状态源
+    console.log('检查钱包状态 - window.walletState:', window.walletState);
+    console.log('检查钱包状态 - window.wallet:', window.wallet);
+
+    // 尝试多种方式获取钱包状态
+    let walletConnected = false;
+    let walletAddress = null;
+
     if (window.walletState && window.walletState.connected && window.walletState.address) {
-        console.log('钱包已连接:', window.walletState.address);
+        walletConnected = true;
+        walletAddress = window.walletState.address;
+    } else if (window.wallet && typeof window.wallet.getCurrentWallet === 'function') {
+        const walletData = window.wallet.getCurrentWallet();
+        if (walletData && walletData.connected && walletData.address) {
+            walletConnected = true;
+            walletAddress = walletData.address;
+        }
+    }
+
+    console.log('最终钱包状态:', { connected: walletConnected, address: walletAddress });
+
+    if (walletConnected && walletAddress) {
+        console.log('钱包已连接:', walletAddress);
         walletCheck.style.display = 'none';
         formContent.style.display = 'block';
 
         // 检查管理员状态
-        setTimeout(() => checkAdmin(window.walletState.address), 100);
+        setTimeout(() => checkAdmin(walletAddress), 100);
     } else {
         console.log('钱包未连接，显示连接提示');
         walletCheck.style.display = 'block';
