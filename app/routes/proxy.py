@@ -19,12 +19,7 @@ VENDOR_MAPPING = {
     "solana-web3.js": "https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js",
     "solana-web3-stable.js": "https://unpkg.com/@solana/web3.js@1.98.0/lib/index.iife.min.js",
     "solana-spl-token.js": "https://unpkg.com/@solana/spl-token@0.3.8/dist/index.iife.js",
-    
-    # Web3和区块链相关
-    "web3.min.js": "https://unpkg.com/web3@1.5.2/dist/web3.min.js",
-    "ethereumjs-tx-1.3.7.min.js": "https://cdn.jsdelivr.net/npm/ethereumjs-tx@1.3.7/dist/index.min.js",
-    "ethers.umd.min.js": "https://cdn.ethers.io/lib/ethers-5.2.umd.min.js",
-    
+
     # 基础库
     "jquery.min.js": "https://code.jquery.com/jquery-3.6.0.min.js",
     "jquery-ui.min.js": "https://code.jquery.com/ui/1.13.2/jquery-ui.min.js",

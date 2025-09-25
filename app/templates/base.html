@@ -1114,46 +1114,7 @@
             };
         })();
     </script>
-    
-    <!-- 加载Web3.js -->
-    <script>
-        // 动态加载Web3.js，多个CDN源和错误处理机制
-        (function loadWeb3() {
-            // 定义多个CDN源（按优先级排序）
-            const cdnUrls = [
-                "https://unpkg.com/web3@1.5.2/dist/web3.min.js",
-                "https://cdnjs.cloudflare.com/ajax/libs/web3/1.5.2/web3.min.js",
-                "https://cdn.bootcdn.net/ajax/libs/web3/1.5.2/web3.min.js", // 国内CDN
-                "/static/vendor/web3.min.js" // 最后尝试使用本地文件(如果有的话)
-            ];
-            
-            function tryLoadScript(index) {
-                if (index >= cdnUrls.length) {
-                    console.warn("所有Web3.js CDN源都加载失败，Web3功能将不可用");
-                    // 触发一个自定义事件，通知应用程序Web3加载失败
-                    document.dispatchEvent(new CustomEvent('web3LoadFailed'));
-                    return;
-                }
-                
-                const script = document.createElement('script');
-                script.src = cdnUrls[index];
-                script.onerror = function() {
-                    console.warn(`从 ${cdnUrls[index]} 加载Web3.js失败，尝试下一个源...`);
-                    tryLoadScript(index + 1);
-                };
-                script.onload = function() {
-                    console.log(`成功从 ${cdnUrls[index]} 加载Web3.js`);
-                    // 触发一个自定义事件，通知应用程序Web3已加载
-                    document.dispatchEvent(new CustomEvent('web3Loaded'));
-                };
-                document.head.appendChild(script);
-            }
-            
-            // 开始尝试加载
-            tryLoadScript(0);
-        })();
-    </script>
-    
+
     <!-- SweetAlert2 JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
     
