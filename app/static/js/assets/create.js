@@ -43,49 +43,58 @@ window.assetFormInitialized = false;
 // 主初始化函数
 function initializeCreatePage() {
     console.log('初始化资产创建页面...');
-    
+
     // 检查是否已初始化
     if (window.assetFormInitialized) {
         console.log('页面已初始化，跳过');
-            return;
-        }
-        
+        return;
+    }
+
     // 设置初始化标志
     window.assetFormInitialized = true;
-        
+
     // 首先重置上传区域状态，确保不显示"uploading"
     resetUploadAreas();
-    
-    // 检查钱包连接
-    setTimeout(initializeWalletCheck, 500); // 延迟执行，确保钱包状态已初始化
-    
+
+    // 立即显示默认状态（显示钱包检查提示）
+    const walletCheck = document.getElementById('walletCheck');
+    const formContent = document.getElementById('formContent');
+
+    if (walletCheck && formContent) {
+        // 默认显示钱包检查，隐藏表单
+        walletCheck.style.display = 'block';
+        formContent.style.display = 'none';
+        console.log('设置默认状态：显示钱包检查提示');
+    }
+
+    // 延迟检查钱包状态，避免初始化时钱包状态未准备好
+    setTimeout(initializeWalletCheck, 300);
+
     // 初始化表单元素
-            initializeFormFields();
-    
+    initializeFormFields();
+
     // 加载草稿
     loadDraft();
-    
+
     // 设置自动保存
     setInterval(saveDraft, CONFIG.DRAFT.AUTO_SAVE_INTERVAL);
-    
+
     // 监听钱包状态变化事件
     document.addEventListener('walletStateChanged', function(event) {
         console.log('资产创建页面收到钱包状态变化事件:', event.detail);
-        // 重新检查钱包状态并更新UI
         setTimeout(initializeWalletCheck, 100);
     });
 
     // 监听钱包初始化完成事件
     document.addEventListener('walletStateInitialized', function(event) {
         console.log('资产创建页面收到钱包初始化完成事件:', event.detail);
-        // 重新检查钱包状态
         setTimeout(initializeWalletCheck, 100);
     });
-        
-    console.log('初始化完成');
-    }
 
-// 检查钱包连接状态
+    console.log('初始化完成');
+}
+
+// 检查钱包连接状态 - 统一函数
 function initializeWalletCheck() {
     console.log('执行钱包连接状态检查...');
     const walletCheck = document.getElementById('walletCheck');
@@ -93,19 +102,20 @@ function initializeWalletCheck() {
     const connectWalletBtn = document.getElementById('connectWalletBtn');
 
     if (!walletCheck || !formContent) {
-        console.error('找不到钱包检查或表单内容元素');
+        console.error('找不到必需的DOM元素:', { walletCheck: !!walletCheck, formContent: !!formContent });
         return;
     }
 
-    // 绑定连接钱包按钮事件
-    if (connectWalletBtn) {
+    // 只绑定一次连接钱包按钮事件，避免重复绑定
+    if (connectWalletBtn && !connectWalletBtn.hasAttribute('data-event-bound')) {
+        connectWalletBtn.setAttribute('data-event-bound', 'true');
         connectWalletBtn.addEventListener('click', function() {
             console.log('点击连接钱包按钮');
             if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
                 window.walletState.openWalletSelector().then(connected => {
                     if (connected) {
                         console.log('钱包连接成功，刷新页面状态');
-                        initializeWalletCheck(); // 重新检查状态
+                        setTimeout(() => initializeWalletCheck(), 200);
                     }
                 }).catch(error => {
                     console.error('钱包连接失败:', error);
@@ -116,33 +126,34 @@ function initializeWalletCheck() {
         });
     }
 
-    // 统一使用window.walletState作为唯一状态源
-    console.log('检查钱包状态 - window.walletState:', window.walletState);
-    console.log('检查钱包状态 - window.wallet:', window.wallet);
-
-    // 尝试多种方式获取钱包状态
+    // 检查钱包连接状态
     let walletConnected = false;
     let walletAddress = null;
 
-    if (window.walletState && window.walletState.connected && window.walletState.address) {
-        walletConnected = true;
-        walletAddress = window.walletState.address;
-    } else if (window.wallet && typeof window.wallet.getCurrentWallet === 'function') {
+    // 优先从window.walletState获取状态
+    if (window.walletState) {
+        walletConnected = window.walletState.connected || false;
+        walletAddress = window.walletState.address || null;
+        console.log('从walletState获取状态:', { connected: walletConnected, address: walletAddress });
+    }
+
+    // 备选：从window.wallet获取状态
+    if (!walletConnected && window.wallet && typeof window.wallet.getCurrentWallet === 'function') {
         const walletData = window.wallet.getCurrentWallet();
         if (walletData && walletData.connected && walletData.address) {
             walletConnected = true;
             walletAddress = walletData.address;
+            console.log('从wallet获取状态:', { connected: walletConnected, address: walletAddress });
         }
     }
 
     console.log('最终钱包状态:', { connected: walletConnected, address: walletAddress });
 
+    // 根据连接状态更新界面
     if (walletConnected && walletAddress) {
-        console.log('钱包已连接:', walletAddress);
+        console.log('钱包已连接，显示表单');
         walletCheck.style.display = 'none';
         formContent.style.display = 'block';
-
-        // 检查管理员状态
         setTimeout(() => checkAdmin(walletAddress), 100);
     } else {
         console.log('钱包未连接，显示连接提示');
@@ -1054,49 +1065,32 @@ function getCookieValue(name) {
     return null;
     }
 
-// 检查并连接钱包
+// 检查并连接钱包 - 简化版本
 async function checkAndConnectWallet() {
-    return new Promise(async (resolve, reject) => {
-        try {
-            // 检查是否已有全局钱包状态
-            if (window.walletState && window.walletState.connected && window.walletState.address) {
-                console.log('钱包已连接:', window.walletState.address);
-                resolve(true);
-                return;
-            }
-            
-            // 尝试使用全局钱包选择器连接
-            console.log('尝试连接钱包...');
-            showLoadingState('正在连接钱包...');
-            
-            // 使用全局钱包选择器
-            if (typeof window.walletState === 'object' && typeof window.walletState.openWalletSelector === 'function') {
-                console.log('使用全局钱包选择器连接');
-                const connected = await window.walletState.openWalletSelector();
-                hideLoadingState();
-                
-                if (connected) {
-                    console.log('成功连接钱包');
-                    resolve(true);
-                    return;
-                } else {
-                    console.warn('钱包连接失败或被用户取消');
-                }
-            }
-            
-            // 没有可用的钱包
-            hideLoadingState();
-            console.error('没有找到可用的钱包或连接方法失败');
-            showError('请安装并解锁兼容的钱包');
-            resolve(false);
-            
-        } catch (error) {
-            hideLoadingState();
-            console.error('钱包连接检查出错:', error);
-            reject(error);
+    try {
+        // 如果已连接，直接返回
+        if (window.walletState && window.walletState.connected && window.walletState.address) {
+            console.log('钱包已连接:', window.walletState.address);
+            return true;
         }
-    });
+
+        // 尝试连接钱包
+        console.log('尝试连接钱包...');
+        if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+            const connected = await window.walletState.openWalletSelector();
+            if (connected) {
+                console.log('钱包连接成功');
+                return true;
+            }
+        }
+
+        console.warn('钱包连接失败');
+        return false;
+    } catch (error) {
+        console.error('钱包连接出错:', error);
+        return false;
     }
+}
 
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', function() {
