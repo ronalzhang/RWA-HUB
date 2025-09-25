@@ -112,60 +112,34 @@ function initializeCreatePage() {
     console.log('初始化完成');
 }
 
-// 检查钱包连接状态 - 统一函数
+// 检查钱包连接状态 - 简化版本
 function initializeWalletCheck() {
-    console.log('=== 开始钱包状态检查 ===');
+    console.log('=== 钱包状态检查 ===');
     const walletCheck = document.getElementById('walletCheck');
     const formContent = document.getElementById('formContent');
 
     if (!walletCheck || !formContent) {
-        console.error('找不到必需的DOM元素:', { walletCheck: !!walletCheck, formContent: !!formContent });
+        console.error('找不到必需的DOM元素');
         return;
     }
 
-    // 检查全局钱包状态对象是否存在
-    console.log('检查全局钱包对象:');
-    console.log('- window.walletState:', !!window.walletState);
-    console.log('- window.wallet:', !!window.wallet);
+    // 直接检查全局钱包状态
+    const isConnected = window.walletState && window.walletState.connected && window.walletState.address;
 
-    if (window.walletState) {
-        console.log('- walletState.connected:', window.walletState.connected);
-        console.log('- walletState.address:', window.walletState.address);
-        console.log('- walletState.walletType:', window.walletState.walletType);
-    }
+    console.log('钱包连接状态:', {
+        hasWalletState: !!window.walletState,
+        connected: window.walletState?.connected,
+        address: window.walletState?.address,
+        finalResult: isConnected
+    });
 
-    // 检查钱包连接状态
-    let walletConnected = false;
-    let walletAddress = null;
-
-    // 优先从window.walletState获取状态
-    if (window.walletState) {
-        walletConnected = window.walletState.connected === true;
-        walletAddress = window.walletState.address;
-        console.log('从walletState获取状态:', { connected: walletConnected, address: walletAddress });
-    }
-
-    // 备选：从window.wallet获取状态
-    if (!walletConnected && window.wallet && typeof window.wallet.getCurrentWallet === 'function') {
-        const walletData = window.wallet.getCurrentWallet();
-        console.log('从wallet.getCurrentWallet()获取数据:', walletData);
-        if (walletData && walletData.connected && walletData.address) {
-            walletConnected = true;
-            walletAddress = walletData.address;
-            console.log('从wallet获取状态:', { connected: walletConnected, address: walletAddress });
-        }
-    }
-
-    console.log('=== 最终钱包状态 ===:', { connected: walletConnected, address: walletAddress });
-
-    // 根据连接状态更新界面
-    if (walletConnected && walletAddress) {
-        console.log('✅ 钱包已连接，显示表单内容');
+    if (isConnected) {
+        console.log('✅ 钱包已连接，显示表单');
         walletCheck.style.display = 'none';
         formContent.style.display = 'block';
-        setTimeout(() => checkAdmin(walletAddress), 100);
+        setTimeout(() => checkAdmin(window.walletState.address), 100);
     } else {
-        console.log('❌ 钱包未连接，显示连接提示');
+        console.log('❌ 钱包未连接，显示提示');
         walletCheck.style.display = 'block';
         formContent.style.display = 'none';
     }
