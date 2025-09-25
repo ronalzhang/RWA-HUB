@@ -437,31 +437,20 @@ function updateTokenPrice() {
             const tokenPriceElement = document.getElementById('token_price');
             
     if (!tokenCountElement || !tokenPriceElement) return;
-    
+
     const tokenCountText = tokenCountElement.textContent.replace(/,/g, '');
     const tokenCount = parseInt(tokenCountText) || 0;
-    
-                if (tokenCount > 0 && totalValue > 0) {
-                    const tokenPrice = totalValue / tokenCount;
-                    tokenPriceElement.textContent = tokenPrice.toFixed(CONFIG.CALCULATION.PRICE_DECIMALS);
-                } else {
-                    tokenPriceElement.textContent = '0.000000';
-                }
-            }
 
-            // 更新不动产的token_price显示 (统一使用token_price ID)
-            const tokenPriceElement = document.getElementById('token_price');
-            if (tokenPriceElement) {
-                if (tokenCount > 0 && totalValue > 0) {
-                    const tokenPrice = totalValue / tokenCount;
-                    tokenPriceElement.textContent = tokenPrice.toFixed(CONFIG.CALCULATION.PRICE_DECIMALS);
-                } else {
-                    tokenPriceElement.textContent = '0.000000';
-                }
-    
+    if (tokenCount > 0 && totalValue > 0) {
+        const tokenPrice = totalValue / tokenCount;
+        tokenPriceElement.textContent = tokenPrice.toFixed(CONFIG.CALCULATION.PRICE_DECIMALS);
+    } else {
+        tokenPriceElement.textContent = '0.000000';
+    }
+
     // 计算发布费用
     calculatePublishingFee();
-            }
+}
 
 // 更新证券总价值 (Securities) - 统一函数名
 function updateTotalValue() {
