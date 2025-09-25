@@ -795,7 +795,7 @@
             
             // 预先检查钱包连接状态
             setTimeout(function() {
-                if (window.wallet && window.wallet.connected) {
+                if (window.walletState && window.walletState.connected) {
                     console.log('钱包已连接，准备支付功能');
                 } else {
                     console.log('钱包未连接，支付时将提示连接钱包');
