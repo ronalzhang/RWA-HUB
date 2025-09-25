@@ -22,7 +22,6 @@ from app.utils.constants import MIN_SOL_BALANCE
 from app.utils.transaction_helpers import record_fee_transaction
 from app.utils.solana_compat.rpc.api import Client
 from app.utils.solana_compat.publickey import PublicKey
-from app.blockchain.ethereum import get_usdc_balance, get_eth_balance, send_usdc, deploy_asset_contract, create_purchase_transaction
 from app.utils.helpers import get_solana_keypair_from_env
 
 logger = logging.getLogger(__name__)
