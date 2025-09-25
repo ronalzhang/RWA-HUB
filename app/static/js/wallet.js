@@ -594,13 +594,6 @@ const walletState = {
      */
     updateUI() {
         try {
-            // 添加方法调用的调试信息
-            console.log('[updateUI] 方法被调用，当前状态:', {
-                connected: this.connected,
-                address: this.address ? this.address.substring(0, 10) + '...' : null,
-                condition: !!(this.connected && this.address)
-            });
-
             // 减少日志输出频率
             if (!this._lastUIUpdate || (Date.now() - this._lastUIUpdate > 2000)) {
                 debugLog('更新钱包UI, 连接状态:', this.connected);
@@ -620,13 +613,7 @@ const walletState = {
             }
             
         if (this.connected && this.address) {
-                // 钱包已连接状态 - 添加详细调试信息
-                console.log('[updateUI] 钱包已连接状态检查:', {
-                    connected: this.connected,
-                    address: this.address ? this.address.substring(0, 10) + '...' : 'null',
-                    balance: this.balance,
-                    walletType: this.walletType
-                });
+                // 钱包已连接状态
                 if (walletBtnText) {
                     // 显示格式化的地址而不是余额
                     const formattedAddress = this.formatAddress(this.address);
@@ -646,30 +633,19 @@ const walletState = {
                 
                 // 更新下拉菜单中的余额显示
                 const dropdownBalanceElement = document.getElementById('walletBalanceInDropdown');
-                console.log('[updateUI] 检查余额显示元素:', {
-                    elementFound: !!dropdownBalanceElement,
-                    balanceValue: this.balance,
-                    formattedBalance: this.balance !== null ? parseFloat(this.balance).toFixed(2) : '0.00'
-                });
                 if (dropdownBalanceElement) {
                     const formattedBalance = this.balance !== null ? parseFloat(this.balance).toFixed(2) : '0.00';
                     dropdownBalanceElement.textContent = formattedBalance;
-                    console.log('[updateUI] ✅ 已设置下拉菜单余额显示:', formattedBalance);
                 } else {
-                    console.error('[updateUI] ❌ 找不到余额显示元素 walletBalanceInDropdown');
+                    console.error('❌ 找不到余额显示元素 walletBalanceInDropdown');
                 }
 
                 // 显示用户资产部分
                 const userAssetsSection = document.getElementById('userAssetsSection');
-                console.log('[updateUI] 检查资产显示元素:', {
-                    elementFound: !!userAssetsSection,
-                    assetsCount: this.assets ? this.assets.length : 0
-                });
                 if (userAssetsSection) {
                     userAssetsSection.style.display = 'block';
-                    console.log('[updateUI] ✅ 已显示用户资产部分');
                 } else {
-                    console.error('[updateUI] ❌ 找不到用户资产部分元素 userAssetsSection');
+                    console.error('❌ 找不到用户资产部分元素 userAssetsSection');
                 }
                 
                 // 根据管理员状态更新管理员入口显示
@@ -681,12 +657,7 @@ const walletState = {
                 // 确保余额也更新
                 this.updateBalanceDisplay();
             } else {
-                // 钱包未连接状态 - 添加详细调试信息
-                console.log('[updateUI] 钱包未连接状态:', {
-                    connected: this.connected,
-                    address: this.address,
-                    reason: !this.connected ? '未连接' : '地址为空'
-                });
+                // 钱包未连接状态
                 if (walletBtnText) {
                     walletBtnText.textContent = window._ ? window._('Connect Wallet') : 'Connect Wallet';
                     debugLog('已设置按钮文本为连接钱包');
@@ -3591,21 +3562,11 @@ checkIfReturningFromWalletApp(walletType) {
             this.connected = true;
             this.provider = provider;
 
-            // 添加状态设置后的调试信息
-            console.log(`[afterSuccessfulConnection] 钱包状态已更新:`, {
-                address: this.address,
-                walletType: this.walletType,
-                connected: this.connected,
-                provider: !!this.provider
-            });
-            
             // 保存状态到本地存储
             localStorage.setItem('walletType', walletType);
             localStorage.setItem('walletAddress', address);
             localStorage.setItem('lastWalletType', walletType);
             localStorage.setItem('lastWalletAddress', address);
-            
-            console.log(`[afterSuccessfulConnection] 钱包状态已保存到localStorage`);
             
             // 自动注册/更新用户信息到数据库
             try {
