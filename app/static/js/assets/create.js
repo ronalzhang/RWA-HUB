@@ -135,7 +135,7 @@ function initializeCreatePage() {
     console.log('初始化完成');
 }
 
-// 检查钱包连接状态 - 简化版本
+// 检查钱包连接状态 - 与资产详情页保持一致的逻辑
 function initializeWalletCheck() {
     console.log('=== 钱包状态检查 ===');
     const walletCheck = document.getElementById('walletCheck');
@@ -146,21 +146,38 @@ function initializeWalletCheck() {
         return;
     }
 
-    // 直接检查全局钱包状态
-    const isConnected = window.walletState && window.walletState.connected && window.walletState.address;
+    // 使用与资产详情页相同的钱包连接检查逻辑
+    function checkWalletConnection() {
+        // 优先检查window.walletState（支持双重标志）
+        if (window.walletState && (window.walletState.connected || window.walletState.isConnected)) {
+            return { connected: true, address: window.walletState.address };
+        }
+
+        // 备选：从localStorage检查
+        const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+        if (storedAddress && storedAddress.length > 10) {
+            return { connected: true, address: storedAddress };
+        }
+
+        return { connected: false, address: null };
+    }
+
+    const walletStatus = checkWalletConnection();
 
     console.log('钱包连接状态:', {
         hasWalletState: !!window.walletState,
-        connected: window.walletState?.connected,
-        address: window.walletState?.address,
-        finalResult: isConnected
+        walletState_connected: window.walletState?.connected,
+        walletState_isConnected: window.walletState?.isConnected,
+        localStorage_walletAddress: !!localStorage.getItem('walletAddress'),
+        localStorage_eth_address: !!localStorage.getItem('eth_address'),
+        finalResult: walletStatus
     });
 
-    if (isConnected) {
+    if (walletStatus.connected && walletStatus.address) {
         console.log('✅ 钱包已连接，显示表单');
         walletCheck.style.display = 'none';
         formContent.style.display = 'block';
-        setTimeout(() => checkAdmin(window.walletState.address), 100);
+        setTimeout(() => checkAdmin(walletStatus.address), 100);
     } else {
         console.log('❌ 钱包未连接，显示提示');
         walletCheck.style.display = 'block';
