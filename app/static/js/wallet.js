@@ -575,7 +575,7 @@ const walletState = {
     updateUI() {
         try {
             // 减少日志输出频率
-            if (!this._lastUIUpdate || (Date.now() - this._lastUIUpdate > 2000)) {
+            if (!this._lastUIUpdate || (Date.now() - this._lastUIUpdate > 5000)) {
                 debugLog('更新钱包UI, 连接状态:', this.connected);
                 this._lastUIUpdate = Date.now();
             }
@@ -598,7 +598,7 @@ const walletState = {
                     // 显示格式化的地址而不是余额
                     const formattedAddress = this.formatAddress(this.address);
                     walletBtnText.textContent = formattedAddress;
-                    debugLog('已设置按钮文本为地址:', formattedAddress);
+                    // 按钮文本已设置为地址
                 }
                 
                 // 确保下拉菜单中的钱包地址显示正确
@@ -606,7 +606,7 @@ const walletState = {
                     const formattedAddress = this.formatAddress(this.address);
                     walletAddressDisplay.textContent = formattedAddress;
                     walletAddressDisplay.title = this.address; // 设置完整地址为悬停提示
-                    debugLog('已设置地址显示:', formattedAddress);
+                    // 地址显示已设置
                 } else {
                     debugWarn('找不到钱包地址显示元素 walletAddressDisplay');
                 }
@@ -630,7 +630,7 @@ const walletState = {
                 
                 // 根据管理员状态更新管理员入口显示
                 if (adminEntry) {
-                    debugLog('更新管理员入口显示, 当前管理员状态:', this.isAdmin);
+                    // 更新管理员入口显示状态
                     adminEntry.style.display = this.isAdmin ? 'block' : 'none';
                 }
                 
@@ -640,7 +640,7 @@ const walletState = {
                 // 钱包未连接状态
                 if (walletBtnText) {
                     walletBtnText.textContent = window._ ? window._('Connect Wallet') : 'Connect Wallet';
-                    debugLog('已设置按钮文本为连接钱包');
+                    // 按钮文本已设置为连接钱包
                 }
                 
                 // 隐藏用户资产部分
@@ -677,7 +677,7 @@ const walletState = {
             // 减少重复日志输出频率
             const now = Date.now();
             if (!this._lastStateChangeLog || (now - this._lastStateChangeLog > 5000)) {
-                debugLog('[triggerWalletStateChanged] 详情页按钮状态已更新');
+                // 详情页按钮状态已更新
                 this._lastStateChangeLog = now;
             }
             
@@ -1028,11 +1028,11 @@ const walletState = {
                 return; // 跳过不必要的管理员检查
             }
             
-            console.log('更新管理员入口显示状态，当前状态:', this.isAdmin);
+            // 更新管理员入口显示状态
             const adminEntry = document.getElementById('adminEntry');
             if (adminEntry) {
                 adminEntry.style.display = this.isAdmin ? 'block' : 'none';
-                console.log('管理员入口显示状态已更新:', this.isAdmin ? '显示' : '隐藏');
+                // 管理员入口显示状态已更新
                 
                 // 更新管理员链接
                 if (this.isAdmin && typeof window.updateAdminNavLink === 'function') {
@@ -1216,7 +1216,7 @@ const walletState = {
             if (dividendBtn) {
                 dividendBtn.href = `/assets/${tokenSymbol}/dividend?eth_address=${this.address}`;
                 dividendBtn.style.display = 'inline-flex';
-                console.log('更新并显示现有分红按钮');
+                // 分红按钮已更新并显示
             } else {
                 // 查找按钮容器
                 const buttonContainer = document.querySelector('.d-flex.align-items-center.gap-2');
@@ -1240,7 +1240,7 @@ const walletState = {
             if (dividendBtnMobile) {
                 dividendBtnMobile.href = `/assets/${tokenSymbol}/dividend?eth_address=${this.address}`;
                 dividendBtnMobile.style.display = 'block';
-                console.log('更新并显示移动端分红按钮');
+                // 移动端分红按钮已更新并显示
             } else {
                 // 查找移动端按钮容器
                 const mobileButtonContainer = document.querySelector('.d-flex.gap-2');
@@ -1264,7 +1264,7 @@ const walletState = {
             if (dividendBtnMedium) {
                 dividendBtnMedium.href = `/assets/${tokenSymbol}/dividend?eth_address=${this.address}`;
                 dividendBtnMedium.style.display = 'block';
-                console.log('更新并显示中屏分红按钮');
+                // 中屏分红按钮已更新并显示
             } else {
                 // 查找中屏按钮容器
                 const mediumButtonContainer = document.querySelector('.d-flex.gap-2');
@@ -1606,7 +1606,6 @@ const walletState = {
                 Math.abs(this._lastDisplayedBalance - displayBalance) > 0.01 ||
                 (Date.now() - this._lastBalanceDisplayUpdate > 10000)) {
                 
-                debugLog('更新余额显示, 余额:', displayBalance);
                 this._lastBalanceDisplayUpdate = Date.now();
                 this._lastDisplayedBalance = displayBalance;
             }
@@ -1616,9 +1615,7 @@ const walletState = {
             if (walletBtnText && this.connected && this.address) {
                 const formattedAddress = this.formatAddress(this.address);
                 walletBtnText.textContent = formattedAddress;
-                if (DEBUG_MODE) {
-                    debugLog('更新钱包按钮文本为地址:', formattedAddress);
-                }
+                // 钱包按钮文本已更新为地址
             }
             
             // 更新下拉菜单中的余额显示
@@ -1626,9 +1623,7 @@ const walletState = {
             if (dropdownBalanceElement) {
                 const formattedBalance = displayBalance !== null ? parseFloat(displayBalance).toFixed(2) : '0.00';
                 dropdownBalanceElement.textContent = formattedBalance;
-                if (DEBUG_MODE) {
-                    debugLog('更新下拉菜单余额显示:', formattedBalance);
-                }
+                // 下拉菜单余额显示已更新
             }
             
             // 更新分佣余额显示
@@ -1638,9 +1633,7 @@ const walletState = {
                 commissionElements.forEach(element => {
                     element.textContent = formattedCommission;
                 });
-                if (DEBUG_MODE) {
-                    debugLog('更新分佣余额显示:', formattedCommission);
-                }
+                // 分佣余额显示已更新
             }
             
             // 更新Commission显示区域的完整文本
@@ -1659,9 +1652,7 @@ const walletState = {
                 const formattedAddress = this.formatAddress(this.address);
                 walletAddressDisplay.textContent = formattedAddress;
                 walletAddressDisplay.title = this.address;
-                if (DEBUG_MODE) {
-                    debugLog('更新钱包地址显示:', formattedAddress, '(完整地址:', this.address, ')');
-                }
+                // 钱包地址显示已更新
             }
             
         } catch (error) {
@@ -1689,7 +1680,7 @@ const walletState = {
         }
 
         const assets = this.assets || [];
-        console.log(`[updateAssetsUI] 处理 ${assets.length} 个资产`);
+        // 处理资产列表
 
         if (assets.length === 0) {
             assetsContainer.innerHTML = '<li class="text-muted text-center py-2" style="font-size:12px;">暂无资产</li>';
@@ -1715,7 +1706,7 @@ const walletState = {
             assetsContainer.innerHTML = assetsHTML;
             if (assetsSection) assetsSection.style.display = 'block';
 
-            console.log('[updateAssetsUI] 钱包资产列表更新完成');
+            // 钱包资产列表已更新
         }
     },
 
@@ -3074,7 +3065,7 @@ checkIfReturningFromWalletApp(walletType) {
                 // 减少重复的分佣日志
                 if (!this._lastCommissionLog || Math.abs(this.commissionBalance - commission) > 0.01 || 
                     (Date.now() - this._lastCommissionLog > 30000)) {
-                    debugLog(`[getCommissionBalance] 获取到分佣余额: ${commission} USDC`);
+                    // 分佣余额已获取
                     this._lastCommissionLog = Date.now();
                 }
                 
@@ -3194,10 +3185,10 @@ checkIfReturningFromWalletApp(walletType) {
                 return;
             }
 
-            console.log('[refreshAllBalances] 开始刷新所有余额信息');
+            // 刷新所有余额信息
 
             // 并行获取余额信息
-            console.log('[refreshAllBalances] 准备调用getUSDCBalance和getCommissionBalance...');
+            // 并行获取余额信息
             const promises = [
                 this.getUSDCBalance(),
                 this.getCommissionBalance()
@@ -3205,13 +3196,13 @@ checkIfReturningFromWalletApp(walletType) {
 
             const [usdcBalance, commissionBalance] = await Promise.all(promises);
 
-            console.log(`[refreshAllBalances] API返回结果 - USDC: ${usdcBalance}, Commission: ${commissionBalance}`);
+            // API返回的余额数据已处理
 
             // 更新实例属性
             this.balance = usdcBalance;
             this.commissionBalance = commissionBalance;
 
-            console.log(`[refreshAllBalances] 实例属性已更新 - this.balance: ${this.balance}, this.commissionBalance: ${this.commissionBalance}`);
+            // 实例属性已更新
 
             // 更新UI显示
             this.updateBalanceDisplay();
@@ -3238,7 +3229,7 @@ checkIfReturningFromWalletApp(walletType) {
      */
     async afterSuccessfulConnection(address, walletType, provider) {
         try {
-            console.log(`[afterSuccessfulConnection] 处理${walletType}钱包连接成功，地址: ${address}`);
+            // 处理钱包连接成功
             
             // 更新钱包状态
             this.address = address;
@@ -3262,10 +3253,9 @@ checkIfReturningFromWalletApp(walletType) {
             
             // 获取余额和分佣余额
             try {
-                console.log('[afterSuccessfulConnection] 开始调用refreshAllBalances...');
+                // 开始获取余额信息
                 const balanceResult = await this.refreshAllBalances();
-                console.log('[afterSuccessfulConnection] refreshAllBalances结果:', balanceResult);
-                console.log('[afterSuccessfulConnection] 当前this.balance:', this.balance);
+                // 余额信息已获取
             } catch (balanceError) {
                 console.error('[afterSuccessfulConnection] 获取余额失败:', balanceError);
                 // 余额获取失败不应该影响连接状态
@@ -3870,7 +3860,7 @@ async function fetchWithMultipleUrls(urls) {
  */
 function updateAssetInfoDisplay(data) {
     // 更新资产详情页面上的资产信息显示
-    console.log("正在更新资产信息显示:", data);
+    // 更新资产信息显示
     
     // 找到并更新各个信息元素
     const remainingSupplyElements = document.querySelectorAll('.remaining-supply, [data-remaining-supply]');
