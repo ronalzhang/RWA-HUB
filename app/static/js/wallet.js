@@ -3300,6 +3300,12 @@ checkIfReturningFromWalletApp(walletType) {
 
             debugLog(`[refreshAllBalances] 余额刷新完成 - USDC: ${usdcBalance}, Commission: ${commissionBalance}`);
 
+            // 更新实例属性
+            this.balance = usdcBalance;
+            this.commissionBalance = commissionBalance;
+
+            console.log(`[refreshAllBalances] 实例属性已更新 - this.balance: ${this.balance}, this.commissionBalance: ${this.commissionBalance}`);
+
             // 触发余额更新事件
             this.triggerBalanceUpdatedEvent();
 
