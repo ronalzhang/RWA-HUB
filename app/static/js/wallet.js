@@ -3204,12 +3204,14 @@ checkIfReturningFromWalletApp(walletType) {
     async refreshAllBalances(force = false) {
         try {
             if (!this.connected || !this.address) {
+                console.log('[refreshAllBalances] 钱包未连接，跳过余额获取');
                 return;
             }
 
-            debugLog('[refreshAllBalances] 开始刷新所有余额信息');
+            console.log('[refreshAllBalances] 开始刷新所有余额信息');
 
             // 并行获取余额信息
+            console.log('[refreshAllBalances] 准备调用getUSDCBalance和getCommissionBalance...');
             const promises = [
                 this.getUSDCBalance(),
                 this.getCommissionBalance()
@@ -3217,7 +3219,7 @@ checkIfReturningFromWalletApp(walletType) {
 
             const [usdcBalance, commissionBalance] = await Promise.all(promises);
 
-            debugLog(`[refreshAllBalances] 余额刷新完成 - USDC: ${usdcBalance}, Commission: ${commissionBalance}`);
+            console.log(`[refreshAllBalances] API返回结果 - USDC: ${usdcBalance}, Commission: ${commissionBalance}`);
 
             // 更新实例属性
             this.balance = usdcBalance;
@@ -3274,9 +3276,12 @@ checkIfReturningFromWalletApp(walletType) {
             
             // 获取余额和分佣余额
             try {
-                await this.refreshAllBalances();
+                console.log('[afterSuccessfulConnection] 开始调用refreshAllBalances...');
+                const balanceResult = await this.refreshAllBalances();
+                console.log('[afterSuccessfulConnection] refreshAllBalances结果:', balanceResult);
+                console.log('[afterSuccessfulConnection] 当前this.balance:', this.balance);
             } catch (balanceError) {
-                console.warn('[afterSuccessfulConnection] 获取余额失败:', balanceError);
+                console.error('[afterSuccessfulConnection] 获取余额失败:', balanceError);
                 // 余额获取失败不应该影响连接状态
             }
             
