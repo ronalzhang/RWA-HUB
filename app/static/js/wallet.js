@@ -1668,14 +1668,29 @@ const walletState = {
      * 更新钱包下拉菜单中的资产列表
      */
     updateAssetsUI() {
-        console.log('[updateAssetsUI] 更新资产列表UI');
+        // 更新资产列表UI
+
+        // 确保DOM已加载
+        if (document.readyState === 'loading') {
+            // 如果DOM还在加载，延迟执行
+            setTimeout(() => this.updateAssetsUI(), 100);
+            return;
+        }
 
         // 钱包下拉菜单中的资产容器
         const assetsContainer = document.getElementById('walletAssetsList');
         const assetsSection = document.getElementById('userAssetsSection');
 
         if (!assetsContainer) {
-            console.warn('[updateAssetsUI] 未找到钱包资产容器 walletAssetsList');
+            debugWarn('未找到钱包资产容器 walletAssetsList');
+            // 延迟重试一次
+            setTimeout(() => {
+                const retryContainer = document.getElementById('walletAssetsList');
+                if (retryContainer) {
+                    console.log('延迟重试找到了资产容器，重新执行updateAssetsUI');
+                    this.updateAssetsUI();
+                }
+            }, 500);
             return;
         }
 
@@ -1998,8 +2013,6 @@ const walletState = {
             }
             
             const data = await response.json();
-            console.log(`[getUserAssets] 获取到 ${data.length || 0} 个资产`);
-
             // 缓存结果并更新assets属性
             this._lastAssetsResult = data;
             this.assets = data;
