@@ -3103,23 +3103,20 @@ checkIfReturningFromWalletApp(walletType) {
             // 我们只支持Solana网络
             const network = 'solana';
 
-            debugLog(`[getUSDCBalance] 获取Solana网络USDC余额: ${address}`);
-            
-            // 检查缓存，避免频繁请求
-            const cacheKey = `usdc_balance_solana_${address}`;
-            const cached = this._getBalanceCache(cacheKey);
+            console.log(`[getUSDCBalance] 获取Solana网络USDC余额: ${address}`);
+
+            // 临时禁用缓存，直接调用API
+            // const cacheKey = `usdc_balance_solana_${address}`;
+            // const cached = this._getBalanceCache(cacheKey);
 
             // 清除旧的以太坊缓存（历史清理）
             localStorage.removeItem(`usdc_balance_ethereum_${address}`);
-            if (cached && (Date.now() - cached.timestamp < 7200000)) { // 2小时缓存
-                debugLog(`[getUSDCBalance] 使用缓存的USDC余额: ${cached.balance}`);
-                return cached.balance;
-            }
 
-            debugLog(`[getUSDCBalance] 开始获取 ${address} 的Solana USDC余额`);
+            console.log(`[getUSDCBalance] 开始获取 ${address} 的Solana USDC余额（跳过缓存）`);
 
             // 调用Solana USDC余额API
             const apiUrl = `/api/service/wallet/usdc_balance?address=${address}&network=solana&_=${Date.now()}`;
+            console.log(`[getUSDCBalance] 调用API: ${apiUrl}`);
             const response = await fetch(apiUrl, {
                 method: 'GET',
                 headers: {
@@ -3134,38 +3131,23 @@ checkIfReturningFromWalletApp(walletType) {
             }
 
             const data = await response.json();
-            
-            if (DEBUG_MODE) {
-                debugLog('[getUSDCBalance] API响应数据:', data);
-            }
+            console.log('[getUSDCBalance] API响应数据:', data);
 
             if (data.success) {
                 const balance = parseFloat(data.balance || 0);
-                
-                // 缓存余额
-                this._setBalanceCache(cacheKey, balance);
 
-                // 减少重复的余额日志
-                if (!this._lastUSDCLog || Math.abs(this.balance - balance) > 0.01 ||
-                    (Date.now() - this._lastUSDCLog > 30000)) {
-                    debugLog(`[getUSDCBalance] 获取到USDC余额: ${balance} USDC (${network})`);
-                    this._lastUSDCLog = Date.now();
-                }
+                console.log(`[getUSDCBalance] 解析后的余额: ${balance} USDC`);
 
                 // 只返回余额，不设置实例属性（由refreshAllBalances统一设置）
                 return balance;
             } else {
                 const errorMsg = data.error || '获取USDC余额失败';
-                debugError('[getUSDCBalance] 获取USDC余额失败:', errorMsg);
-                // 返回缓存的余额或0
-                return cached ? cached.balance : 0;
+                console.error('[getUSDCBalance] 获取USDC余额失败:', errorMsg);
+                return 0;
             }
         } catch (error) {
-            debugError('[getUSDCBalance] 获取USDC余额出错:', error);
-            // 尝试返回缓存的余额
-            const cacheKey = `usdc_balance_solana_${this.address}`;
-            const cached = this._getBalanceCache(cacheKey);
-            return cached ? cached.balance : 0;
+            console.error('[getUSDCBalance] 获取USDC余额出错:', error);
+            return 0;
         }
     },
 
