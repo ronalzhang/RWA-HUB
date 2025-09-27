@@ -1781,15 +1781,16 @@ const walletState = {
                 <div class="asset-item">
                     <div class="asset-info">
                         <h4>${asset.name}</h4>
-                        <p>符号: ${asset.symbol}</p>
-                        <p>数量: ${asset.quantity}</p>
+                        <p>符号: ${asset.token_symbol}</p>
+                        <p>数量: ${asset.holding_amount}</p>
+                        <p>价值: $${parseFloat(asset.total_value || 0).toFixed(2)}</p>
                     </div>
                 </div>
             `).join('');
-            
+
             assetsContainer.innerHTML = assetsHTML;
             if (assetsWrapper) assetsWrapper.style.display = 'block';
-            
+
             console.log('[updateAssetsUI] 资产列表更新完成');
         }
     },
@@ -2083,10 +2084,14 @@ const walletState = {
             
             const data = await response.json();
             console.log(`[getUserAssets] 获取到 ${data.length || 0} 个资产`);
-            
-            // 缓存结果
+
+            // 缓存结果并更新assets属性
             this._lastAssetsResult = data;
-            
+            this.assets = data;
+
+            // 更新资产UI
+            this.updateAssetsUI();
+
             return data;
         } catch (error) {
             console.error(`[getUserAssets] 获取资产失败:`, error);
