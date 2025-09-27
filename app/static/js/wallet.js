@@ -1697,9 +1697,14 @@ const walletState = {
         const assets = this.assets || [];
         // 处理资产列表
 
+        // 如果钱包已连接，确保资产区域可见
+        if (this.connected && assetsSection) {
+            assetsSection.style.display = 'block';
+        }
+
         if (assets.length === 0) {
             assetsContainer.innerHTML = '<li class="text-muted text-center py-2" style="font-size:12px;">暂无资产</li>';
-            if (assetsSection) assetsSection.style.display = 'none';
+            if (assetsSection && !this.connected) assetsSection.style.display = 'none';
         } else {
             // 生成资产HTML - 适用于钱包下拉菜单
             const assetsHTML = assets.map(asset => `
