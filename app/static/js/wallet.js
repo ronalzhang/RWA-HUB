@@ -74,7 +74,7 @@ const walletState = {
                 console.log('检测到移动设备，检查是否从钱包App返回');
                 
                 // 检查各种可能的钱包类型
-                const walletTypes = ['phantom', 'metamask', 'ethereum', 'solflare'];
+                const walletTypes = ['phantom', 'solflare'];
                 
                 for (const type of walletTypes) {
                     if (this.checkIfReturningFromWalletApp(type)) {
@@ -1305,14 +1305,8 @@ const walletState = {
             const address = this.address;
             debugLog(`[getWalletBalance] 开始获取 ${address} 的钱包余额`);
 
-            // 修复：根据钱包类型获取余额
-            let tokenSymbol = 'USDC'; // 默认获取USDC余额
-            
-            if (this.walletType === 'ethereum') {
-                tokenSymbol = 'USDC'; // 以太坊也获取USDC
-            } else if (this.walletType === 'phantom' || this.walletType === 'solana') {
-                tokenSymbol = 'USDC'; // Solana获取USDC
-            }
+            // 我们只支持Solana网络的USDC
+            const tokenSymbol = 'USDC';
 
             // 修复：使用正确的API路径
             const apiUrl = `/api/service/wallet/token_balance?address=${address}&token=${tokenSymbol}&_=${Date.now()}`;
@@ -2669,14 +2663,11 @@ checkIfReturningFromWalletApp(walletType) {
             }
             
             // 根据钱包类型执行不同的转账逻辑
-            if (this.walletType === 'phantom' || this.walletType === 'solana') {
-                // Phantom钱包转账
+            if (this.walletType === 'phantom' || this.walletType === 'solana' || !this.walletType) {
+                // 我们只支持Solana网络转账
                 return await this.transferSolanaToken(tokenSymbol, to, amount);
-            } else if (this.walletType === 'ethereum') {
-                // 以太坊钱包转账
-                return await this.transferEthereumToken(tokenSymbol, to, amount);
             } else {
-                throw new Error(`不支持的钱包类型: ${this.walletType}`);
+                throw new Error(`不支持的钱包类型: ${this.walletType}，我们只支持Solana网络钱包`);
             }
         } catch (error) {
             console.error('转账失败:', error);
@@ -3185,22 +3176,17 @@ checkIfReturningFromWalletApp(walletType) {
             }
 
             const address = this.address;
-            // 强制正确的网络判断，优先使用localStorage中的walletType
-            const storedWalletType = localStorage.getItem('walletType');
-            const actualWalletType = this.walletType || storedWalletType || 'phantom';
-            const network = (actualWalletType === 'phantom' || actualWalletType === 'solana') ? 'solana' : 'ethereum';
+            // 我们只支持Solana网络
+            const network = 'solana';
 
-            debugLog(`[getUSDCBalance] 钱包类型: ${actualWalletType}, 网络: ${network}`);
+            debugLog(`[getUSDCBalance] 获取Solana网络USDC余额: ${address}`);
             
             // 检查缓存，避免频繁请求
-            const cacheKey = `usdc_balance_${network}_${address}`;
+            const cacheKey = `usdc_balance_solana_${address}`;
             const cached = this._getBalanceCache(cacheKey);
 
-            // 清除错误网络的缓存（如果之前用错了网络）
-            if (network === 'solana') {
-                const wrongCacheKey = `usdc_balance_ethereum_${address}`;
-                localStorage.removeItem(wrongCacheKey);
-            }
+            // 清除旧的以太坊缓存（历史清理）
+            localStorage.removeItem(`usdc_balance_ethereum_${address}`);
             if (cached && (Date.now() - cached.timestamp < 7200000)) { // 2小时缓存
                 debugLog(`[getUSDCBalance] 使用缓存的USDC余额: ${cached.balance}`);
                 this.balance = cached.balance;
@@ -3208,16 +3194,16 @@ checkIfReturningFromWalletApp(walletType) {
                 return cached.balance;
             }
 
-            debugLog(`[getUSDCBalance] 开始获取 ${address} 的USDC余额 (${network})`);
+            debugLog(`[getUSDCBalance] 开始获取 ${address} 的Solana USDC余额`);
 
-            // 调用USDC余额API
-            const apiUrl = `/api/service/wallet/usdc_balance?address=${address}&network=${network}&_=${Date.now()}`;
+            // 调用Solana USDC余额API
+            const apiUrl = `/api/service/wallet/usdc_balance?address=${address}&network=solana&_=${Date.now()}`;
             const response = await fetch(apiUrl, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Wallet-Address': address,
-                    'X-Wallet-Type': this.walletType
+                    'X-Wallet-Type': 'phantom'
                 }
             });
 
@@ -3258,7 +3244,7 @@ checkIfReturningFromWalletApp(walletType) {
         } catch (error) {
             debugError('[getUSDCBalance] 获取USDC余额出错:', error);
             // 尝试返回缓存的余额
-            const cacheKey = `usdc_balance_${this.walletType === 'phantom' ? 'solana' : 'ethereum'}_${this.address}`;
+            const cacheKey = `usdc_balance_solana_${this.address}`;
             const cached = this._getBalanceCache(cacheKey);
             return cached ? cached.balance : 0;
         }
@@ -4066,69 +4052,14 @@ async function signAndConfirmTransaction(transactionData) {
   const walletType = localStorage.getItem('walletType') || '';
   
   try {
-    // 根据钱包类型处理签名
-    if (walletType.toLowerCase().includes('metamask') || window.ethereum) {
-      return await signEthereumTransaction(transactionData);
-    } else if (walletType.toLowerCase().includes('phantom') || window.solana) {
+    // 我们只支持Solana网络钱包
+    if (walletType.toLowerCase().includes('phantom') || window.solana) {
       return await signSolanaTransaction(transactionData);
     } else {
-      return Promise.reject(new Error('不支持的钱包类型'));
+      return Promise.reject(new Error('不支持的钱包类型，我们只支持Solana网络钱包'));
     }
   } catch (error) {
     console.error('签名失败:', error);
-    return Promise.reject(error);
-  }
-}
-
-/**
- * 签名以太坊交易
- * @param {Object} transactionData - 交易数据
- * @returns {Promise<Object>} - 返回签名结果
- */
-async function signEthereumTransaction(transactionData) {
-  if (!window.ethereum) {
-    return Promise.reject(new Error('未检测到以太坊钱包'));
-  }
-  
-  try {
-    // 获取当前账户
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-    const from = accounts[0];
-    
-    if (!from) {
-      return Promise.reject(new Error('无法获取钱包地址'));
-    }
-    
-    // 是否需要发送交易还是仅签名
-    if (transactionData.method === 'eth_signTypedData_v4' || transactionData.method === 'eth_signTypedData') {
-      // EIP-712签名
-      const signature = await window.ethereum.request({
-        method: transactionData.method || 'eth_signTypedData_v4',
-        params: [from, JSON.stringify(transactionData.data)]
-      });
-      
-      return { signature, wallet_address: from };
-    } else {
-      // 常规交易
-      const txParams = {
-        from,
-        to: transactionData.to,
-        value: transactionData.value || '0x0',
-        data: transactionData.data || '0x',
-        gas: transactionData.gas || undefined,
-        gasPrice: transactionData.gasPrice || undefined
-      };
-      
-      // 发送交易
-      const txHash = await window.ethereum.request({
-        method: 'eth_sendTransaction',
-        params: [txParams]
-      });
-      
-      return { signature: txHash, wallet_address: from };
-    }
-  } catch (error) {
-    console.error('以太坊签名失败:', error);
     return Promise.reject(error);
   }
 }
