@@ -965,39 +965,27 @@ class AssetService:
     def get_solana_usdc_balance(wallet_address):
         """
         获取Solana网络的USDC余额（服务器代理方式）
-        
+
         Args:
             wallet_address: Solana钱包地址
-            
+
         Returns:
             float: USDC余额
         """
         try:
-            import requests
-            
             logger.info(f"开始获取Solana钱包 {wallet_address} 的USDC余额")
-            
+
             # Solana USDC Token Mint地址
             USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-            
-            # 使用Solana RPC
-            RPC_URL = "https://api.mainnet-beta.solana.com"
-            
-            # 简化版本：直接返回模拟余额，避免网络请求
-            # 在生产环境中，这里应该实现真实的链上查询
-            
-            # 模拟余额获取
-            cached_balance = 0.0
-            
-            # 尝试从缓存获取余额
-            cache_key = f"usdc_balance_sol_{wallet_address}"
-            # 这里可以集成Redis缓存
-            
-            logger.info(f"Solana钱包 {wallet_address} 的USDC余额: {cached_balance}")
-            return cached_balance
-            
+
+            # 调用更可靠的get_token_balance方法
+            balance = AssetService.get_token_balance(wallet_address, USDC_MINT)
+
+            logger.info(f"钱包 {wallet_address} 的USDC余额: {balance}")
+            return balance
+
         except Exception as e:
-            logger.error(f"获取Solana USDC余额失败: {str(e)}", exc_info=True)
+            logger.error(f"获取Solana USDC余额出错: {str(e)}")
             return 0.0 
 
     @staticmethod

@@ -94,7 +94,7 @@ const walletState = {
                             if (type === 'phantom' || type === 'solana') {
                                 connected = await this.connectPhantom();
                             } else if (type === 'ethereum' || type === 'metamask') {
-                                connected = await this.connectEthereum();
+                                console.log('以太坊钱包已不再支持，跳过连接');
                             }
                             
                             if (connected) {
@@ -141,11 +141,8 @@ const walletState = {
                 
                 // 检查浏览器是否支持所需的钱包
                 let canReconnect = false;
-                
-                if (storedWalletType === 'ethereum' && window.ethereum) {
-                    canReconnect = true;
-                    console.log('检测到以太坊钱包可用，将尝试重连');
-                } else if (storedWalletType === 'phantom') {
+
+                if (storedWalletType === 'phantom') {
                     // 修改逻辑：给Phantom钱包更多时间初始化
                     if (window.solana && window.solana.isPhantom) {
                         canReconnect = true;
@@ -175,10 +172,10 @@ const walletState = {
                         console.log(`尝试静默重连到${storedWalletType}钱包...`);
                         let success = false;
                         
-                        if (storedWalletType === 'ethereum') {
-                            success = await this.connectEthereum(true); // 传入true表示重连操作
-                        } else if (storedWalletType === 'phantom' || storedWalletType === 'solana') {
+                        if (storedWalletType === 'phantom' || storedWalletType === 'solana') {
                             success = await this.connectPhantom(true); // 传入true表示重连操作
+                        } else {
+                            console.log('不支持的钱包类型:', storedWalletType);
                         }
                         
                         if (success) {
@@ -293,9 +290,7 @@ const walletState = {
                     // 如果浏览器支持该钱包类型，尝试静默重连
                     let canReconnect = false;
                     
-                    if (storedType === 'ethereum' && window.ethereum) {
-                        canReconnect = true;
-                    } else if ((storedType === 'phantom' || storedType === 'solana') && 
+                    if ((storedType === 'phantom' || storedType === 'solana') &&
                               window.solana && window.solana.isPhantom) {
                         canReconnect = true;
                     }
@@ -305,10 +300,10 @@ const walletState = {
                         setTimeout(async () => {
                             try {
                                 debugLog('尝试静默重连钱包...');
-                                if (storedType === 'ethereum') {
-                                    await this.connectEthereum(true);
-                                } else if (storedType === 'phantom' || storedType === 'solana') {
+                                if (storedType === 'phantom' || storedType === 'solana') {
                                     await this.connectPhantom(true);
+                                } else {
+                                    console.log('不支持的钱包类型:', storedType);
                                 }
                             } catch (err) {
                                 debugError('静默重连失败:', err);
@@ -462,21 +457,12 @@ const walletState = {
             let isConnected = false;
             
             // 根据钱包类型检查连接
-            if (this.walletType === 'ethereum') {
-                if (window.ethereum) {
-                    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                    isConnected = accounts && accounts.length > 0 && accounts[0].toLowerCase() === this.address.toLowerCase();
-                    
-                    if (isConnected && this.chainId !== window.ethereum.chainId) {
-                        // 更新chainId
-                        this.chainId = window.ethereum.chainId;
-                        console.log('更新以太坊链ID:', this.chainId);
-                    }
-                }
-            } else if (this.walletType === 'phantom' || this.walletType === 'solana') {
+            if (this.walletType === 'phantom' || this.walletType === 'solana') {
                 if (window.solana && window.solana.isPhantom) {
                     isConnected = window.solana.isConnected && window.solana.publicKey && window.solana.publicKey.toString() === this.address;
                 }
+            } else {
+                console.log('不支持的钱包类型:', this.walletType);
             }
             
             console.log('钱包连接状态检查结果:', isConnected ? '已连接' : '已断开');
@@ -521,10 +507,6 @@ const walletState = {
         sessionStorage.removeItem('returningFromWalletApp');
         
         // 移除可能存在的事件监听器
-        if (window.ethereum) {
-            window.ethereum.removeAllListeners?.();
-        }
-        
         if (window.solana) {
             window.solana.removeAllListeners?.();
         }
@@ -550,9 +532,7 @@ const walletState = {
         
         let success = false;
         try {
-            if (walletType === 'ethereum') {
-                success = await this.connectEthereum();
-            } else if (walletType === 'phantom' || walletType === 'solana') {
+            if (walletType === 'phantom' || walletType === 'solana') {
                 success = await this.connectPhantom();
             } else {
                 throw new Error(`不支持的钱包类型: ${walletType}`);
@@ -1896,13 +1876,6 @@ const walletState = {
                     class: 'phantom',
                     type: 'phantom',
                     onClick: () => this.connect('phantom')
-                },
-                {
-                    name: 'MetaMask',
-                    icon: '/static/images/wallets/MetaMask.png', // 使用正确的文件名大小写
-                    class: 'ethereum',
-                    type: 'ethereum',
-                    onClick: () => this.connect('ethereum')
                 }
             ];
             
@@ -2198,7 +2171,14 @@ const walletState = {
      * 连接到Coinbase钱包
      * @returns {Promise<boolean>} 连接是否成功
      */
+    /**
+     * 连接到Coinbase钱包 (已禁用)
+     * @returns {Promise<boolean>} 连接是否成功
+     */
     connectCoinbase: async function() {
+        console.log('Coinbase钱包连接已禁用，只支持Phantom钱包');
+        return false;
+    },
         try {
             console.log('尝试连接Coinbase钱包...');
             
@@ -2592,158 +2572,6 @@ checkIfReturningFromWalletApp(walletType) {
     }
 },
 
-/**
-     * 连接到以太坊钱包（MetaMask等）
-     * @param {boolean} isReconnect - 是否是重新连接
-     * @returns {Promise<boolean>} 连接是否成功
-     */
-    async connectEthereum(isReconnect = false) {
-        return this.connectWallet({
-            walletType: 'ethereum',
-            isReconnect: isReconnect,
-            
-            // 1. 检查钱包是否可用
-            checkWalletAvailability: async () => {
-                // 检查以太坊对象是否存在
-                if (!window.ethereum) {
-                    console.error('MetaMask或其他以太坊钱包未安装');
-                    if (!isReconnect) {
-                        showError('请安装MetaMask或其他以太坊钱包');
-                    }
-                    return false;
-                }
-                
-                return true;
-            },
-            
-            // 2. 连接到钱包
-            connectToWallet: async () => {
-                try {
-                    const provider = window.ethereum;
-                    
-                    // 创建Web3实例
-                    const web3 = new Web3(provider);
-                    
-                    // 连接前检查chainId，确保是主网或测试网
-                    try {
-                        const chainId = await web3.eth.getChainId();
-                        console.log('当前链ID:', chainId);
-                        this.chainId = chainId;
-                    } catch (chainError) {
-                        console.warn('无法获取链ID:', chainError);
-                    }
-                    
-                    // 请求用户账户授权
-                    console.log('请求账户授权...');
-                    const accounts = await provider.request({ method: 'eth_requestAccounts' });
-                    
-                    if (!accounts || accounts.length === 0) {
-                        console.error('用户拒绝连接或无法获取账户');
-                        if (!isReconnect) {
-                            showError('用户拒绝连接或无法获取账户');
-                        }
-                        return { success: false };
-                    }
-                    
-                    // 成功获取账户
-                    return {
-                        success: true,
-                        address: accounts[0],
-                        provider: provider
-                    };
-                } catch (error) {
-                    console.error('连接以太坊钱包时出错:', error);
-                    if (!isReconnect) {
-                        showError('连接以太坊钱包失败: ' + (error.message || '未知错误'));
-                    }
-                    return { success: false };
-                }
-            },
-            
-            // 3. 设置事件监听器
-            setupListeners: () => this.setupEthereumListeners()
-        });
-    },
-
-    /**
-     * 设置以太坊钱包的事件监听器
-     * 这是作为单独函数实现，避免重复代码
-     */
-    setupEthereumListeners() {
-        if (!window.ethereum) {
-            console.warn('无法设置以太坊事件监听器：window.ethereum不存在');
-            return;
-        }
-
-        try {
-            console.log('设置以太坊钱包事件监听器');
-            
-            // 移除现有监听器
-            if (typeof window.ethereum.removeAllListeners === 'function') {
-                try {
-                    window.ethereum.removeAllListeners('accountsChanged');
-                    window.ethereum.removeAllListeners('chainChanged');
-                    window.ethereum.removeAllListeners('disconnect');
-                    console.log('已移除旧的以太坊事件监听器');
-                } catch(e) {
-                    console.warn('移除以太坊事件监听器失败:', e);
-                }
-            }
-            
-            // 账号变更事件
-            window.ethereum.on('accountsChanged', (accounts) => {
-                console.log('MetaMask账户已更改:', accounts);
-                if (accounts.length === 0) {
-                    console.log('MetaMask已断开连接');
-                    this.disconnect(false);
-                } else {
-                    // 切换到新账户
-                    const newAddress = accounts[0]; 
-                    console.log('MetaMask已切换到新账户:', newAddress);
-                    this.address = newAddress;
-                    
-                    // 保存新地址到本地存储
-                    try {
-                        localStorage.setItem('walletType', 'ethereum');
-                        localStorage.setItem('walletAddress', newAddress);
-                        console.log('账户变更: 已保存新地址到本地存储', newAddress);
-                    } catch (error) {
-                        console.warn('账户变更: 保存地址到本地存储失败:', error);
-                    }
-                    
-                    this.getWalletBalance().then(() => {
-                        this.updateUI();
-                this.notifyStateChange({
-                    type: 'connect',
-                    address: this.address,
-                    walletType: this.walletType,
-                    balance: this.balance,
-                    nativeBalance: this.nativeBalance
-                });
-                    });
-                }
-            });
-            
-            // 链ID变更事件
-            window.ethereum.on('chainChanged', (chainId) => {
-                console.log('MetaMask链ID已更改:', chainId);
-                // 记录新的链ID
-                this.chainId = chainId;
-                // 刷新页面以确保UI与新链相匹配
-                window.location.reload();
-            });
-            
-            // 断开连接事件
-            window.ethereum.on('disconnect', (error) => {
-                console.log('MetaMask断开连接:', error);
-                this.disconnect(false);
-            });
-            
-            console.log('以太坊钱包事件监听器设置完成');
-        } catch (listenerError) {
-            console.warn('设置以太坊事件监听器失败:', listenerError);
-        }
-    },
 
     /**
      * 为Phantom钱包设置事件监听器
