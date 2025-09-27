@@ -975,15 +975,7 @@ def get_dividend_stats_api(asset_id):
             'asset_id': asset_id
         }), 200
 
-@api_bp.route('/assets/<string:asset_id>/dividend')
-def get_asset_dividend_api(asset_id):
-    """资产分红数据API的别名路由（兼容前端其他API路径）"""
-    return get_dividend_stats_api(asset_id)
 
-@api_bp.route('/dividend/total/<string:asset_id>')
-def get_dividend_total_api(asset_id):
-    """资产分红总额API的别名路由（兼容前端其他API路径）"""
-    return get_dividend_stats_api(asset_id)
 
 @api_bp.route('/assets/<string:token_symbol>/dividends/total')
 def get_asset_dividends_total(token_symbol):
@@ -1029,101 +1021,7 @@ def get_asset_dividends_total(token_symbol):
             'total_amount': 0
         }), 500
 
-@api_bp.route('/solana/execute_transfer_v2', methods=['POST'])
-def api_execute_transfer_v2():
-    """使用服务器作为中转执行Solana转账交易"""
-    try:
-        data = request.json
-        logger.info(f"API路由收到转账请求: {data}")
-        
-        # 验证必要参数
-        required_fields = ['from_address', 'to_address', 'amount', 'token_symbol']
-        
-        # 前端传来的参数名称可能有所不同，进行兼容处理
-        mapped_data = {
-            'from_address': data.get('from_address') or data.get('fromAddress'),
-            'to_address': data.get('to_address') or data.get('toAddress'),
-            'amount': data.get('amount'),
-            'token_symbol': data.get('token_symbol') or data.get('tokenSymbol'),
-            'purpose': data.get('purpose'),
-            'metadata': data.get('metadata')
-        }
-        
-        # 检查必填字段
-        missing_fields = []
-        for field in required_fields:
-            if not mapped_data.get(field):
-                missing_fields.append(field)
-        
-        if missing_fields:
-            logger.error(f"转账请求缺少必要参数: {missing_fields}")
-            return jsonify({
-                'success': False,
-                'message': f"缺少必要参数: {', '.join(missing_fields)}"
-            }), 400
-            
-        # 通知前端需要使用钱包来执行交易，而不是由服务器代替执行
-        return jsonify({
-            'success': False,
-            'message': "请使用钱包直接执行交易，服务器不代替执行转账操作",
-            'requireWallet': True
-        }), 200
-            
-    except Exception as e:
-        logger.error(f"API异常: {str(e)}")
-        return jsonify({
-            'success': False, 
-            'message': f"处理请求时发生异常: {str(e)}"
-        }), 500
 
-@api_bp.route('/solana/build_transfer', methods=['GET'])
-def api_build_transfer():
-    """构建Solana转账交易，返回序列化的交易数据"""
-    try:
-        # 获取查询参数
-        from_address = request.args.get('from')
-        to_address = request.args.get('to')
-        amount = request.args.get('amount')
-        token_mint = request.args.get('token_mint')
-        
-        logger.info(f"收到构建转账请求 - from: {from_address}, to: {to_address}, amount: {amount}, token: {token_mint}")
-        
-        # 验证参数完整性
-        if not all([from_address, to_address, amount, token_mint]):
-            missing_fields = []
-            if not from_address:
-                missing_fields.append('from')
-            if not to_address:
-                missing_fields.append('to')
-            if not amount:
-                missing_fields.append('amount')
-            if not token_mint:
-                missing_fields.append('token')
-                
-            logger.error(f"构建转账请求缺少必要参数: {', '.join(missing_fields)}")
-            return jsonify({
-                'success': False,
-                'error': f"缺少必要参数: {', '.join(missing_fields)}"
-            }), 400
-        
-        # 简化处理 - 直接返回简化版的交易参数
-        # 在实际应用中，这里会构建真实的Solana交易
-        return jsonify({
-            'success': True,
-            'transaction_data': {
-                'from': from_address,
-                'to': to_address,
-                'amount': amount,
-                'token_mint': token_mint
-            },
-            'message': 'Transaction parameters built successfully'
-        })
-    except Exception as e:
-        logger.exception(f"构建Solana转账交易失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': f"构建转账交易失败: {str(e)}"
-        }), 500
 
 @api_bp.route('/solana/relay', methods=['POST'])
 def solana_relay():
@@ -1489,58 +1387,6 @@ def get_share_config():
         current_app.logger.error(f"获取分享配置失败: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@api_bp.route('/assets/symbol/<string:token_symbol>/dividend_stats', methods=['GET'])
-def get_asset_dividend_stats_by_symbol(token_symbol):
-    """获取资产分红统计信息 - 通过token_symbol"""
-    try:
-        current_app.logger.info(f"请求资产分红统计: {token_symbol}")
-        from app.models.asset import Asset
-        from app.models.dividend import DividendRecord, Dividend
-        from sqlalchemy import func
-        
-        # 查找资产
-        asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-        if not asset:
-            current_app.logger.warning(f"找不到资产: {token_symbol}")
-            return jsonify({
-                'success': False,
-                'error': f'找不到资产: {token_symbol}',
-                'total_amount': 0
-            }), 404
-        
-        # 计算总分红金额
-        total_amount = 0
-        try:
-            # 优先从DividendRecord表计算
-            dividend_sum = db.session.query(func.sum(DividendRecord.amount)).filter_by(asset_id=asset.id).scalar()
-            if dividend_sum:
-                total_amount = float(dividend_sum)
-            else:
-                # 如果DividendRecord表没有数据，尝试从Dividend表计算
-                dividend_sum = db.session.query(func.sum(Dividend.amount)).filter_by(asset_id=asset.id).scalar()
-                if dividend_sum:
-                    total_amount = float(dividend_sum)
-        except Exception as e:
-            current_app.logger.warning(f"无法从数据库计算分红，使用默认值: {str(e)}")
-            # 如果分红表不存在或有问题，使用默认值
-            total_amount = 50000  # 默认分红金额
-        
-        current_app.logger.info(f"资产 {token_symbol} 的总分红金额: {total_amount}")
-        
-        return jsonify({
-            'success': True,
-            'total_amount': float(total_amount),
-            'asset_symbol': token_symbol,
-            'asset_name': asset.name
-        }), 200
-        
-    except Exception as e:
-        current_app.logger.error(f"获取资产分红统计失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'total_amount': 0
-        }), 500
 
 @api_bp.route('/debug/asset-stats', methods=['GET'])
 def debug_asset_stats():

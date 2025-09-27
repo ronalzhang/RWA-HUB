@@ -38,7 +38,7 @@
     <!-- AOS Animation -->
     <link href="{{ url_for('static', filename='vendor/aos.css') }}" rel="stylesheet">
     <!-- SweetAlert2 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/sweetalert2.min.css') }}" rel="stylesheet">
     
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     
@@ -1116,7 +1116,7 @@
     </script>
 
     <!-- SweetAlert2 JavaScript -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+    <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
     
     <!-- 钱包主脚本 -->
     <script src="{{ url_for('static', filename='js/wallet.js') }}?v=20241231-fix3&t=1735659600"></script>
@@ -1234,12 +1234,6 @@
     </script>
     
     {% block scripts %}
-    <!-- 加载核心JavaScript -->
-    {% if not js_loaded %}
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/dividend.js') }}"></script>
-    {% endif %}
     <!-- 页面特定脚本可以在此添加 -->
     {% endblock %}
 

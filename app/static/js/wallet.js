@@ -2138,7 +2138,7 @@ const walletState = {
                     await this.getWalletBalance();
                     await this.getUserAssets(this.address);
                     await this.checkIsAdmin();
-                    await this.updateUI();
+                    this.updateUI();
                     this.updateDisplay();
                     
                     this.notifyStateChange({
@@ -2223,7 +2223,7 @@ const walletState = {
                     await this.getWalletBalance();
                     await this.getUserAssets(this.address);
                     await this.checkIsAdmin();
-                    await this.updateUI();
+                    this.updateUI();
                     this.updateDisplay();
                     
                     this.notifyStateChange({
@@ -2289,7 +2289,7 @@ const walletState = {
                     await this.getWalletBalance();
                     await this.getUserAssets(this.address);
                     await this.checkIsAdmin();
-                    await this.updateUI();
+                    this.updateUI();
                     this.updateDisplay();
                     
                     this.notifyStateChange({
@@ -2539,7 +2539,7 @@ checkIfReturningFromWalletApp(walletType) {
                     await this.checkIsAdmin();
                     
                     // 更新UI
-                    await this.updateUI();
+                    this.updateUI();
                     
                     // 触发状态变更事件
                     this.notifyStateChange();
@@ -2597,7 +2597,13 @@ checkIfReturningFromWalletApp(walletType) {
                 tempInput.value = this.address;
                 document.body.appendChild(tempInput);
                 tempInput.select();
-                document.execCommand('copy');
+                // 使用现代剪贴板API或回退到execCommand
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(this.address);
+                } else {
+                    // 回退方案：使用已弃用但兼容的execCommand
+                    document.execCommand('copy');
+                }
                 document.body.removeChild(tempInput);
                 
                 // 显示成功提示
