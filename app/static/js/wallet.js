@@ -314,7 +314,7 @@ const walletState = {
                             // 更新余额和资产信息（有限频率）
                             if (!this._lastBalanceCheck || (now - this._lastBalanceCheck > 30000)) {
                                 this._lastBalanceCheck = now;
-                                this.getWalletBalance().catch(err => debugError('获取余额失败:', err));
+                                this.getUSDCBalance().catch(err => debugError('获取余额失败:', err));
                             }
                             
                             if (!this._lastAssetsCheck || (now - this._lastAssetsCheck > 60000)) {
@@ -473,7 +473,7 @@ const walletState = {
             } else {
                 console.log('钱包仍然连接，刷新数据');
                 // 更新余额和资产
-                this.getWalletBalance().catch(err => console.error('获取余额失败:', err));
+                this.getUSDCBalance().catch(err => console.error('获取余额失败:', err));
                 this.getUserAssets(this.address).catch(err => console.error('获取资产失败:', err));
             }
         } catch (error) {
@@ -1290,83 +1290,7 @@ const walletState = {
         }
     },
     
-    /**
-     * 更新钱包余额
-     * 从区块链获取最新的钱包余额
-     * @returns {Promise<number|null>} 更新后的余额，失败时返回null
-     */
-    async getWalletBalance() {
-        try {
-            if (!this.connected || !this.address) {
-                debugWarn('[getWalletBalance] 钱包未连接，无法获取余额');
-                return 0;
-            }
-
-            const address = this.address;
-            debugLog(`[getWalletBalance] 开始获取 ${address} 的钱包余额`);
-
-            // 我们只支持Solana网络的USDC
-            const tokenSymbol = 'USDC';
-
-            // 修复：使用正确的API路径
-            const apiUrl = `/api/service/wallet/token_balance?address=${address}&token=${tokenSymbol}&_=${Date.now()}`;
-            const response = await fetch(apiUrl, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Wallet-Address': address,
-                    'X-Wallet-Type': this.walletType
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`API响应错误: ${response.status} ${response.statusText}`);
-            }
-
-                        const data = await response.json();
-            
-            // 减少重复的API响应日志 - 只在debug模式或有错误时显示详细信息
-            if (DEBUG_MODE || !data.success) {
-                debugLog('[getWalletBalance] API响应数据:', data);
-            }
-
-            if (data.success) {
-                const balance = parseFloat(data.balance || 0);
-                
-                // 减少重复的余额日志
-                if (!this._lastBalanceLog || Math.abs(this.balance - balance) > 0.01 || 
-                    (Date.now() - this._lastBalanceLog > 30000)) {
-                    debugLog(`[getWalletBalance] 通过API获取到钱包余额: ${balance} ${data.symbol || tokenSymbol}`);
-                    this._lastBalanceLog = Date.now();
-                }
-                
-                // 更新余额
-                this.balance = balance;
-                this.updateBalanceDisplay(balance);
-                
-                // 触发余额更新事件
-                this.triggerBalanceUpdatedEvent();
-                
-                return balance;
-            } else {
-                const errorMsg = data.error || '获取余额失败';
-                debugError('[getWalletBalance] 获取余额失败:', errorMsg);
-                
-                // 在失败时尝试后备方案，但不记录过多日志
-                return await this.getBalanceWithFallback(address, tokenSymbol);
-            }
-        } catch (error) {
-            debugError('[getWalletBalance] 获取钱包余额出错:', error);
-            
-            // 尝试后备方案
-            try {
-                return await this.getBalanceWithFallback(this.address, 'USDC');
-            } catch (fallbackError) {
-                debugError('[getWalletBalance] 后备方案也失败:', fallbackError);
-                    return 0;
-                }
-        }
-    },
+    // 删除重复的getWalletBalance方法，统一使用getUSDCBalance
     
     /**
      * 优化的Solana库加载检查
@@ -2134,7 +2058,7 @@ const walletState = {
                 
                 // 获取余额和资产
                 try {
-                    await this.getWalletBalance();
+                    await this.getUSDCBalance();
                     await this.getUserAssets(this.address);
                     await this.checkIsAdmin();
                     this.updateUI();
@@ -2219,7 +2143,7 @@ const walletState = {
                 
                 // 获取余额和资产
                 try {
-                    await this.getWalletBalance();
+                    await this.getUSDCBalance();
                     await this.getUserAssets(this.address);
                     await this.checkIsAdmin();
                     this.updateUI();
@@ -2285,7 +2209,7 @@ const walletState = {
                 
                 // 获取余额和资产
                 try {
-                    await this.getWalletBalance();
+                    await this.getUSDCBalance();
                     await this.getUserAssets(this.address);
                     await this.checkIsAdmin();
                     this.updateUI();
@@ -2531,7 +2455,7 @@ checkIfReturningFromWalletApp(walletType) {
                     localStorage.setItem('walletAddress', this.address);
                     
                     // 更新余额和资产
-                    await this.getWalletBalance();
+                    await this.getUSDCBalance();
                     await this.getUserAssets(this.address);
                     
                     // 检查是否为管理员
@@ -2960,7 +2884,7 @@ checkIfReturningFromWalletApp(walletType) {
             }
             
             // 尝试获取余额
-            const balance = await this.getWalletBalance();
+            const balance = await this.getUSDCBalance();
             
             return {
                 success: true,
@@ -3189,8 +3113,6 @@ checkIfReturningFromWalletApp(walletType) {
             localStorage.removeItem(`usdc_balance_ethereum_${address}`);
             if (cached && (Date.now() - cached.timestamp < 7200000)) { // 2小时缓存
                 debugLog(`[getUSDCBalance] 使用缓存的USDC余额: ${cached.balance}`);
-                this.balance = cached.balance;
-                this.updateBalanceDisplay();
                 return cached.balance;
             }
 
@@ -3222,18 +3144,15 @@ checkIfReturningFromWalletApp(walletType) {
                 
                 // 缓存余额
                 this._setBalanceCache(cacheKey, balance);
-                
+
                 // 减少重复的余额日志
-                if (!this._lastUSDCLog || Math.abs(this.balance - balance) > 0.01 || 
+                if (!this._lastUSDCLog || Math.abs(this.balance - balance) > 0.01 ||
                     (Date.now() - this._lastUSDCLog > 30000)) {
                     debugLog(`[getUSDCBalance] 获取到USDC余额: ${balance} USDC (${network})`);
                     this._lastUSDCLog = Date.now();
                 }
-                
-                // 更新余额
-                this.balance = balance;
-                this.updateBalanceDisplay();
-                
+
+                // 只返回余额，不设置实例属性（由refreshAllBalances统一设置）
                 return balance;
             } else {
                 const errorMsg = data.error || '获取USDC余额失败';
@@ -3305,6 +3224,9 @@ checkIfReturningFromWalletApp(walletType) {
             this.commissionBalance = commissionBalance;
 
             console.log(`[refreshAllBalances] 实例属性已更新 - this.balance: ${this.balance}, this.commissionBalance: ${this.commissionBalance}`);
+
+            // 更新UI显示
+            this.updateBalanceDisplay();
 
             // 触发余额更新事件
             this.triggerBalanceUpdatedEvent();
