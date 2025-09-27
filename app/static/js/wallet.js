@@ -1674,42 +1674,48 @@ const walletState = {
 
     /**
      * 更新资产列表UI
-     * 完全使用DOM API创建元素，彻底解决箭头问题
+     * 更新钱包下拉菜单中的资产列表
      */
     updateAssetsUI() {
         console.log('[updateAssetsUI] 更新资产列表UI');
-        
-        const assetsContainer = document.getElementById('userAssets');
-        const assetsWrapper = document.querySelector('.assets-wrapper');
-        
+
+        // 钱包下拉菜单中的资产容器
+        const assetsContainer = document.getElementById('walletAssetsList');
+        const assetsSection = document.getElementById('userAssetsSection');
+
         if (!assetsContainer) {
-            console.warn('[updateAssetsUI] 未找到资产容器');
+            console.warn('[updateAssetsUI] 未找到钱包资产容器 walletAssetsList');
             return;
         }
-        
+
         const assets = this.assets || [];
         console.log(`[updateAssetsUI] 处理 ${assets.length} 个资产`);
-        
+
         if (assets.length === 0) {
-            assetsContainer.innerHTML = '<div class="no-assets">暂无资产</div>';
-            if (assetsWrapper) assetsWrapper.style.display = 'none';
+            assetsContainer.innerHTML = '<li class="text-muted text-center py-2" style="font-size:12px;">暂无资产</li>';
+            if (assetsSection) assetsSection.style.display = 'none';
         } else {
-            // 生成资产HTML
+            // 生成资产HTML - 适用于钱包下拉菜单
             const assetsHTML = assets.map(asset => `
-                <div class="asset-item">
-                    <div class="asset-info">
-                        <h4>${asset.name}</h4>
-                        <p>符号: ${asset.token_symbol}</p>
-                        <p>数量: ${asset.holding_amount}</p>
-                        <p>价值: $${parseFloat(asset.total_value || 0).toFixed(2)}</p>
+                <li class="wallet-asset-item" style="padding:6px 0; border-bottom:1px solid #f0f0f0; font-size:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <strong style="color:#333;">${asset.name}</strong>
+                            <div style="color:#666; margin-top:2px;">
+                                ${asset.token_symbol} × ${asset.holding_amount}
+                            </div>
+                        </div>
+                        <div style="text-align:right; color:#28a745; font-weight:500;">
+                            $${parseFloat(asset.total_value || 0).toFixed(2)}
+                        </div>
                     </div>
-                </div>
+                </li>
             `).join('');
 
             assetsContainer.innerHTML = assetsHTML;
-            if (assetsWrapper) assetsWrapper.style.display = 'block';
+            if (assetsSection) assetsSection.style.display = 'block';
 
-            console.log('[updateAssetsUI] 资产列表更新完成');
+            console.log('[updateAssetsUI] 钱包资产列表更新完成');
         }
     },
 
@@ -3095,28 +3101,25 @@ checkIfReturningFromWalletApp(walletType) {
     async getUSDCBalance() {
         try {
             if (!this.connected || !this.address) {
-                debugWarn('[getUSDCBalance] 钱包未连接，无法获取USDC余额');
                 return 0;
             }
 
             const address = this.address;
-            // 我们只支持Solana网络
             const network = 'solana';
 
-            console.log(`[getUSDCBalance] 获取Solana网络USDC余额: ${address}`);
+            // 检查缓存，但缩短缓存时间到30分钟
+            const cacheKey = `usdc_balance_solana_${address}`;
+            const cached = this._getBalanceCache(cacheKey);
 
-            // 临时禁用缓存，直接调用API
-            // const cacheKey = `usdc_balance_solana_${address}`;
-            // const cached = this._getBalanceCache(cacheKey);
-
-            // 清除旧的以太坊缓存（历史清理）
+            // 清除旧的以太坊缓存
             localStorage.removeItem(`usdc_balance_ethereum_${address}`);
 
-            console.log(`[getUSDCBalance] 开始获取 ${address} 的Solana USDC余额（跳过缓存）`);
+            if (cached && (Date.now() - cached.timestamp < 1800000)) { // 30分钟缓存
+                return cached.balance;
+            }
 
             // 调用Solana USDC余额API
             const apiUrl = `/api/service/wallet/usdc_balance?address=${address}&network=solana&_=${Date.now()}`;
-            console.log(`[getUSDCBalance] 调用API: ${apiUrl}`);
             const response = await fetch(apiUrl, {
                 method: 'GET',
                 headers: {
@@ -3131,23 +3134,24 @@ checkIfReturningFromWalletApp(walletType) {
             }
 
             const data = await response.json();
-            console.log('[getUSDCBalance] API响应数据:', data);
 
             if (data.success) {
                 const balance = parseFloat(data.balance || 0);
 
-                console.log(`[getUSDCBalance] 解析后的余额: ${balance} USDC`);
+                // 缓存余额
+                this._setBalanceCache(cacheKey, balance);
 
-                // 只返回余额，不设置实例属性（由refreshAllBalances统一设置）
                 return balance;
             } else {
-                const errorMsg = data.error || '获取USDC余额失败';
-                console.error('[getUSDCBalance] 获取USDC余额失败:', errorMsg);
-                return 0;
+                console.error('[getUSDCBalance] 获取USDC余额失败:', data.error);
+                return cached ? cached.balance : 0;
             }
         } catch (error) {
             console.error('[getUSDCBalance] 获取USDC余额出错:', error);
-            return 0;
+            // 尝试返回缓存的余额
+            const cacheKey = `usdc_balance_solana_${this.address}`;
+            const cached = this._getBalanceCache(cacheKey);
+            return cached ? cached.balance : 0;
         }
     },
 
