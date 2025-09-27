@@ -3185,11 +3185,22 @@ checkIfReturningFromWalletApp(walletType) {
             }
 
             const address = this.address;
-            const network = this.walletType === 'phantom' ? 'solana' : 'ethereum';
+            // 强制正确的网络判断，优先使用localStorage中的walletType
+            const storedWalletType = localStorage.getItem('walletType');
+            const actualWalletType = this.walletType || storedWalletType || 'phantom';
+            const network = (actualWalletType === 'phantom' || actualWalletType === 'solana') ? 'solana' : 'ethereum';
+
+            debugLog(`[getUSDCBalance] 钱包类型: ${actualWalletType}, 网络: ${network}`);
             
             // 检查缓存，避免频繁请求
             const cacheKey = `usdc_balance_${network}_${address}`;
             const cached = this._getBalanceCache(cacheKey);
+
+            // 清除错误网络的缓存（如果之前用错了网络）
+            if (network === 'solana') {
+                const wrongCacheKey = `usdc_balance_ethereum_${address}`;
+                localStorage.removeItem(wrongCacheKey);
+            }
             if (cached && (Date.now() - cached.timestamp < 7200000)) { // 2小时缓存
                 debugLog(`[getUSDCBalance] 使用缓存的USDC余额: ${cached.balance}`);
                 this.balance = cached.balance;
